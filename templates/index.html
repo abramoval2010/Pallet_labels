@@ -1,0 +1,314 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система формирования палетных этикеток</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 50px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #1a237e;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header .subtitle {
+            color: #4a6fa5;
+            font-size: 1.1em;
+            font-weight: 300;
+        }
+
+        .menu {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .menu-item {
+            background: linear-gradient(135deg, #e8f5e9, #e1f5fe);
+            border-radius: 15px;
+            padding: 25px 30px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-color: #4caf50;
+        }
+
+        .menu-item .icon {
+            font-size: 2em;
+            margin-right: 15px;
+        }
+
+        .menu-item .title {
+            font-size: 1.3em;
+            color: #1a237e;
+            font-weight: 500;
+        }
+
+        .menu-item .description {
+            color: #546e7a;
+            margin-top: 5px;
+            font-size: 0.95em;
+        }
+
+        .upload-area {
+            border: 2px dashed #4caf50;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: rgba(76, 175, 80, 0.05);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: #388e3c;
+        }
+
+        .upload-area .upload-icon {
+            font-size: 4em;
+            color: #4caf50;
+            margin-bottom: 15px;
+        }
+
+        .upload-area h3 {
+            color: #1a237e;
+            margin-bottom: 10px;
+        }
+
+        .upload-area p {
+            color: #78909c;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 12px 35px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4caf50, #66bb6a);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(76, 175, 80, 0.4);
+            background: linear-gradient(135deg, #43a047, #4caf50);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #2196f3, #64b5f6);
+            color: white;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #1e88e5, #42a5f5);
+            box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #d32f2f, #e53935);
+            box-shadow: 0 6px 25px rgba(244, 67, 54, 0.4);
+        }
+
+        .file-name {
+            margin-top: 15px;
+            color: #4a6fa5;
+            font-size: 0.95em;
+        }
+
+        .menu-footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .menu-item {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏭 Система формирования палетных этикеток</h1>
+            <div class="subtitle">Автоматическое извлечение данных из приходных ордеров</div>
+        </div>
+
+        <div class="menu">
+            <div class="menu-item">
+                <div style="display: flex; align-items: center;">
+                    <span class="icon">📦</span>
+                    <div>
+                        <div class="title">Сформировать палетные этикетки</div>
+                        <div class="description">Загрузите приходный ордер в формате PDF для автоматического извлечения данных</div>
+                    </div>
+                </div>
+            </div>
+
+            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <h3>Загрузите PDF-файл</h3>
+                    <p>Перетащите файл сюда или нажмите для выбора</p>
+
+                    <div class="file-input-wrapper">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+                            Выбрать файл
+                        </button>
+                        <input type="file" name="file" id="fileInput" accept=".pdf" required>
+                    </div>
+
+                    <div class="file-name" id="fileName">Файл не выбран</div>
+                </div>
+
+                <div style="text-align: center; margin-top: 25px;">
+                    <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                        🔄 Извлечь данные
+                    </button>
+                </div>
+            </form>
+
+            <div class="menu-footer">
+                <a href="/exit" class="btn btn-danger">
+                    🚪 Выход из программы
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || 'Файл не выбран';
+            document.getElementById('fileName').textContent = fileName;
+            document.getElementById('submitBtn').disabled = !e.target.files[0];
+
+            if (e.target.files[0]) {
+                document.getElementById('submitBtn').textContent = '📊 Извлечь данные';
+                document.getElementById('uploadArea').style.borderColor = '#388e3c';
+                document.getElementById('uploadArea').style.background = 'rgba(76, 175, 80, 0.1)';
+            }
+        });
+
+        // Drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '#2196f3';
+            this.style.background = 'rgba(33, 150, 243, 0.1)';
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '#4caf50';
+            this.style.background = 'rgba(76, 175, 80, 0.05)';
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '#4caf50';
+            this.style.background = 'rgba(76, 175, 80, 0.05)';
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'application/pdf') {
+                    document.getElementById('fileInput').files = files;
+                    document.getElementById('fileName').textContent = file.name;
+                    document.getElementById('submitBtn').disabled = false;
+                    document.getElementById('submitBtn').textContent = '📊 Извлечь данные';
+                } else {
+                    alert('Пожалуйста, загрузите файл в формате PDF');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
