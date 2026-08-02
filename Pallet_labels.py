@@ -1,16 +1,183 @@
 # app.py
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, send_file
 import os
 import re
 import fitz  # PyMuPDF
 from werkzeug.utils import secure_filename
+from docx import Document
+from docx.shared import Pt, Inches, RGBColor, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docxtpl import DocxTemplate
+import subprocess
+import json
+from pathlib import Path
+import sys
+import tempfile
+import shutil
+from datetime import datetime
+import io
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['SETTINGS_FILE'] = 'settings.json'
+app.config['TEMPLATE_FILE'] = 'template.docx'  # Имя файла шаблона
 
 # Создаем папку для загрузок если её нет
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Файл настроек
+SETTINGS_FILE = 'settings.json'
+
+
+def load_settings():
+    """Загружает настройки из файла"""
+    default_settings = {
+        'save_path': os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки')
+    }
+
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings
+        except:
+            return default_settings
+    else:
+        # Создаем папку по умолчанию
+        os.makedirs(default_settings['save_path'], exist_ok=True)
+        return default_settings
+
+
+def save_settings(settings):
+    """Сохраняет настройки в файл"""
+    try:
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=4)
+        return True
+    except:
+        return False
+
+
+def get_available_drives():
+    """Получает список доступных дисков в Windows"""
+    drives = []
+    if sys.platform == 'win32':
+        import string
+        for letter in string.ascii_uppercase:
+            drive = f"{letter}:\\"
+            if os.path.exists(drive):
+                drives.append(drive)
+    else:
+        drives = ['/']
+    return drives
+
+
+def create_pallet_labels_file(all_products, order_number, save_path=None):
+    """
+    Создает файл с несколькими палетными этикетками используя шаблон
+
+    Args:
+        all_products: список словарей с данными товаров
+        order_number: номер приходного ордера
+        save_path: путь для сохранения
+
+    Returns:
+        str: путь к созданному файлу
+    """
+    if save_path is None:
+        settings = load_settings()
+        save_path = settings.get('save_path', os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки'))
+
+    # Создаем папку если её нет
+    os.makedirs(save_path, exist_ok=True)
+
+    # Создаем новый документ
+    merged_doc = Document()
+
+    # Устанавливаем поля страницы
+    for section in merged_doc.sections:
+        section.top_margin = Cm(2.0)
+        section.bottom_margin = Cm(2.0)
+        section.left_margin = Cm(2.0)
+        section.right_margin = Cm(2.0)
+
+    # Для каждого товара создаем этикетку
+    for idx, product in enumerate(all_products):
+        # Добавляем разрыв страницы между этикетками (кроме первой)
+        if idx > 0:
+            merged_doc.add_page_break()
+
+        # 1) ООО «Верофарм»
+        p1 = merged_doc.add_paragraph()
+        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run1 = p1.add_run('ООО «Верофарм»')
+        run1.italic = True
+        run1.bold = True
+        run1.font.size = Pt(16)
+        run1.font.name = 'Times New Roman'
+
+        # Пустая строка для отступа
+        merged_doc.add_paragraph()
+
+        # 2) Название товара
+        product_name = product.get('наименование', 'Не указано')
+        p2 = merged_doc.add_paragraph()
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run2 = p2.add_run(product_name)
+        run2.bold = True
+        run2.font.size = Pt(14)
+        run2.font.name = 'Times New Roman'
+
+        # 3) Серия поставщика
+        supplier_series = product.get('партия_поставщика', 'Не указана')
+        p3 = merged_doc.add_paragraph()
+        p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run3 = p3.add_run(supplier_series)
+        run3.italic = True
+        run3.font.size = Pt(12)
+        run3.font.name = 'Times New Roman'
+
+        # 4) Аналитический лист
+        analytic_list = product.get('аналитический_лист', 'Не указан')
+        p4 = merged_doc.add_paragraph()
+        p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run4 = p4.add_run(f'АЛ {analytic_list}')
+        run4.bold = True
+        run4.font.size = Pt(12)
+        run4.font.name = 'Times New Roman'
+
+        # 5) Код
+        p5 = merged_doc.add_paragraph()
+        p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run5 = p5.add_run('RUPD.VLG.05.04.C01')
+        run5.font.size = Pt(10)
+        run5.font.name = 'Times New Roman'
+
+    # Формируем имя файла с временной меткой
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"Информационный лист {order_number}_{timestamp}.docx"
+    filepath = os.path.join(save_path, filename)
+
+    # Сохраняем документ
+    merged_doc.save(filepath)
+
+    return filepath
+
+
+def open_in_word(filepath):
+    """Открывает файл в Microsoft Word"""
+    try:
+        if sys.platform == 'win32':
+            os.startfile(filepath)
+        elif sys.platform == 'darwin':  # macOS
+            subprocess.run(['open', filepath])
+        else:  # Linux
+            subprocess.run(['xdg-open', filepath])
+        return True
+    except Exception as e:
+        print(f"Ошибка при открытии файла: {e}")
+        return False
 
 
 def extract_data_from_pdf(pdf_path):
@@ -31,22 +198,25 @@ def extract_data_from_pdf(pdf_path):
     result = {
         'дата_приемки': None,
         'название_поставщика': None,
-        'наименование_товара': None,
-        'номенклатурный_номер': None,
-        'аналитический_лист': None,
-        'партия_поставщика': None
+        'номер_ордера': None,
+        'товары': []  # Список товаров
     }
 
-    # Проходим по всем строкам и ищем данные
-    for i, line in enumerate(lines):
-        # 1) Дата приемки - ищем в строке 31 (28.01.2026)
+    # 1) Номер приходного ордера
+    for line in lines:
+        if 'ПРИХОДНЫЙ ОРДЕР №' in line:
+            order_match = re.search(r'№\s*(\d+)', line)
+            if order_match:
+                result['номер_ордера'] = order_match.group(1)
+                break
+
+    # 2) Дата приемки
+    for line in lines:
         if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
-            # Проверяем, что это не срок годности (строка 94)
-            if '2028' not in line and 'годности' not in lines[i - 1] if i > 0 else True:
+            if '2028' not in line and 'годности' not in line:
                 result['дата_приемки'] = line
                 break
 
-    # Если дата не найдена, ищем в строке после "составления"
     if not result['дата_приемки']:
         for i, line in enumerate(lines):
             if 'составления' in line.lower() and i + 1 < len(lines):
@@ -55,98 +225,184 @@ def extract_data_from_pdf(pdf_path):
                     result['дата_приемки'] = date_match.group(1)
                     break
 
-    # 2) Название поставщика - ищем строку с ООО (строка 34)
+    # 3) Название поставщика
     for line in lines:
         if 'ООО' in line or 'ЗАО' in line or 'ОАО' in line or 'АО' in line or 'ИП' in line:
-            # Проверяем, что это не "ООО "ВЕРОФАРМ"" (строки 7 и 11)
             if 'ВЕРОФАРМ' not in line and 'Завод' not in line:
                 result['название_поставщика'] = line
                 break
 
-    # 3) Наименование товара - ищем строку 84 (НАТРИЯ ЦИТРАТ MERCK 106446 (2-ВОД))
-    # Ищем по ключевым словам
-    for line in lines:
-        if 'НАТРИЯ' in line or 'ЦИТРАТ' in line or 'MERCK' in line:
-            result['наименование_товара'] = line
+    # 4) Парсинг товаров из таблицы
+    # Находим начало таблицы
+    start_index = -1
+    end_index = -1
+
+    for i, line in enumerate(lines):
+        if 'Материальные ценности' in line:
+            start_index = i
             break
 
-    # Если не нашли по ключевым словам, ищем после "Материальные ценности"
-    if not result['наименование_товара']:
-        found_material = False
-        for i, line in enumerate(lines):
-            if 'Материальные ценности' in line:
-                found_material = True
-                # Ищем в следующих строках, пропуская номера колонок (1-14)
-                for j in range(i + 1, len(lines)):
-                    # Проверяем, что это не цифра от 1 до 14
-                    if re.match(r'^[1-9]$|^1[0-4]$', lines[j]):
-                        continue
-                    # Проверяем, что это не служебное слово
-                    if lines[j].lower() in ['кг', 'шт', 'г', 'л', 'м', 'уп', 'пач', 'итого', 'x', 'принял', 'сдал',
-                                            'должность', 'подпись', 'расшифровка', 'номер', 'паспорта', 'партия',
-                                            'поставщика', 'срок годности']:
-                        continue
-                    # Проверяем, что это не дата
-                    if re.match(r'\d{2}\.\d{2}\.\d{4}', lines[j]):
-                        continue
-                    # Проверяем, что строка содержит буквы и не является числом
-                    if re.search(r'[А-ЯЁA-Z]', lines[j]) and len(lines[j]) > 3:
-                        result['наименование_товара'] = lines[j]
-                        break
+    for i, line in enumerate(lines):
+        if line == 'Итого' or line.startswith('Итого'):
+            end_index = i
+            break
+
+    if start_index != -1 and end_index != -1:
+        # Находим строку с "14" - это последний номер колонки
+        data_start = -1
+        for i in range(start_index, end_index):
+            if lines[i] == '14':
+                data_start = i + 1
                 break
 
-    # 4) Номенклатурный номер - ищем 8-значный номер (строка 85)
-    for line in lines:
-        # Ищем 8-значный номер, который не является телефоном
-        nomencl_match = re.search(r'\b(\d{8})\b', line)
-        if nomencl_match:
-            # Проверяем, что это не телефон (не начинается с 8 или 7)
-            if not nomencl_match.group(1).startswith(('8', '7')):
-                # Проверяем, что это не "48797491" (ОКПО) и не "21000101"
-                if nomencl_match.group(1) not in ['48797491', '21000101']:
-                    result['номенклатурный_номер'] = nomencl_match.group(1)
-                    break
+        if data_start != -1:
+            # Список заголовков, которые нужно пропускать
+            header_keywords = [
+                'наименование', 'сорт', 'размер', 'марка', 'код',
+                'единица измерения', 'количество', 'цена', 'сумма',
+                'без учета', 'всего с учетом', 'номер паспорта',
+                'партия', 'поставщика', 'партия поставщика',
+                'срок годности', 'паспорта'
+            ]
 
-    # 5) Аналитический лист (партия) - ищем 10 цифр, начинающихся с 1 (строка 92)
-    for line in lines:
-        # Ищем 10-значный номер, начинающийся с 1
-        batch_match = re.search(r'\b(1\d{9})\b', line)
-        if batch_match:
-            result['аналитический_лист'] = batch_match.group(1)
-            break
+            i = data_start
+            products = []
 
-    # 6) Партия поставщика - ищем буквенно-цифровой код (строка 93)
-    for line in lines:
-        # Ищем код с буквой и цифрами
-        supplier_batch_match = re.search(r'([A-Z]\d{7,10})', line, re.IGNORECASE)
-        if supplier_batch_match:
-            result['партия_поставщика'] = supplier_batch_match.group(1)
-            break
+            while i < end_index:
+                line = lines[i]
 
-    # Если номенклатурный номер не найден, ищем после "номенклатурный"
-    if not result['номенклатурный_номер']:
-        for i, line in enumerate(lines):
-            if 'номенклатурный' in line.lower() and i + 1 < len(lines):
-                nomencl_match = re.search(r'\b(\d{8})\b', lines[i + 1])
-                if nomencl_match:
-                    result['номенклатурный_номер'] = nomencl_match.group(1)
-                    break
+                # Пропускаем пустые строки
+                if not line:
+                    i += 1
+                    continue
 
-    # Если партия поставщика не найдена, ищем после "Партия поставщика"
-    if not result['партия_поставщика']:
-        for i, line in enumerate(lines):
-            if 'Партия поставщика' in line and i + 1 < len(lines):
-                supplier_batch_match = re.search(r'([A-Z0-9]{6,12})', lines[i + 1], re.IGNORECASE)
-                if supplier_batch_match:
-                    result['партия_поставщика'] = supplier_batch_match.group(1)
-                    break
+                # Пропускаем даты
+                if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
+                    i += 1
+                    continue
+
+                # Пропускаем числа
+                if re.match(r'^[\d\s,]+$', line) and len(line) > 3:
+                    i += 1
+                    continue
+
+                # Пропускаем "X"
+                if line == 'X':
+                    i += 1
+                    continue
+
+                # Проверяем, является ли строка заголовком
+                is_header = False
+                line_lower = line.lower()
+                for keyword in header_keywords:
+                    if keyword in line_lower:
+                        is_header = True
+                        break
+
+                if is_header:
+                    i += 1
+                    continue
+
+                # Проверяем, что строка содержит буквы и это не числа - это начало названия товара
+                if re.search(r'[А-ЯЁA-Z]', line) and not re.match(r'^[\d\s,]+$', line):
+                    # Начинаем сбор названия товара
+                    product_name_lines = [line]
+                    current_pos = i + 1
+                    last_name_line = i
+
+                    # Собираем название, пока не встретим 8-значное число (номенклатурный номер)
+                    while current_pos < end_index:
+                        next_line = lines[current_pos]
+
+                        # Проверяем, является ли строка 8-значным числом (номенклатурный номер)
+                        nomencl_match = re.search(r'\b(\d{8})\b', next_line)
+                        if nomencl_match:
+                            if not nomencl_match.group(1).startswith(('8', '7')):
+                                if nomencl_match.group(1) not in ['48797491', '21000101']:
+                                    # Это номенклатурный номер, название закончилось
+                                    last_name_line = current_pos - 1
+                                    break
+
+                        # Если строка содержит буквы и не является служебной, добавляем к названию
+                        if re.search(r'[А-ЯЁA-Z]', next_line) and not re.match(r'^[\d\s,]+$', next_line):
+                            # Проверяем, что это не служебное слово
+                            skip_words = ['кг', 'шт', 'г', 'л', 'м', 'уп', 'пач', 'итого',
+                                          'x', 'принял', 'сдал', 'должность', 'подпись',
+                                          'расшифровка', 'номер', 'паспорта']
+                            if next_line.lower() not in skip_words:
+                                product_name_lines.append(next_line)
+                                current_pos += 1
+                            else:
+                                break
+                        else:
+                            break
+
+                    # Если не нашли номенклатурный номер, проверяем что последняя строка с названием - current_pos-1
+                    if last_name_line == i:
+                        last_name_line = current_pos - 1
+
+                    # Объединяем название товара
+                    product_name = ' '.join(product_name_lines)
+
+                    # Номенклатурный номер находится в строке last_name_line + 1
+                    nomencl_number = None
+                    nomencl_line = last_name_line + 1
+                    if nomencl_line < len(lines):
+                        nomencl_match = re.search(r'\b(\d{8})\b', lines[nomencl_line])
+                        if nomencl_match:
+                            if not nomencl_match.group(1).startswith(('8', '7')):
+                                if nomencl_match.group(1) not in ['48797491', '21000101']:
+                                    nomencl_number = nomencl_match.group(1)
+
+                    # Аналитический лист находится в строке last_name_line + 8
+                    analytic_list = None
+                    batch_line = last_name_line + 8
+                    if batch_line < len(lines):
+                        # Проверяем, что это 10-значное число, начинающееся с 1
+                        batch_match = re.search(r'\b(1\d{9})\b', lines[batch_line])
+                        if batch_match:
+                            analytic_list = batch_match.group(1)
+
+                    # Партия поставщика находится в строке last_name_line + 9
+                    supplier_batch = None
+                    supplier_line = last_name_line + 9
+                    if supplier_line < len(lines):
+                        # Берем значение ячейки без проверки шаблона (любой формат)
+                        supplier_batch = lines[supplier_line]
+
+                    # Срок годности находится в строке last_name_line + 10
+                    expiration_date = None
+                    expiration_line = last_name_line + 10
+                    if expiration_line < len(lines):
+                        # Проверяем, что это дата в формате ДД.ММ.ГГГГ
+                        date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[expiration_line])
+                        if date_match:
+                            expiration_date = date_match.group(1)
+
+                    # Добавляем товар, если есть аналитический лист
+                    if analytic_list:
+                        products.append({
+                            'наименование': product_name,
+                            'номенклатурный_номер': nomencl_number,
+                            'аналитический_лист': analytic_list,
+                            'партия_поставщика': supplier_batch,
+                            'срок_годности': expiration_date
+                        })
+
+                    # Переходим к следующему товару (last_name_line + 11)
+                    i = last_name_line + 11
+                else:
+                    i += 1
+
+            result['товары'] = products
 
     return result
 
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    settings = load_settings()
+    return render_template('index.html', settings=settings)
 
 
 @app.route('/upload', methods=['POST'])
@@ -170,7 +426,7 @@ def upload_file():
         data = extract_data_from_pdf(filepath)
         os.remove(filepath)
 
-        if not any(data.values()):
+        if not data['дата_приемки'] and not data['название_поставщика'] and not data['товары']:
             return render_template('error.html',
                                    error='Не удалось извлечь данные из PDF-файла. Проверьте формат файла.')
 
@@ -180,6 +436,61 @@ def upload_file():
         if os.path.exists(filepath):
             os.remove(filepath)
         return render_template('error.html', error=f'Ошибка при обработке файла: {str(e)}')
+
+
+@app.route('/generate_labels', methods=['POST'])
+def generate_labels():
+    try:
+        # Получаем данные из формы
+        products_json = request.form.get('products')
+        order_number = request.form.get('order_number')
+
+        if not products_json or not order_number:
+            return render_template('error.html', error='Нет данных для формирования этикеток')
+
+        # Парсим JSON
+        try:
+            products = json.loads(products_json)
+        except json.JSONDecodeError as e:
+            return render_template('error.html', error=f'Ошибка парсинга данных: {str(e)}')
+
+        if not products:
+            return render_template('error.html', error='Нет товаров для формирования этикеток')
+
+        # Загружаем настройки
+        settings = load_settings()
+        save_path = settings.get('save_path')
+
+        # Создаем файл с этикетками
+        filepath = create_pallet_labels_file(products, order_number, save_path)
+
+        # Открываем в Word
+        open_in_word(filepath)
+
+        return render_template('success.html',
+                               filepath=filepath,
+                               product_count=len(products),
+                               order_number=order_number)
+
+    except Exception as e:
+        return render_template('error.html', error=f'Ошибка при формировании этикеток: {str(e)}')
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings_page():
+    settings = load_settings()
+    drives = get_available_drives()
+
+    if request.method == 'POST':
+        new_path = request.form.get('save_path')
+        if new_path:
+            settings['save_path'] = new_path
+            save_settings(settings)
+            # Создаем папку если её нет
+            os.makedirs(new_path, exist_ok=True)
+            return redirect(url_for('settings_page'))
+
+    return render_template('settings.html', settings=settings, drives=drives)
 
 
 @app.route('/exit')

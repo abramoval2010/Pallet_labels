@@ -1,3 +1,4 @@
+<!-- templates/result.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -15,18 +16,16 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 20px;
         }
 
         .container {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
-            padding: 50px;
-            max-width: 900px;
+            padding: 40px;
+            max-width: 1200px;
             width: 100%;
+            margin: 0 auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
 
@@ -52,52 +51,120 @@
             margin-bottom: 20px;
         }
 
-        .data-grid {
+        .info-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 20px;
             margin: 30px 0;
-        }
-
-        .data-item {
-            background: linear-gradient(135deg, #f5f5f5, #e8f5e9);
-            border-radius: 12px;
+            background: #f5f5f5;
             padding: 20px;
-            border-left: 4px solid #4caf50;
-            transition: all 0.3s ease;
+            border-radius: 12px;
         }
 
-        .data-item:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        .info-item {
+            padding: 10px;
         }
 
-        .data-item .label {
+        .info-item .label {
             font-size: 0.85em;
             color: #546e7a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 600;
-            margin-bottom: 8px;
         }
 
-        .data-item .value {
+        .info-item .value {
             font-size: 1.1em;
             color: #1a237e;
             font-weight: 500;
-            word-break: break-word;
+            margin-top: 5px;
         }
 
-        .data-item .value.empty {
+        .products-section {
+            margin-top: 30px;
+        }
+
+        .products-section h2 {
+            color: #1a237e;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #4caf50;
+            padding-bottom: 10px;
+        }
+
+        .product-count {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            min-width: 600px;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #1a237e, #283593);
+            color: white;
+        }
+
+        th {
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            color: #1a237e;
+        }
+
+        tbody tr:hover {
+            background: #f5f5f5;
+            transition: background 0.3s ease;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .empty-value {
             color: #e53935;
             font-style: italic;
-            font-weight: 400;
         }
 
-        .data-item .value.empty::after {
+        .empty-value::after {
             content: ' (не найдено)';
             color: #e53935;
             font-style: italic;
+        }
+
+        .no-products {
+            text-align: center;
+            padding: 30px;
+            background: #fff3e0;
+            border-radius: 10px;
+            color: #e65100;
         }
 
         .actions {
@@ -153,31 +220,29 @@
             box-shadow: 0 6px 25px rgba(255, 152, 0, 0.4);
         }
 
-        .all-found {
-            text-align: center;
-            padding: 15px;
-            background: #e8f5e9;
-            border-radius: 10px;
-            color: #2e7d32;
-            margin: 20px 0;
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
         }
 
-        .missing-data {
-            text-align: center;
-            padding: 15px;
-            background: #fff3e0;
-            border-radius: 10px;
-            color: #e65100;
-            margin: 20px 0;
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(244, 67, 54, 0.4);
         }
 
         @media (max-width: 768px) {
             .container {
-                padding: 30px 20px;
+                padding: 20px;
             }
 
-            .data-grid {
+            .info-grid {
                 grid-template-columns: 1fr;
+            }
+
+            th, td {
+                padding: 8px 10px;
+                font-size: 0.85em;
             }
 
             .actions {
@@ -197,75 +262,104 @@
         <div class="header">
             <div class="success-icon">✅</div>
             <h1>Данные успешно извлечены</h1>
-            <div class="subtitle">Информация из приходного ордера для формирования палетной этикетки</div>
+            <div class="subtitle">Информация из приходного ордера для формирования палетных этикеток</div>
         </div>
 
-        {% set has_data = data.values()|select('!=', None)|list|length > 0 %}
-        {% set missing_data = data.items()|selectattr('1', 'equalto', None)|list %}
-
-        {% if missing_data|length == 0 %}
-            <div class="all-found">✅ Все данные успешно извлечены из PDF-файла</div>
-        {% else %}
-            <div class="missing-data">
-                ⚠️ Некоторые данные не найдены (отмечены красным). Проверьте правильность PDF-файла.
-            </div>
-        {% endif %}
-
-        <div class="data-grid">
-            <div class="data-item">
+        <div class="info-grid">
+            <div class="info-item">
                 <div class="label">📅 Дата приемки</div>
-                <div class="value {% if not data.дата_приемки %}empty{% endif %}">
-                    {{ data.дата_приемки if data.дата_приемки else 'Не найдено' }}
-                </div>
+                <div class="value">{{ data.дата_приемки if data.дата_приемки else 'Не найдено' }}</div>
             </div>
-
-            <div class="data-item">
+            <div class="info-item">
                 <div class="label">🏢 Название поставщика</div>
-                <div class="value {% if not data.название_поставщика %}empty{% endif %}">
-                    {{ data.название_поставщика if data.название_поставщика else 'Не найдено' }}
-                </div>
+                <div class="value">{{ data.название_поставщика if data.название_поставщика else 'Не найдено' }}</div>
             </div>
+            <div class="info-item">
+                <div class="label">📋 Номер ордера</div>
+                <div class="value">{{ data.номер_ордера if data.номер_ордера else 'Не найден' }}</div>
+            </div>
+        </div>
 
-            <div class="data-item">
-                <div class="label">📦 Наименование товара</div>
-                <div class="value {% if not data.наименование_товара %}empty{% endif %}">
-                    {{ data.наименование_товара if data.наименование_товара else 'Не найдено' }}
-                </div>
-            </div>
+        <div class="products-section">
+            <h2>
+                📦 Товары
+                <span class="product-count">{{ data.товары|length }}</span>
+            </h2>
 
-            <div class="data-item">
-                <div class="label">🔢 Номенклатурный номер</div>
-                <div class="value {% if not data.номенклатурный_номер %}empty{% endif %}">
-                    {{ data.номенклатурный_номер if data.номенклатурный_номер else 'Не найдено' }}
+            {% if data.товары %}
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>Наименование товара</th>
+                                <th>Номенклатурный номер</th>
+                                <th>Аналитический лист</th>
+                                <th>Партия поставщика</th>
+                                <th>Срок годности</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in data.товары %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    {% if product.наименование %}
+                                        {{ product.наименование }}
+                                    {% else %}
+                                        <span class="empty-value">Не найдено</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if product.номенклатурный_номер %}
+                                        {{ product.номенклатурный_номер }}
+                                    {% else %}
+                                        <span class="empty-value">Не найдено</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if product.аналитический_лист %}
+                                        <strong>{{ product.аналитический_лист }}</strong>
+                                    {% else %}
+                                        <span class="empty-value">Не найдено</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if product.партия_поставщика %}
+                                        {{ product.партия_поставщика }}
+                                    {% else %}
+                                        <span class="empty-value">Не найдено</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if product.срок_годности %}
+                                        {{ product.срок_годности }}
+                                    {% else %}
+                                        <span class="empty-value">Не найдено</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-
-            <div class="data-item">
-                <div class="label">📋 Аналитический лист (партия)</div>
-                <div class="value {% if not data.аналитический_лист %}empty{% endif %}">
-                    {{ data.аналитический_лист if data.аналитический_лист else 'Не найдено' }}
+            {% else %}
+                <div class="no-products">
+                    <p>⚠️ Товары не найдены в приходном ордере</p>
                 </div>
-            </div>
-
-            <div class="data-item">
-                <div class="label">🔖 Партия поставщика</div>
-                <div class="value {% if not data.партия_поставщика %}empty{% endif %}">
-                    {{ data.партия_поставщика if data.партия_поставщика else 'Не найдено' }}
-                </div>
-            </div>
+            {% endif %}
         </div>
 
         <div class="actions">
             <a href="/" class="btn btn-secondary">⬅️ Назад к загрузке</a>
-            <button onclick="window.print()" class="btn btn-warning">🖨️ Распечатать</button>
-            <button onclick="generateLabel()" class="btn btn-primary">🏷️ Сформировать этикетку</button>
+            {% if data.товары %}
+            <form action="/generate_labels" method="post" style="display: inline;">
+                <input type="hidden" name="products" value='{{ data.товары|tojson }}'>
+                <input type="hidden" name="order_number" value="{{ data.номер_ордера if data.номер_ордера else 'unknown' }}">
+                <button type="submit" class="btn btn-primary">🏷️ Сформировать палетные этикетки ({{ data.товары|length }})</button>
+            </form>
+            {% endif %}
         </div>
     </div>
-
-    <script>
-        function generateLabel() {
-            alert('Функция формирования палетной этикетки будет добавлена в следующей версии');
-        }
-    </script>
 </body>
 </html>

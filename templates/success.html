@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Выход из программы</title>
+    <title>Этикетки сформированы</title>
     <style>
         * {
             margin: 0;
@@ -31,7 +31,7 @@
             text-align: center;
         }
 
-        .exit-icon {
+        .success-icon {
             font-size: 5em;
             margin-bottom: 20px;
         }
@@ -45,8 +45,31 @@
         .message {
             color: #546e7a;
             font-size: 1.1em;
-            margin-bottom: 30px;
-            line-height: 1.6;
+            line-height: 1.8;
+            margin-bottom: 25px;
+        }
+
+        .message strong {
+            color: #1a237e;
+        }
+
+        .file-info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+
+        .file-info .label {
+            color: #78909c;
+            font-size: 0.85em;
+        }
+
+        .file-info .value {
+            color: #1a237e;
+            font-weight: 500;
+            margin-top: 5px;
         }
 
         .btn {
@@ -73,17 +96,6 @@
             box-shadow: 0 6px 25px rgba(76, 175, 80, 0.4);
         }
 
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(244, 67, 54, 0.4);
-        }
-
         .btn-secondary {
             background: linear-gradient(135deg, #2196f3, #64b5f6);
             color: white;
@@ -95,37 +107,50 @@
             box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
         }
 
-        .buttons {
+        .actions {
             display: flex;
             gap: 15px;
             justify-content: center;
             flex-wrap: wrap;
-            margin-top: 20px;
+            margin-top: 25px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="exit-icon">🚪</div>
-        <h1>Выход из программы</h1>
+        <div class="success-icon">🎉</div>
+        <h1>Палетные этикетки сформированы!</h1>
+
         <div class="message">
-            Вы уверены, что хотите выйти из программы?<br>
-            Все несохраненные данные будут потеряны.
+            Сформировано <strong>{{ product_count }}</strong> палетных этикеток для заказа <strong>№{{ order_number }}</strong>.<br>
+            Файл автоматически открыт в Microsoft Word.
         </div>
 
-        <div class="buttons">
-            <a href="/" class="btn btn-secondary">⬅️ Вернуться</a>
-            <button onclick="exitProgram()" class="btn btn-danger">✅ Выйти</button>
+        <div class="file-info">
+            <div class="label">📁 Файл сохранен по пути:</div>
+            <div class="value">{{ filepath }}</div>
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn btn-secondary">⬅️ На главную</a>
+            <a href="/upload" class="btn btn-primary">📄 Загрузить новый PDF</a>
         </div>
     </div>
-
-    <script>
-        function exitProgram() {
-            if (confirm('Подтвердите выход из программы')) {
-                window.close();
-                window.location.href = 'about:blank';
-            }
-        }
-    </script>
 </body>
 </html>
