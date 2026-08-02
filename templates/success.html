@@ -1,3 +1,4 @@
+<!-- templates/success.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -107,6 +108,28 @@
             box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
         }
 
+        .btn-success {
+            background: linear-gradient(135deg, #43a047, #66bb6a);
+            color: white;
+            box-shadow: 0 4px 15px rgba(67, 160, 71, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(67, 160, 71, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(244, 67, 54, 0.4);
+        }
+
         .actions {
             display: flex;
             gap: 15px;
@@ -148,9 +171,19 @@
         </div>
 
         <div class="actions">
+            <a href="/" class="btn btn-success">📄 Загрузить новый PDF</a>
             <a href="/" class="btn btn-secondary">⬅️ На главную</a>
-            <a href="/upload" class="btn btn-primary">📄 Загрузить новый PDF</a>
+            <button onclick="exitProgram()" class="btn btn-danger">🚪 Выход из программы</button>
         </div>
     </div>
+
+    <script>
+        function exitProgram() {
+            // Закрываем окно без подтверждения
+            window.close();
+            // Если window.close() не работает, перенаправляем на пустую страницу
+            window.location.href = 'about:blank';
+        }
+    </script>
 </body>
 </html>

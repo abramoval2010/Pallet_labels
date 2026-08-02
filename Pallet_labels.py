@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docxtpl import DocxTemplate
+from docx.enum.section import WD_ORIENT
 import subprocess
 import json
 from pathlib import Path
@@ -15,13 +15,13 @@ import sys
 import tempfile
 import shutil
 from datetime import datetime
-import io
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['SETTINGS_FILE'] = 'settings.json'
-app.config['TEMPLATE_FILE'] = 'template.docx'  # Имя файла шаблона
 
 # Создаем папку для загрузок если её нет
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -75,7 +75,7 @@ def get_available_drives():
 
 def create_pallet_labels_file(all_products, order_number, save_path=None):
     """
-    Создает файл с несколькими палетными этикетками используя шаблон
+    Создает файл с несколькими палетными этикетками
 
     Args:
         all_products: список словарей с данными товаров
@@ -95,64 +95,163 @@ def create_pallet_labels_file(all_products, order_number, save_path=None):
     # Создаем новый документ
     merged_doc = Document()
 
-    # Устанавливаем поля страницы
+    # Устанавливаем ЛАНДШАФТНУЮ ориентацию страницы и уменьшенные поля
     for section in merged_doc.sections:
-        section.top_margin = Cm(2.0)
-        section.bottom_margin = Cm(2.0)
-        section.left_margin = Cm(2.0)
-        section.right_margin = Cm(2.0)
+        section.orientation = WD_ORIENT.LANDSCAPE
+        section.page_width = Inches(11.69)  # A4 landscape width
+        section.page_height = Inches(8.27)  # A4 landscape height
+        section.top_margin = Inches(0.15)
+        section.bottom_margin = Inches(0.15)
+        section.left_margin = Inches(0.15)
+        section.right_margin = Inches(0.15)
 
     # Для каждого товара создаем этикетку
     for idx, product in enumerate(all_products):
         # Добавляем разрыв страницы между этикетками (кроме первой)
         if idx > 0:
             merged_doc.add_page_break()
+            # Для каждой новой страницы устанавливаем ландшафтную ориентацию
+            for section in merged_doc.sections:
+                section.orientation = WD_ORIENT.LANDSCAPE
+                section.page_width = Inches(11.69)
+                section.page_height = Inches(8.27)
+                section.top_margin = Inches(0.15)
+                section.bottom_margin = Inches(0.15)
+                section.left_margin = Inches(0.15)
+                section.right_margin = Inches(0.15)
 
-        # 1) ООО «Верофарм»
-        p1 = merged_doc.add_paragraph()
+        # Получаем данные товара
+        product_name = product.get('наименование', 'Не указано')
+        supplier_series = product.get('партия_поставщика', 'Не указана')
+        analytic_list = product.get('аналитический_лист', 'Не указан')
+
+        # Определяем размеры шрифтов в зависимости от длины названия
+        name_len = len(product_name)
+
+        if name_len < 30:
+            # Короткое название - большие шрифты
+            font_sizes = {
+                'header': 14,
+                'product': 82,
+                'supplier': 60,
+                'analytic': 76,
+                'code': 14
+            }
+        elif name_len < 40:
+            # Среднее название (30-39 символов)
+            font_sizes = {
+                'header': 14,
+                'product': 74,
+                'supplier': 58,
+                'analytic': 68,
+                'code': 14
+            }
+        else:
+            # Длинное название (40+ символов)
+            font_sizes = {
+                'header': 14,
+                'product': 70,
+                'supplier': 56,
+                'analytic': 66,
+                'code': 14
+            }
+
+        # Дополнительное уменьшение для очень длинных названий
+        if name_len > 55:
+            font_sizes['product'] = 62
+            font_sizes['supplier'] = 50
+            font_sizes['analytic'] = 58
+        elif name_len > 70:
+            font_sizes['product'] = 54
+            font_sizes['supplier'] = 44
+            font_sizes['analytic'] = 50
+        elif name_len > 85:
+            font_sizes['product'] = 46
+            font_sizes['supplier'] = 38
+            font_sizes['analytic'] = 44
+
+        # Дополнительное уменьшение для длинной серии поставщика
+        supplier_len = len(supplier_series) if supplier_series else 0
+        if supplier_len > 25:
+            font_sizes['supplier'] = max(32, font_sizes['supplier'] - 12)
+        elif supplier_len > 18:
+            font_sizes['supplier'] = max(38, font_sizes['supplier'] - 8)
+
+        # Дополнительное уменьшение для длинного аналитического листа
+        analytic_len = len(str(analytic_list)) if analytic_list else 0
+        if analytic_len > 15:
+            font_sizes['analytic'] = max(42, font_sizes['analytic'] - 10)
+
+        # Создаем этикетку как таблицу для лучшего контроля пространства
+        table = merged_doc.add_table(rows=1, cols=1)
+        table.autofit = False
+        table.allow_autofit = False
+
+        # Устанавливаем ширину таблицы на всю страницу
+        table.columns[0].width = Inches(10.8)
+
+        # Получаем ячейку
+        cell = table.cell(0, 0)
+        cell.vertical_alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Очищаем стандартный параграф и добавляем свои
+        cell.paragraphs[0].clear()
+
+        # 1) ООО «Верофарм» - Calibri, 14pt, жирный курсив, по центру
+        p1 = cell.add_paragraph()
         p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p1.paragraph_format.space_before = Pt(2)
+        p1.paragraph_format.space_after = Pt(2)
         run1 = p1.add_run('ООО «Верофарм»')
         run1.italic = True
         run1.bold = True
-        run1.font.size = Pt(16)
-        run1.font.name = 'Times New Roman'
+        run1.font.size = Pt(font_sizes['header'])
+        run1.font.name = 'Calibri'
 
-        # Пустая строка для отступа
-        merged_doc.add_paragraph()
-
-        # 2) Название товара
-        product_name = product.get('наименование', 'Не указано')
-        p2 = merged_doc.add_paragraph()
+        # 2) Название товара - Calibri, жирный курсив, по центру
+        p2 = cell.add_paragraph()
         p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p2.paragraph_format.space_before = Pt(5)
+        p2.paragraph_format.space_after = Pt(5)
         run2 = p2.add_run(product_name)
+        run2.italic = True
         run2.bold = True
-        run2.font.size = Pt(14)
-        run2.font.name = 'Times New Roman'
+        run2.font.size = Pt(font_sizes['product'])
+        run2.font.name = 'Calibri'
 
-        # 3) Серия поставщика
-        supplier_series = product.get('партия_поставщика', 'Не указана')
-        p3 = merged_doc.add_paragraph()
+        # 3) Серия поставщика - Calibri, курсив, по центру
+        supplier_text = f"п. {supplier_series}" if supplier_series and supplier_series != 'Не указана' else supplier_series
+        p3 = cell.add_paragraph()
         p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run3 = p3.add_run(supplier_series)
+        p3.paragraph_format.space_before = Pt(4)
+        p3.paragraph_format.space_after = Pt(4)
+        run3 = p3.add_run(supplier_text)
         run3.italic = True
-        run3.font.size = Pt(12)
-        run3.font.name = 'Times New Roman'
+        run3.bold = False
+        run3.font.size = Pt(font_sizes['supplier'])
+        run3.font.name = 'Calibri'
 
-        # 4) Аналитический лист
-        analytic_list = product.get('аналитический_лист', 'Не указан')
-        p4 = merged_doc.add_paragraph()
+        # 4) Аналитический лист - Calibri, жирный курсив, по центру
+        p4 = cell.add_paragraph()
         p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p4.paragraph_format.space_before = Pt(4)
+        p4.paragraph_format.space_after = Pt(4)
         run4 = p4.add_run(f'АЛ {analytic_list}')
+        run4.italic = True
         run4.bold = True
-        run4.font.size = Pt(12)
-        run4.font.name = 'Times New Roman'
+        run4.font.size = Pt(font_sizes['analytic'])
+        run4.font.name = 'Calibri'
 
-        # 5) Код
-        p5 = merged_doc.add_paragraph()
-        p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # 5) Код - Calibri, 14pt, жирный, с правым центрированием
+        p5 = cell.add_paragraph()
+        p5.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p5.paragraph_format.space_before = Pt(8)
+        p5.paragraph_format.space_after = Pt(2)
         run5 = p5.add_run('RUPD.VLG.05.04.C01')
-        run5.font.size = Pt(10)
-        run5.font.name = 'Times New Roman'
+        run5.italic = False
+        run5.bold = True
+        run5.font.size = Pt(font_sizes['code'])
+        run5.font.name = 'Calibri'
 
     # Формируем имя файла с временной меткой
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

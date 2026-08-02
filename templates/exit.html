@@ -1,3 +1,4 @@
+<!-- templates/exit.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -121,10 +122,10 @@
 
     <script>
         function exitProgram() {
-            if (confirm('Подтвердите выход из программы')) {
-                window.close();
-                window.location.href = 'about:blank';
-            }
+            // Закрываем окно без подтверждения
+            window.close();
+            // Если window.close() не работает, перенаправляем на пустую страницу
+            window.location.href = 'about:blank';
         }
     </script>
 </body>
