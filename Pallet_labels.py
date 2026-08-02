@@ -73,6 +73,20 @@ def get_available_drives():
     return drives
 
 
+def get_subdirectories(path):
+    """Получает список подпапок в указанном пути"""
+    subdirs = []
+    try:
+        if os.path.exists(path):
+            for item in os.listdir(path):
+                item_path = os.path.join(path, item)
+                if os.path.isdir(item_path):
+                    subdirs.append(item)
+    except:
+        pass
+    return sorted(subdirs)
+
+
 def create_pallet_labels_file(all_products, order_number, save_path=None):
     """
     Создает файл с несколькими палетными этикетками
@@ -580,16 +594,62 @@ def settings_page():
     settings = load_settings()
     drives = get_available_drives()
 
+    # Получаем текущий путь
+    current_path = settings.get('save_path', os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки'))
+
+    # Получаем путь из параметров запроса для навигации
+    path_param = request.args.get('path')
+    if path_param and os.path.exists(path_param):
+        current_path = path_param
+
+    # Разбиваем путь на части для отображения в виде дерева
+    path_parts = []
+    if current_path:
+        normalized_path = os.path.normpath(current_path)
+        parts = normalized_path.split(os.sep)
+        temp_path = ""
+        for part in parts:
+            if part:
+                if temp_path:
+                    temp_path = os.path.join(temp_path, part)
+                else:
+                    if sys.platform == 'win32' and ':' in part:
+                        temp_path = part + os.sep
+                    else:
+                        temp_path = os.sep + part
+                path_parts.append({
+                    'name': part,
+                    'path': temp_path
+                })
+
+    # Получаем список подпапок в текущем пути
+    subdirs = get_subdirectories(current_path)
+
     if request.method == 'POST':
-        new_path = request.form.get('save_path')
-        if new_path:
+        # Получаем выбранный путь из формы
+        selected_path = request.form.get('selected_path')
+        if selected_path:
+            settings['save_path'] = selected_path
+            save_settings(settings)
+            os.makedirs(selected_path, exist_ok=True)
+            return redirect(url_for('settings_page', saved=True))
+
+        # Если выбран путь через компоненты
+        path_component = request.form.get('path_component')
+        if path_component:
+            new_path = path_component
             settings['save_path'] = new_path
             save_settings(settings)
-            # Создаем папку если её нет
             os.makedirs(new_path, exist_ok=True)
-            return redirect(url_for('settings_page'))
+            return redirect(url_for('settings_page', saved=True))
 
-    return render_template('settings.html', settings=settings, drives=drives)
+    return render_template('settings.html',
+                           settings=settings,
+                           drives=drives,
+                           current_path=current_path,
+                           path_parts=path_parts,
+                           subdirs=subdirs,
+                           os_sep=os.sep)
 
 
 @app.route('/exit')

@@ -1,3 +1,4 @@
+<!-- templates/settings.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -24,7 +25,7 @@
         .container {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
-            padding: 50px;
+            padding: 40px;
             max-width: 700px;
             width: 100%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
@@ -32,22 +33,22 @@
 
         .header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
         }
 
         .header h1 {
             color: #1a237e;
-            font-size: 2.2em;
+            font-size: 2em;
             margin-bottom: 10px;
         }
 
         .header .subtitle {
             color: #4a6fa5;
-            font-size: 1.1em;
+            font-size: 1em;
         }
 
         .settings-group {
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
 
         .settings-group label {
@@ -64,59 +65,113 @@
             margin-bottom: 15px;
         }
 
-        .settings-group select {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1em;
-            background: white;
-            transition: border-color 0.3s ease;
-        }
-
-        .settings-group select:focus {
-            outline: none;
-            border-color: #4caf50;
-        }
-
-        .settings-group input[type="text"] {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1em;
-            transition: border-color 0.3s ease;
-        }
-
-        .settings-group input[type="text"]:focus {
-            outline: none;
-            border-color: #4caf50;
-        }
-
-        .current-path {
+        .path-display {
             background: #f5f5f5;
             padding: 12px 15px;
             border-radius: 10px;
-            margin-top: 10px;
-            color: #1a237e;
+            margin-bottom: 15px;
             word-break: break-all;
         }
 
-        .current-path .label {
+        .path-display .label {
             color: #78909c;
             font-size: 0.85em;
         }
 
-        .current-path .value {
+        .path-display .value {
+            color: #1a237e;
             font-weight: 500;
             margin-top: 5px;
         }
 
+        .folder-tree {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .folder-tree .tree-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .folder-tree .tree-item:last-child {
+            border-bottom: none;
+        }
+
+        .folder-tree .tree-item a {
+            color: #1a237e;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+            cursor: pointer;
+        }
+
+        .folder-tree .tree-item a:hover {
+            background: #e3f2fd;
+        }
+
+        .folder-tree .tree-item .icon {
+            margin-right: 10px;
+        }
+
+        .folder-tree .tree-item .name {
+            font-weight: 500;
+        }
+
+        .folder-tree .tree-item .current {
+            background: #e8f5e9;
+            font-weight: 600;
+        }
+
+        .folder-tree .tree-item .current .name {
+            color: #2e7d32;
+        }
+
+        .breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .breadcrumb .crumb {
+            color: #1a237e;
+            text-decoration: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            transition: background 0.3s ease;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+
+        .breadcrumb .crumb:hover {
+            background: #e3f2fd;
+        }
+
+        .breadcrumb .separator {
+            color: #78909c;
+        }
+
+        .breadcrumb .crumb.current {
+            font-weight: 600;
+            color: #2e7d32;
+        }
+
         .btn {
-            padding: 12px 35px;
+            padding: 10px 30px;
             border: none;
             border-radius: 50px;
-            font-size: 1.1em;
+            font-size: 1em;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -146,22 +201,11 @@
             box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
         }
 
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(244, 67, 54, 0.4);
-        }
-
         .actions {
             display: flex;
             gap: 15px;
             justify-content: center;
-            margin-top: 30px;
+            margin-top: 25px;
             flex-wrap: wrap;
         }
 
@@ -176,7 +220,7 @@
 
         @media (max-width: 768px) {
             .container {
-                padding: 30px 20px;
+                padding: 20px;
             }
 
             .actions {
@@ -188,6 +232,10 @@
                 width: 100%;
                 text-align: center;
             }
+
+            .breadcrumb {
+                font-size: 0.85em;
+            }
         }
     </style>
 </head>
@@ -195,7 +243,7 @@
     <div class="container">
         <div class="header">
             <h1>⚙️ Настройки</h1>
-            <div class="subtitle">Настройка путей сохранения палетных этикеток</div>
+            <div class="subtitle">Настройка пути сохранения палетных этикеток</div>
         </div>
 
         {% if request.args.get('saved') %}
@@ -204,27 +252,88 @@
         </div>
         {% endif %}
 
-        <form method="post">
+        <form method="post" id="settingsForm">
             <div class="settings-group">
                 <label>📁 Путь к сохраненным палетным этикеткам</label>
-                <div class="description">Выберите папку, в которую будут сохраняться сформированные палетные этикетки</div>
+                <div class="description">Выберите папку для сохранения сформированных палетных этикеток</div>
 
-                <select name="save_path" id="save_path">
-                    {% for drive in drives %}
-                    <option value="{{ drive }}" {% if drive == settings.save_path %}selected{% endif %}>
-                        {{ drive }}
-                    </option>
-                    {% endfor %}
-                    <option value="custom">Другой путь...</option>
-                </select>
-
-                <div id="custom_path_container" style="display: none; margin-top: 10px;">
-                    <input type="text" name="custom_path" id="custom_path" placeholder="Введите полный путь к папке" value="{{ settings.save_path if settings.save_path not in drives else '' }}">
+                <div class="path-display">
+                    <div class="label">Текущий путь:</div>
+                    <div class="value">{{ current_path }}</div>
                 </div>
 
-                <div class="current-path">
-                    <div class="label">Текущий путь сохранения:</div>
-                    <div class="value">{{ settings.save_path }}</div>
+                <!-- Навигационная цепочка (хлебные крошки) -->
+                <div class="breadcrumb">
+                    <a href="{{ url_for('settings_page') }}" class="crumb">🏠</a>
+                    {% for part in path_parts %}
+                        <span class="separator">›</span>
+                        <a href="{{ url_for('settings_page') }}?path={{ part.path }}" class="crumb {% if loop.last %}current{% endif %}">
+                            {{ part.name }}
+                        </a>
+                    {% endfor %}
+                </div>
+
+                <!-- Список папок -->
+                <div class="folder-tree">
+                    <div class="tree-item">
+                        <a href="{{ url_for('settings_page') }}">
+                            <span class="icon">📂</span>
+                            <span class="name">Корень</span>
+                        </a>
+                    </div>
+
+                    {% for drive in drives %}
+                    <div class="tree-item">
+                        <a href="{{ url_for('settings_page') }}?path={{ drive }}">
+                            <span class="icon">💾</span>
+                            <span class="name">{{ drive }}</span>
+                        </a>
+                    </div>
+                    {% endfor %}
+
+                    {% if subdirs %}
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
+                        {% for subdir in subdirs %}
+                        <div class="tree-item">
+                            <a href="{{ url_for('settings_page') }}?path={{ current_path }}/{{ subdir }}">
+                                <span class="icon">📁</span>
+                                <span class="name">{{ subdir }}</span>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
+                        <div class="tree-item">
+                            <a href="#" onclick="selectCurrentPath()" style="background: #e8f5e9;">
+                                <span class="icon">✅</span>
+                                <span class="name" style="color: #2e7d32;">Выбрать текущую папку</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Скрытое поле для выбранного пути -->
+                <input type="hidden" name="selected_path" id="selected_path" value="{{ current_path }}">
+
+                <!-- Кнопка для выбора через ниспадающее меню -->
+                <div style="margin-top: 10px;">
+                    <select name="path_component" id="path_select" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0; font-size: 1em;">
+                        <option value="">-- Быстрый выбор --</option>
+                        {% for drive in drives %}
+                        <option value="{{ drive }}">{{ drive }}</option>
+                        {% endfor %}
+                        {% if subdirs %}
+                        <optgroup label="Папки в текущем каталоге">
+                            {% for subdir in subdirs %}
+                            <option value="{{ current_path }}/{{ subdir }}">
+                                📁 {{ subdir }}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endif %}
+                    </select>
                 </div>
             </div>
 
@@ -236,13 +345,17 @@
     </div>
 
     <script>
-        document.getElementById('save_path').addEventListener('change', function() {
-            const customContainer = document.getElementById('custom_path_container');
-            if (this.value === 'custom') {
-                customContainer.style.display = 'block';
-            } else {
-                customContainer.style.display = 'none';
-                document.getElementById('custom_path').value = this.value;
+        // Функция для выбора текущего пути
+        function selectCurrentPath() {
+            document.getElementById('selected_path').value = '{{ current_path }}';
+            document.getElementById('settingsForm').submit();
+        }
+
+        // Обработчик для ниспадающего меню
+        document.getElementById('path_select').addEventListener('change', function() {
+            if (this.value) {
+                document.getElementById('selected_path').value = this.value;
+                document.getElementById('settingsForm').submit();
             }
         });
     </script>
