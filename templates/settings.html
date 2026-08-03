@@ -137,6 +137,13 @@
         .btn-admin:hover {
             background: linear-gradient(135deg, #7b1fa2, #8e24aa);
         }
+        .btn-materials {
+            background: linear-gradient(135deg, #00897b, #26a69a);
+            color: white;
+        }
+        .btn-materials:hover {
+            background: linear-gradient(135deg, #00695c, #00897b);
+        }
         .alert {
             padding: 12px 20px;
             border-radius: 10px;
@@ -225,6 +232,21 @@
             background: #9c27b0;
             color: white;
             margin-left: 8px;
+        }
+        .material-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .stat-item {
+            background: #e8eaf6;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .stat-item strong {
+            color: #1a237e;
         }
         @media (max-width: 768px) {
             .container { padding: 20px; }
@@ -336,7 +358,27 @@
             </div>
             {% endif %}
 
-            <!-- 3. База пользователей (только для администратора) -->
+            <!-- 3. Редактирование мастер-данных материалов (только для администратора) -->
+            {% if is_admin %}
+            <div class="settings-section" style="border-left-color: #00897b;">
+                <h2>
+                    <span class="icon">📦</span>
+                    Редактирование мастер-данных материалов
+                </h2>
+                <div class="desc">Управление базой материалов: просмотр, редактирование и импорт данных о палетизации</div>
+
+                <div class="material-stats">
+                    <span class="stat-item">📊 Всего материалов: <strong>{{ material_count }}</strong></span>
+                </div>
+
+                <div class="admin-actions">
+                    <a href="/materials" class="btn btn-materials">📋 Редактировать материалы</a>
+                    <a href="/materials/import" class="btn btn-settings">📤 Загрузить данные о палетизации</a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 4. База пользователей (только для администратора) -->
             {% if is_admin %}
             <div class="settings-section" style="border-left-color: #9c27b0;">
                 <h2>

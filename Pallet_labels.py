@@ -5,6 +5,7 @@ import json
 import sqlite3
 import hashlib
 import secrets
+import math
 from datetime import datetime
 from pathlib import Path
 import subprocess
@@ -12,7 +13,7 @@ import tempfile
 import shutil
 from contextlib import contextmanager
 
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash, jsonify
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
@@ -30,9 +31,286 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['SETTINGS_FILE'] = 'settings.json'
 app.config['DATABASE_FILE'] = 'users.db'
+app.config['MATERIALS_DATABASE_FILE'] = 'materials.db'
 
 # Создаем папку для загрузок
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+
+# ============================================================
+# БАЗА ДАННЫХ МАСТЕР-ДАННЫХ МАТЕРИАЛОВ
+# ============================================================
+
+class MaterialsDatabase:
+    """Класс для работы с базой мастер-данных материалов"""
+
+    def __init__(self, db_file='materials.db'):
+        self.db_file = db_file
+        self.init_database()
+
+    @contextmanager
+    def get_connection(self):
+        """Получает соединение с базой данных"""
+        conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    def init_database(self):
+        """Инициализирует базу данных и создает таблицу материалов"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS materials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sap_code INTEGER UNIQUE NOT NULL,
+                    material_name TEXT UNIQUE NOT NULL,
+                    palletization INTEGER DEFAULT 0,
+                    box_quantity INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            conn.commit()
+
+            cursor.execute("SELECT COUNT(*) FROM materials")
+            count = cursor.fetchone()[0]
+
+            if count == 0:
+                self.create_default_materials()
+
+    def create_default_materials(self):
+        """Создает тестовые материалы"""
+        default_materials = [
+            {'sap_code': 10000001, 'material_name': 'Тестовый материал 1', 'palletization': 100, 'box_quantity': 10},
+            {'sap_code': 10000002, 'material_name': 'Тестовый материал 2', 'palletization': 200, 'box_quantity': 20},
+            {'sap_code': 10000003, 'material_name': 'Тестовый материал 3', 'palletization': 150, 'box_quantity': 15},
+        ]
+
+        for material in default_materials:
+            self.add_material(material)
+
+        print(f"✅ Создано {len(default_materials)} тестовых материалов")
+
+    def add_material(self, material_data):
+        """Добавляет новый материал в базу"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO materials (sap_code, material_name, palletization, box_quantity)
+                    VALUES (?, ?, ?, ?)
+                ''', (
+                    material_data['sap_code'],
+                    material_data['material_name'],
+                    material_data.get('palletization', 0),
+                    material_data.get('box_quantity', 0)
+                ))
+                conn.commit()
+                return True, "Материал успешно добавлен"
+        except sqlite3.IntegrityError as e:
+            if 'UNIQUE constraint failed: materials.sap_code' in str(e):
+                return False, f"Материал с SAP-кодом {material_data['sap_code']} уже существует"
+            elif 'UNIQUE constraint failed: materials.material_name' in str(e):
+                return False, f"Материал с названием '{material_data['material_name']}' уже существует"
+            return False, f"Ошибка целостности данных: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка при добавлении материала: {str(e)}"
+
+    def get_material_by_sap(self, sap_code):
+        """Находит материал по SAP-коду"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM materials WHERE sap_code = ?", (sap_code,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def get_material_by_name(self, material_name):
+        """Находит материал по названию"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM materials WHERE material_name = ?", (material_name,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def update_material(self, sap_code, new_data):
+        """Обновляет данные материала"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                fields = []
+                values = []
+
+                for key in ['material_name', 'palletization', 'box_quantity']:
+                    if key in new_data:
+                        fields.append(f"{key} = ?")
+                        values.append(new_data[key])
+
+                values.append(sap_code)
+                fields.append("updated_at = CURRENT_TIMESTAMP")
+
+                query = f"UPDATE materials SET {', '.join(fields)} WHERE sap_code = ?"
+                cursor.execute(query, values)
+                conn.commit()
+                return True, "Данные материала обновлены"
+        except sqlite3.IntegrityError as e:
+            if 'UNIQUE constraint failed: materials.material_name' in str(e):
+                return False, f"Материал с названием '{new_data.get('material_name', '')}' уже существует"
+            return False, f"Ошибка целостности данных: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка при обновлении: {str(e)}"
+
+    def delete_material(self, sap_code):
+        """Удаляет материал"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM materials WHERE sap_code = ?", (sap_code,))
+                conn.commit()
+                return True, "Материал удален"
+        except Exception as e:
+            return False, f"Ошибка при удалении: {str(e)}"
+
+    def get_all_materials(self):
+        """Возвращает список всех материалов"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM materials ORDER BY sap_code")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def get_materials_count(self):
+        """Возвращает количество материалов в базе"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM materials")
+            return cursor.fetchone()[0]
+
+    def validate_and_import_from_excel(self, filepath):
+        """Проверяет и импортирует данные из Excel файла"""
+        try:
+            df = pd.read_excel(filepath, header=None)
+
+            if df.empty:
+                return False, "Файл пуст"
+
+            header_row = 0
+            first_row = df.iloc[0]
+            is_header = False
+
+            if isinstance(first_row[0], str) and not first_row[0].isdigit():
+                is_header = True
+            elif isinstance(first_row[1], str) and len(str(first_row[1])) > 0:
+                is_header = True
+
+            if is_header:
+                header_row = 1
+                df = df.iloc[1:].reset_index(drop=True)
+
+            if df.shape[1] < 3:
+                return False, "Файл должен содержать минимум 3 колонки (SAP код, Название, Палетизация)"
+
+            errors = []
+            materials_to_add = []
+            materials_to_update = []
+
+            for idx, row in df.iterrows():
+                sap_value = row[0]
+                if pd.isna(sap_value):
+                    errors.append(f"Строка {idx + 2}: SAP код не может быть пустым")
+                    continue
+
+                try:
+                    sap_code = int(sap_value)
+                    if len(str(sap_code)) != 8:
+                        errors.append(
+                            f"Строка {idx + 2}: SAP код должен содержать 8 цифр (текущее значение: {sap_code})")
+                        continue
+                except (ValueError, TypeError):
+                    errors.append(f"Строка {idx + 2}: SAP код должен быть числом (текущее значение: {sap_value})")
+                    continue
+
+                material_name = str(row[1]) if not pd.isna(row[1]) else ''
+                if not material_name.strip():
+                    errors.append(f"Строка {idx + 2}: Название материала не может быть пустым")
+                    continue
+
+                palletization_value = row[2] if not pd.isna(row[2]) else 0
+                try:
+                    palletization = int(palletization_value)
+                    if palletization < 0:
+                        errors.append(
+                            f"Строка {idx + 2}: Палетизация не может быть отрицательной (текущее значение: {palletization})")
+                        continue
+                except (ValueError, TypeError):
+                    errors.append(
+                        f"Строка {idx + 2}: Палетизация должна быть числом (текущее значение: {palletization_value})")
+                    continue
+
+                if df.shape[1] > 3:
+                    for col_idx in range(3, df.shape[1]):
+                        if not pd.isna(row[col_idx]) and str(row[col_idx]).strip():
+                            errors.append(f"Строка {idx + 2}: Обнаружены данные в дополнительной колонке {col_idx + 1}")
+                            break
+
+                material_data = {
+                    'sap_code': sap_code,
+                    'material_name': material_name.strip(),
+                    'palletization': palletization
+                }
+
+                existing = self.get_material_by_sap(sap_code)
+                if existing:
+                    materials_to_update.append(material_data)
+                else:
+                    existing_name = self.get_material_by_name(material_name.strip())
+                    if existing_name:
+                        errors.append(
+                            f"Строка {idx + 2}: Материал с названием '{material_name.strip()}' уже существует в базе (SAP: {existing_name['sap_code']})")
+                    else:
+                        materials_to_add.append(material_data)
+
+            if errors:
+                return False, "Ошибки в файле:\n" + "\n".join(errors)
+
+            updated_count = 0
+            for material in materials_to_update:
+                existing = self.get_material_by_sap(material['sap_code'])
+                if existing:
+                    new_data = {
+                        'material_name': material['material_name'],
+                        'palletization': material['palletization'],
+                        'box_quantity': existing.get('box_quantity', 0)
+                    }
+                    success, message = self.update_material(material['sap_code'], new_data)
+                    if success:
+                        updated_count += 1
+
+            added_count = 0
+            for material in materials_to_add:
+                material_data = {
+                    'sap_code': material['sap_code'],
+                    'material_name': material['material_name'],
+                    'palletization': material['palletization'],
+                    'box_quantity': 0
+                }
+                success, message = self.add_material(material_data)
+                if success:
+                    added_count += 1
+
+            return True, f"Успешно обработано: добавлено {added_count} материалов, обновлено {updated_count} материалов"
+
+        except Exception as e:
+            return False, f"Ошибка при обработке файла: {str(e)}"
 
 
 # ============================================================
@@ -95,7 +373,6 @@ class UserDatabase:
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Создаем таблицу пользователей
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,7 +390,6 @@ class UserDatabase:
                 )
             ''')
 
-            # Проверяем и добавляем колонку status если её нет
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
             if 'status' not in columns:
@@ -123,7 +399,6 @@ class UserDatabase:
                 cursor.execute("UPDATE users SET status = 'active' WHERE status IS NULL")
                 conn.commit()
 
-            # Создаем таблицу аудита
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -240,7 +515,6 @@ class UserDatabase:
         """Проверяет логин и пароль"""
         user = self.find_user(login)
         if user:
-            # Проверяем статус пользователя
             if user.get('status') == 'blocked':
                 self.log_action(login, 'LOGIN_FAILED', f"Попытка входа заблокированного пользователя")
                 return None, 'blocked'
@@ -396,10 +670,11 @@ class UserDatabase:
 
 
 # ============================================================
-# ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ
+# ИНИЦИАЛИЗАЦИЯ БАЗ ДАННЫХ
 # ============================================================
 
 db = UserDatabase(app.config['DATABASE_FILE'])
+materials_db = MaterialsDatabase(app.config['MATERIALS_DATABASE_FILE'])
 
 # ============================================================
 # ФУНКЦИИ ДЛЯ РАБОТЫ С НАСТРОЙКАМИ
@@ -470,6 +745,54 @@ def get_subdirectories(path):
     except:
         pass
     return sorted(subdirs)
+
+
+# ============================================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ============================================================
+
+def parse_quantity_from_string(text):
+    """
+    Извлекает число из строки, учитывая пробелы между разрядами.
+    Например: "24 000" -> 24000, "1 500" -> 1500
+    """
+    if not text:
+        return None
+
+    # Удаляем все пробелы из строки
+    cleaned = text.replace(' ', '').replace('\u00a0', '').replace('\t', '')
+
+    # Пробуем найти число в строке
+    match = re.search(r'(\d+)', cleaned)
+    if match:
+        try:
+            return int(match.group(1))
+        except:
+            return None
+    return None
+
+
+def calculate_pallets(quantity, palletization):
+    """
+    Рассчитывает количество паллет по формуле:
+    - если палетизация > 0: ceil(количество / палетизация)
+    - если палетизация <= 0: 1
+    """
+    if not quantity:
+        return 1
+
+    try:
+        qty = int(quantity)
+    except:
+        return 1
+
+    if palletization > 0:
+        try:
+            return math.ceil(qty / palletization)
+        except:
+            return 1
+    else:
+        return 1
 
 
 # ============================================================
@@ -767,6 +1090,9 @@ def extract_data_from_pdf(pdf_path):
                     current_pos = i + 1
                     last_name_line = i
 
+                    # Сохраняем позицию начала названия для последующего извлечения количества
+                    name_start_line = i
+
                     while current_pos < end_index:
                         next_line = lines[current_pos]
 
@@ -822,14 +1148,23 @@ def extract_data_from_pdf(pdf_path):
                         if date_match:
                             expiration_date = date_match.group(1)
 
+                    # Извлекаем количество из строки на 5 позиций ниже от начала названия
+                    quantity = None
+                    quantity_line_index = name_start_line + 5
+                    if quantity_line_index < len(lines):
+                        quantity_line = lines[quantity_line_index]
+                        quantity = parse_quantity_from_string(quantity_line)
+
                     if analytic_list:
-                        products.append({
+                        product_data = {
                             'наименование': product_name,
                             'номенклатурный_номер': nomencl_number,
                             'аналитический_лист': analytic_list,
                             'партия_поставщика': supplier_batch,
-                            'срок_годности': expiration_date
-                        })
+                            'срок_годности': expiration_date,
+                            'количество': quantity
+                        }
+                        products.append(product_data)
 
                     i = last_name_line + 11
                 else:
@@ -1159,6 +1494,146 @@ def update_user(login):
         return redirect(url_for('admin_panel'))
 
 
+# ============================================================
+# МАРШРУТЫ ДЛЯ РАБОТЫ С МАТЕРИАЛАМИ
+# ============================================================
+
+@app.route('/materials')
+@admin_required
+def materials_page():
+    """Страница управления материалами"""
+    try:
+        materials = materials_db.get_all_materials()
+        return render_template('materials.html', materials=materials)
+    except Exception as e:
+        print(f"Ошибка в materials_page: {e}")
+        flash('Ошибка загрузки данных материалов', 'danger')
+        return redirect(url_for('settings_page'))
+
+
+@app.route('/materials/update', methods=['POST'])
+@admin_required
+def update_materials():
+    """Обновление данных материалов"""
+    try:
+        materials_data = request.form.get('materials_data')
+        if not materials_data:
+            flash('Нет данных для сохранения', 'danger')
+            return redirect(url_for('materials_page'))
+
+        materials = json.loads(materials_data)
+        errors = []
+        success_count = 0
+
+        for material in materials:
+            sap_code = material.get('sap_code')
+            material_name = material.get('material_name', '').strip()
+            palletization = material.get('palletization', 0)
+            box_quantity = material.get('box_quantity', 0)
+
+            existing = materials_db.get_material_by_name(material_name)
+            if existing and existing['sap_code'] != sap_code:
+                errors.append(f"Материал с названием '{material_name}' уже существует (SAP: {existing['sap_code']})")
+                continue
+
+            try:
+                palletization = int(palletization)
+                if palletization < 0:
+                    errors.append(f"SAP {sap_code}: Палетизация не может быть отрицательной")
+                    continue
+            except (ValueError, TypeError):
+                errors.append(f"SAP {sap_code}: Палетизация должна быть числом")
+                continue
+
+            try:
+                box_quantity = int(box_quantity)
+                if box_quantity < 0:
+                    errors.append(f"SAP {sap_code}: Вложение в короб не может быть отрицательным")
+                    continue
+            except (ValueError, TypeError):
+                errors.append(f"SAP {sap_code}: Вложение в короб должно быть числом")
+                continue
+
+            new_data = {
+                'material_name': material_name,
+                'palletization': palletization,
+                'box_quantity': box_quantity
+            }
+            success, message = materials_db.update_material(sap_code, new_data)
+            if success:
+                success_count += 1
+            else:
+                errors.append(message)
+
+        if errors:
+            flash(f"Сохранено {success_count} материалов. Ошибки:\n" + "\n".join(errors), 'warning')
+        else:
+            flash(f"Успешно сохранено {success_count} материалов", 'success')
+
+        return redirect(url_for('materials_page'))
+    except Exception as e:
+        print(f"Ошибка в update_materials: {e}")
+        flash(f'Ошибка при сохранении данных: {str(e)}', 'danger')
+        return redirect(url_for('materials_page'))
+
+
+@app.route('/materials/delete/<int:sap_code>', methods=['POST'])
+@admin_required
+def delete_material(sap_code):
+    """Удаление материала"""
+    try:
+        success, message = materials_db.delete_material(sap_code)
+        flash(message, 'success' if success else 'danger')
+        return redirect(url_for('materials_page'))
+    except Exception as e:
+        print(f"Ошибка в delete_material: {e}")
+        flash(f'Ошибка при удалении материала: {str(e)}', 'danger')
+        return redirect(url_for('materials_page'))
+
+
+@app.route('/materials/import', methods=['GET', 'POST'])
+@admin_required
+def import_materials():
+    """Импорт материалов из Excel файла"""
+    if request.method == 'GET':
+        return render_template('import_materials.html')
+
+    try:
+        if 'file' not in request.files:
+            flash('Файл не выбран', 'danger')
+            return redirect(url_for('import_materials'))
+
+        file = request.files['file']
+
+        if file.filename == '':
+            flash('Файл не выбран', 'danger')
+            return redirect(url_for('import_materials'))
+
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            flash('Пожалуйста, загрузите файл в формате Excel (.xlsx или .xls)', 'danger')
+            return redirect(url_for('import_materials'))
+
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+        try:
+            success, message = materials_db.validate_and_import_from_excel(filepath)
+            if success:
+                flash(message, 'success')
+            else:
+                flash(message, 'danger')
+        finally:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
+        return redirect(url_for('materials_page'))
+    except Exception as e:
+        print(f"Ошибка в import_materials: {e}")
+        flash(f'Ошибка при импорте: {str(e)}', 'danger')
+        return redirect(url_for('import_materials'))
+
+
 @app.route('/upload', methods=['POST'])
 @labels_access_required
 def upload_file():
@@ -1187,6 +1662,33 @@ def upload_file():
                 return render_template('error.html',
                                        error='Не удалось извлечь данные из PDF-файла. Проверьте формат файла.')
 
+            # Обогащаем данные о товарах информацией о палетизации
+            for product in data['товары']:
+                sap_code = product.get('номенклатурный_номер')
+                product['sap_code_display'] = sap_code if sap_code else '-'
+
+                if sap_code:
+                    try:
+                        sap_code_int = int(sap_code)
+                        material = materials_db.get_material_by_sap(sap_code_int)
+                        if material:
+                            product['palletization'] = material.get('palletization', 0)
+                            product['material_found'] = True
+                        else:
+                            product['palletization'] = 0
+                            product['material_found'] = False
+                    except (ValueError, TypeError):
+                        product['palletization'] = 0
+                        product['material_found'] = False
+                else:
+                    product['palletization'] = 0
+                    product['material_found'] = False
+
+                # Рассчитываем количество паллет
+                quantity = product.get('количество', 0)
+                palletization = product.get('palletization', 0)
+                product['pallets'] = calculate_pallets(quantity, palletization)
+
             db.log_action(session['user'], 'UPLOAD_PDF', f"Загружен PDF: {filename}")
 
             return render_template('result.html', data=data)
@@ -1197,6 +1699,30 @@ def upload_file():
     except Exception as e:
         print(f"Ошибка в upload_file: {e}")
         return render_template('error.html', error=f'Ошибка при загрузке файла: {str(e)}')
+
+
+@app.route('/recalculate_pallets', methods=['POST'])
+@labels_access_required
+def recalculate_pallets():
+    """Пересчет количества паллет для всех товаров"""
+    try:
+        data = request.get_json()
+        if not data or 'products' not in data:
+            return jsonify({'success': False, 'error': 'Нет данных'})
+
+        products = data.get('products', [])
+        recalculated = []
+
+        for product in products:
+            quantity = product.get('количество', 0)
+            palletization = product.get('palletization', 0)
+            pallets = calculate_pallets(quantity, palletization)
+            recalculated.append(pallets)
+
+        return jsonify({'success': True, 'pallets': recalculated})
+    except Exception as e:
+        print(f"Ошибка в recalculate_pallets: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 @app.route('/generate_labels', methods=['POST'])
@@ -1210,14 +1736,12 @@ def generate_labels():
         if not products_json or not order_number:
             return render_template('error.html', error='Нет данных для формирования этикеток')
 
-        # Пробуем исправить JSON если он в одинарных кавычках
         products_json = products_json.replace("'", '"')
 
         try:
             products = json.loads(products_json)
         except json.JSONDecodeError as e:
             print(f"Ошибка парсинга JSON: {e}")
-            print(f"Полученные данные: {products_json[:200]}...")
             return render_template('error.html', error=f'Ошибка парсинга данных: {str(e)}')
 
         if not products:
@@ -1278,9 +1802,7 @@ def settings_page():
 
         subdirs = get_subdirectories(current_path)
 
-        # Обработка POST запросов
         if request.method == 'POST':
-            # Сохранение пути
             selected_path = request.form.get('selected_path')
             if selected_path:
                 settings['save_path'] = selected_path
@@ -1289,7 +1811,6 @@ def settings_page():
                 flash('Настройки сохранены', 'success')
                 return redirect(url_for('settings_page'))
 
-            # Сохранение SOP кода
             sop_code = request.form.get('sop_code')
             if sop_code:
                 settings['sop_code'] = sop_code.strip()
@@ -1297,7 +1818,6 @@ def settings_page():
                 flash('Номер СОП успешно обновлен', 'success')
                 return redirect(url_for('settings_page'))
 
-            # Навигация по пути
             path_component = request.form.get('path_component')
             if path_component:
                 new_path = path_component
@@ -1307,6 +1827,8 @@ def settings_page():
                 flash('Настройки сохранены', 'success')
                 return redirect(url_for('settings_page'))
 
+        material_count = materials_db.get_materials_count()
+
         return render_template('settings.html',
                                settings=settings,
                                drives=drives,
@@ -1314,9 +1836,12 @@ def settings_page():
                                path_parts=path_parts,
                                subdirs=subdirs,
                                os_sep=os.sep,
-                               is_admin=(session.get('user_rights') == 'Администратор'))
+                               is_admin=(session.get('user_rights') == 'Администратор'),
+                               material_count=material_count)
     except Exception as e:
         print(f"Ошибка в settings_page: {e}")
+        import traceback
+        traceback.print_exc()
         flash('Ошибка загрузки настроек', 'danger')
         return redirect(url_for('index'))
 

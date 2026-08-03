@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -33,19 +33,30 @@
             border-left: 4px solid #4caf50;
         }
         .info-box p { margin: 5px 0; }
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            margin: 20px 0;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            font-size: 14px;
         }
         th, td {
-            padding: 12px;
+            padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid #ddd;
         }
         th {
             background: #1a237e;
             color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
         tr:hover { background: #f5f5f5; }
         .btn {
@@ -58,24 +69,92 @@
             text-decoration: none;
             display: inline-block;
             margin: 5px;
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
         }
-        .btn:hover { transform: scale(1.05); }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
         .btn-primary {
             background: linear-gradient(135deg, #4caf50, #66bb6a);
             color: white;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #43a047, #4caf50);
         }
         .btn-secondary {
             background: linear-gradient(135deg, #2196f3, #64b5f6);
             color: white;
         }
-        .actions { text-align: center; margin-top: 20px; }
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #1e88e5, #42a5f5);
+        }
+        .btn-toggle {
+            background: linear-gradient(135deg, #ff9800, #ffa726);
+            color: white;
+        }
+        .btn-toggle:hover {
+            background: linear-gradient(135deg, #f57c00, #fb8c00);
+        }
+        .btn-toggle.active {
+            background: linear-gradient(135deg, #2196f3, #64b5f6);
+        }
+        .btn-toggle.active:hover {
+            background: linear-gradient(135deg, #1e88e5, #42a5f5);
+        }
+        .actions {
+            text-align: center;
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
         .product-count {
             background: #e3f2fd;
             padding: 10px 20px;
             border-radius: 10px;
             display: inline-block;
             margin: 10px 0;
+        }
+        .pallets-input {
+            width: 80px;
+            padding: 6px 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+        .pallets-input:focus {
+            outline: none;
+            border-color: #2196f3;
+        }
+        /* Убираем стрелки для ввода числа */
+        .pallets-input::-webkit-outer-spin-button,
+        .pallets-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .pallets-input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .badge-found { background: #4caf50; color: white; }
+        .badge-not-found { background: #f44336; color: white; }
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            th, td { padding: 8px 10px; font-size: 13px; }
+            .pallets-input { width: 60px; }
+            .actions { flex-direction: column; }
+            .actions .btn { width: 100%; }
         }
     </style>
 </head>
@@ -92,38 +171,67 @@
 
         <h2>Список товаров</h2>
         {% if data.товары %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>№</th>
-                        <th>Наименование</th>
-                        <th>Аналитический лист</th>
-                        <th>Партия поставщика</th>
-                        <th>Срок годности</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for product in data.товары %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ product.наименование }}</td>
-                        <td><strong>{{ product.аналитический_лист }}</strong></td>
-                        <td>{{ product.партия_поставщика or '-' }}</td>
-                        <td>{{ product.срок_годности or '-' }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="min-width: 40px;">№</th>
+                            <th style="min-width: 120px;">SAP код</th>
+                            <th style="min-width: 250px;">Наименование</th>
+                            <th style="min-width: 120px;">Аналитический лист</th>
+                            <th style="min-width: 80px;">Кол-во</th>
+                            <th style="min-width: 100px;">Палетизация</th>
+                            <th style="min-width: 150px;">Кол-во паллет</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in data.товары %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                {{ product.sap_code_display or '-' }}
+                                {% if product.sap_code_display and product.sap_code_display != '-' %}
+                                    {% if product.material_found %}
+                                        <span class="badge badge-found">✓</span>
+                                    {% else %}
+                                        <span class="badge badge-not-found">✗</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>{{ product.наименование }}</td>
+                            <td><strong>{{ product.аналитический_лист }}</strong></td>
+                            <td>{{ product.количество or '-' }}</td>
+                            <td>{{ product.palletization or 0 }}</td>
+                            <td>
+                                <input type="number"
+                                       class="pallets-input"
+                                       id="pallets_{{ loop.index0 }}"
+                                       value="{{ product.pallets or 1 }}"
+                                       min="1"
+                                       step="1"
+                                       data-index="{{ loop.index0 }}"
+                                       onkeydown="return event.key !== '-'">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% else %}
             <p style="text-align: center; color: #999; padding: 40px;">Товары не найдены</p>
         {% endif %}
 
         <div class="actions">
-            <form action="/generate_labels" method="post" id="generateForm">
+            <button class="btn btn-toggle" id="togglePalletsBtn" onclick="togglePallets()">
+                📦 Сделать все по 1 палету
+            </button>
+
+            <form action="/generate_labels" method="post" id="generateForm" style="display:inline;">
                 <input type="hidden" name="products" id="productsData">
                 <input type="hidden" name="order_number" value="{{ data.номер_ордера }}">
                 <button type="button" class="btn btn-primary" onclick="submitForm()">📄 Сформировать этикетки</button>
             </form>
+
             <a href="/" class="btn btn-secondary">🏠 На главную</a>
         </div>
     </div>
@@ -131,13 +239,101 @@
     <script>
         // Данные товаров для передачи в form
         const products = {{ data.товары|tojson|safe }};
+        let isAllOnePallet = false;
 
         function submitForm() {
-            // Кодируем данные в JSON строку с правильными кавычками
+            // Обновляем данные о паллетах из полей ввода
+            const palletsInputs = document.querySelectorAll('.pallets-input');
+            palletsInputs.forEach(input => {
+                const index = parseInt(input.dataset.index);
+                const value = parseInt(input.value);
+                if (!isNaN(value) && value > 0) {
+                    products[index].pallets = value;
+                }
+            });
+
             const productsJson = JSON.stringify(products);
             document.getElementById('productsData').value = productsJson;
             document.getElementById('generateForm').submit();
         }
+
+        function togglePallets() {
+            const btn = document.getElementById('togglePalletsBtn');
+            const inputs = document.querySelectorAll('.pallets-input');
+
+            if (!isAllOnePallet) {
+                // Режим: все по 1 палету
+                inputs.forEach(input => {
+                    input.value = 1;
+                    const index = parseInt(input.dataset.index);
+                    products[index].pallets = 1;
+                });
+                btn.textContent = '🔄 Пересчитать число палет';
+                btn.classList.add('active');
+                isAllOnePallet = true;
+            } else {
+                // Режим: пересчитать палеты по формуле
+                btn.textContent = '⏳ Пересчет...';
+                btn.disabled = true;
+
+                // Собираем данные о продуктах для пересчета
+                const productsData = products.map(p => ({
+                    количество: p.количество,
+                    palletization: p.palletization
+                }));
+
+                fetch('/recalculate_pallets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ products: productsData })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const pallets = data.pallets;
+                        const inputs = document.querySelectorAll('.pallets-input');
+                        inputs.forEach((input, idx) => {
+                            const value = pallets[idx] || 1;
+                            input.value = value;
+                            const index = parseInt(input.dataset.index);
+                            products[index].pallets = value;
+                        });
+                        btn.textContent = '📦 Сделать все по 1 палету';
+                        btn.classList.remove('active');
+                        isAllOnePallet = false;
+                    } else {
+                        alert('Ошибка при пересчете: ' + data.error);
+                        btn.textContent = '🔄 Пересчитать число палет';
+                    }
+                })
+                .catch(error => {
+                    alert('Ошибка при пересчете');
+                    btn.textContent = '🔄 Пересчитать число палет';
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                });
+            }
+        }
+
+        // Запрещаем ввод минуса
+        document.querySelectorAll('.pallets-input').forEach(input => {
+            input.addEventListener('input', function() {
+                // Проверяем, что нет минуса
+                if (this.value.includes('-')) {
+                    this.value = this.value.replace(/-/g, '');
+                }
+            });
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === '-' || e.key === 'Minus') {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        });
     </script>
 </body>
 </html>
