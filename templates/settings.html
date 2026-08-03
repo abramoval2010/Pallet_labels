@@ -1,4 +1,3 @@
-<!-- templates/settings.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -6,358 +5,359 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Настройки</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 20px;
         }
-
         .container {
-            background: rgba(255, 255, 255, 0.95);
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
             border-radius: 20px;
             padding: 40px;
-            max-width: 700px;
-            width: 100%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            color: #1a237e;
-            font-size: 2em;
-            margin-bottom: 10px;
-        }
-
-        .header .subtitle {
-            color: #4a6fa5;
-            font-size: 1em;
-        }
-
-        .settings-group {
-            margin-bottom: 25px;
-        }
-
-        .settings-group label {
-            display: block;
-            font-weight: 600;
+        h1 {
             color: #1a237e;
             margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-
-        .settings-group .description {
-            color: #78909c;
-            font-size: 0.9em;
-            margin-bottom: 15px;
-        }
-
-        .path-display {
-            background: #f5f5f5;
-            padding: 12px 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            word-break: break-all;
-        }
-
-        .path-display .label {
-            color: #78909c;
-            font-size: 0.85em;
-        }
-
-        .path-display .value {
-            color: #1a237e;
-            font-weight: 500;
-            margin-top: 5px;
-        }
-
-        .folder-tree {
-            background: #f5f5f5;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .folder-tree .tree-item {
-            padding: 5px 0;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .folder-tree .tree-item:last-child {
-            border-bottom: none;
-        }
-
-        .folder-tree .tree-item a {
-            color: #1a237e;
-            text-decoration: none;
             display: flex;
             align-items: center;
-            padding: 5px 10px;
-            border-radius: 5px;
-            transition: background 0.3s ease;
-            cursor: pointer;
+            gap: 10px;
         }
-
-        .folder-tree .tree-item a:hover {
-            background: #e3f2fd;
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
         }
-
-        .folder-tree .tree-item .icon {
-            margin-right: 10px;
-        }
-
-        .folder-tree .tree-item .name {
-            font-weight: 500;
-        }
-
-        .folder-tree .tree-item .current {
-            background: #e8f5e9;
-            font-weight: 600;
-        }
-
-        .folder-tree .tree-item .current .name {
-            color: #2e7d32;
-        }
-
-        .breadcrumb {
+        .settings-menu {
             display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            padding: 10px;
-            background: white;
-            border-radius: 8px;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .settings-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            border-left: 4px solid #9c27b0;
+            transition: all 0.3s ease;
+        }
+        .settings-section:hover {
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+        .settings-section h2 {
+            color: #1a237e;
+            font-size: 18px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .settings-section .desc {
+            color: #666;
+            font-size: 14px;
             margin-bottom: 15px;
         }
-
-        .breadcrumb .crumb {
-            color: #1a237e;
-            text-decoration: none;
-            padding: 3px 8px;
-            border-radius: 4px;
-            transition: background 0.3s ease;
-            font-size: 0.9em;
-            cursor: pointer;
+        .settings-section .icon {
+            font-size: 24px;
         }
-
-        .breadcrumb .crumb:hover {
-            background: #e3f2fd;
+        .current-path {
+            background: #e8f5e9;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #4caf50;
+            word-break: break-all;
+            font-size: 14px;
         }
-
-        .breadcrumb .separator {
-            color: #78909c;
-        }
-
-        .breadcrumb .crumb.current {
-            font-weight: 600;
+        .current-path strong {
             color: #2e7d32;
         }
-
+        .current-sop {
+            background: #e3f2fd;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+            word-break: break-all;
+            font-size: 14px;
+        }
+        .current-sop strong {
+            color: #0d47a1;
+        }
         .btn {
-            padding: 10px 30px;
+            padding: 10px 25px;
             border: none;
             border-radius: 50px;
-            font-size: 1em;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
+            transition: all 0.3s ease;
         }
-
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
         .btn-primary {
             background: linear-gradient(135deg, #4caf50, #66bb6a);
             color: white;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
-
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(76, 175, 80, 0.4);
+            background: linear-gradient(135deg, #43a047, #4caf50);
         }
-
         .btn-secondary {
             background: linear-gradient(135deg, #2196f3, #64b5f6);
             color: white;
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
         }
-
         .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
+            background: linear-gradient(135deg, #1e88e5, #42a5f5);
         }
-
-        .actions {
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: white;
+        }
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #d32f2f, #e53935);
+        }
+        .btn-settings {
+            background: linear-gradient(135deg, #ff9800, #ffa726);
+            color: white;
+        }
+        .btn-settings:hover {
+            background: linear-gradient(135deg, #f57c00, #fb8c00);
+        }
+        .btn-admin {
+            background: linear-gradient(135deg, #9c27b0, #ab47bc);
+            color: white;
+        }
+        .btn-admin:hover {
+            background: linear-gradient(135deg, #7b1fa2, #8e24aa);
+        }
+        .alert {
+            padding: 12px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .form-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .form-row input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            min-width: 200px;
+            transition: border-color 0.3s;
+        }
+        .form-row input:focus {
+            outline: none;
+            border-color: #9c27b0;
+        }
+        .drive-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .drive-list .btn {
+            font-size: 13px;
+            padding: 8px 18px;
+        }
+        .path-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .path-nav .btn {
+            font-size: 12px;
+            padding: 5px 15px;
+        }
+        .admin-actions {
             display: flex;
             gap: 15px;
-            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .actions {
             margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 15px;
             flex-wrap: wrap;
         }
-
-        .success-message {
-            padding: 15px;
-            background: #e8f5e9;
-            border-radius: 10px;
-            color: #2e7d32;
-            text-align: center;
-            margin-bottom: 20px;
+        .admin-badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #9c27b0;
+            color: white;
+            margin-left: 8px;
         }
-
         @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-
-            .actions {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .btn {
-                width: 100%;
-                text-align: center;
-            }
-
-            .breadcrumb {
-                font-size: 0.85em;
-            }
+            .container { padding: 20px; }
+            .settings-section { padding: 20px; }
+            .form-row { flex-direction: column; }
+            .form-row input { min-width: auto; }
+            .actions { flex-direction: column; }
+            .actions .btn { width: 100%; text-align: center; }
+            .admin-actions { flex-direction: column; }
+            .admin-actions .btn { width: 100%; text-align: center; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>⚙️ Настройки</h1>
-            <div class="subtitle">Настройка пути сохранения палетных этикеток</div>
-        </div>
+        <h1>
+            ⚙️ Настройки системы
+            {% if is_admin %}
+                <span class="admin-badge">Администратор</span>
+            {% endif %}
+        </h1>
+        <p class="subtitle">Управление параметрами программы</p>
 
-        {% if request.args.get('saved') %}
-        <div class="success-message">
-            ✅ Настройки успешно сохранены!
-        </div>
-        {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
-        <form method="post" id="settingsForm">
-            <div class="settings-group">
-                <label>📁 Путь к сохраненным палетным этикеткам</label>
-                <div class="description">Выберите папку для сохранения сформированных палетных этикеток</div>
+        <div class="settings-menu">
 
-                <div class="path-display">
-                    <div class="label">Текущий путь:</div>
-                    <div class="value">{{ current_path }}</div>
+            <!-- 1. Путь к папке с сохраненными этикетками -->
+            <div class="settings-section">
+                <h2>
+                    <span class="icon">📁</span>
+                    Путь к папке с сохраненными палетными этикетками
+                </h2>
+                <div class="desc">Выберите папку, где будут сохраняться сгенерированные палетные этикетки</div>
+
+                <div class="current-path">
+                    <strong>Текущая папка:</strong> {{ settings.save_path }}
                 </div>
 
-                <!-- Навигационная цепочка (хлебные крошки) -->
-                <div class="breadcrumb">
-                    <a href="{{ url_for('settings_page') }}" class="crumb">🏠</a>
-                    {% for part in path_parts %}
-                        <span class="separator">›</span>
-                        <a href="{{ url_for('settings_page') }}?path={{ part.path }}" class="crumb {% if loop.last %}current{% endif %}">
-                            {{ part.name }}
-                        </a>
-                    {% endfor %}
-                </div>
-
-                <!-- Список папок -->
-                <div class="folder-tree">
-                    <div class="tree-item">
-                        <a href="{{ url_for('settings_page') }}">
-                            <span class="icon">📂</span>
-                            <span class="name">Корень</span>
-                        </a>
+                <form method="POST">
+                    <div class="form-row">
+                        <input type="text" name="selected_path" placeholder="Введите путь к папке" value="{{ current_path }}">
+                        <button type="submit" class="btn btn-primary">💾 Сохранить путь</button>
                     </div>
+                </form>
 
+                <h3 style="font-size: 14px; color: #666; margin-top: 15px;">💾 Доступные диски</h3>
+                <div class="drive-list">
                     {% for drive in drives %}
-                    <div class="tree-item">
-                        <a href="{{ url_for('settings_page') }}?path={{ drive }}">
-                            <span class="icon">💾</span>
-                            <span class="name">{{ drive }}</span>
-                        </a>
-                    </div>
+                        <a href="/settings?path={{ drive }}" class="btn btn-secondary">{{ drive }}</a>
                     {% endfor %}
+                </div>
 
-                    {% if subdirs %}
-                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
+                {% if subdirs %}
+                    <h3 style="font-size: 14px; color: #666; margin-top: 10px;">📂 Папки в текущей директории</h3>
+                    <div class="drive-list">
                         {% for subdir in subdirs %}
-                        <div class="tree-item">
-                            <a href="{{ url_for('settings_page') }}?path={{ current_path }}/{{ subdir }}">
-                                <span class="icon">📁</span>
-                                <span class="name">{{ subdir }}</span>
-                            </a>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
-                        <div class="tree-item">
-                            <a href="#" onclick="selectCurrentPath()" style="background: #e8f5e9;">
-                                <span class="icon">✅</span>
-                                <span class="name" style="color: #2e7d32;">Выбрать текущую папку</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Скрытое поле для выбранного пути -->
-                <input type="hidden" name="selected_path" id="selected_path" value="{{ current_path }}">
-
-                <!-- Кнопка для выбора через ниспадающее меню -->
-                <div style="margin-top: 10px;">
-                    <select name="path_component" id="path_select" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0; font-size: 1em;">
-                        <option value="">-- Быстрый выбор --</option>
-                        {% for drive in drives %}
-                        <option value="{{ drive }}">{{ drive }}</option>
-                        {% endfor %}
-                        {% if subdirs %}
-                        <optgroup label="Папки в текущем каталоге">
-                            {% for subdir in subdirs %}
-                            <option value="{{ current_path }}/{{ subdir }}">
+                            <a href="/settings?path={{ current_path }}{{ os_sep }}{{ subdir }}" class="btn btn-secondary">
                                 📁 {{ subdir }}
-                            </option>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <div style="margin-top: 10px; padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                    <p style="color: #999; font-size: 13px;">
+                        <strong>Текущий путь:</strong> {{ current_path }}
+                    </p>
+                    {% if path_parts %}
+                        <div class="path-nav">
+                            {% for part in path_parts %}
+                                <a href="/settings?path={{ part.path }}" class="btn btn-secondary">
+                                    {{ part.name }}
+                                </a>
                             {% endfor %}
-                        </optgroup>
-                        {% endif %}
-                    </select>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="actions">
-                <a href="/" class="btn btn-secondary">⬅️ Назад</a>
-                <button type="submit" class="btn btn-primary">💾 Сохранить настройки</button>
+            <!-- 2. Номер СОП (только для администратора) -->
+            {% if is_admin %}
+            <div class="settings-section" style="border-left-color: #ff9800;">
+                <h2>
+                    <span class="icon">📋</span>
+                    Номер СОП при формировании палетной этикетки
+                </h2>
+                <div class="desc">Редактирование последней строки, которая выводится на палетной этикетке</div>
+
+                <div class="current-sop">
+                    <strong>Текущий номер СОП:</strong> {{ settings.sop_code }}
+                </div>
+
+                <form method="POST">
+                    <div class="form-row">
+                        <input type="text" name="sop_code" placeholder="Введите номер СОП" value="{{ settings.sop_code }}">
+                        <button type="submit" class="btn btn-settings">💾 Сохранить СОП</button>
+                    </div>
+                </form>
+                <div style="margin-top: 8px; font-size: 13px; color: #999;">
+                    <span>ℹ️ Пример: RUPD.VLG.05.04.C01</span>
+                </div>
             </div>
-        </form>
+            {% endif %}
+
+            <!-- 3. База пользователей (только для администратора) -->
+            {% if is_admin %}
+            <div class="settings-section" style="border-left-color: #9c27b0;">
+                <h2>
+                    <span class="icon">👥</span>
+                    База пользователей
+                </h2>
+                <div class="desc">Управление пользователями системы: создание, редактирование, блокировка и удаление учетных записей</div>
+
+                <div class="admin-actions">
+                    <a href="/admin" class="btn btn-admin">👥 Перейти к управлению пользователями</a>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn btn-settings">🏠 На главную</a>
+            <a href="/change_password" class="btn btn-secondary">🔑 Сменить пароль</a>
+            <a href="/logout" class="btn btn-danger">🚪 Выйти</a>
+        </div>
     </div>
-
-    <script>
-        // Функция для выбора текущего пути
-        function selectCurrentPath() {
-            document.getElementById('selected_path').value = '{{ current_path }}';
-            document.getElementById('settingsForm').submit();
-        }
-
-        // Обработчик для ниспадающего меню
-        document.getElementById('path_select').addEventListener('change', function() {
-            if (this.value) {
-                document.getElementById('selected_path').value = this.value;
-                document.getElementById('settingsForm').submit();
-            }
-        });
-    </script>
 </body>
 </html>

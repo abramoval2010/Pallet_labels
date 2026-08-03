@@ -1,365 +1,143 @@
-<!-- templates/result.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Результаты извлечения данных</title>
+    <title>Результат обработки</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
             padding: 20px;
         }
-
         .container {
-            background: rgba(255, 255, 255, 0.95);
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
             border-radius: 20px;
             padding: 40px;
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
-
-        .header {
-            text-align: center;
-            margin-bottom: 35px;
-        }
-
-        .header h1 {
+        h1 {
             color: #1a237e;
-            font-size: 2em;
-            margin-bottom: 5px;
-        }
-
-        .header .subtitle {
-            color: #4a6fa5;
-            font-size: 1em;
-        }
-
-        .success-icon {
-            text-align: center;
-            font-size: 4em;
             margin-bottom: 20px;
+            text-align: center;
         }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
-            margin: 30px 0;
-            background: #f5f5f5;
+        .info-box {
+            background: #e8f5e9;
             padding: 20px;
-            border-radius: 12px;
-        }
-
-        .info-item {
-            padding: 10px;
-        }
-
-        .info-item .label {
-            font-size: 0.85em;
-            color: #546e7a;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-        }
-
-        .info-item .value {
-            font-size: 1.1em;
-            color: #1a237e;
-            font-weight: 500;
-            margin-top: 5px;
-        }
-
-        .products-section {
-            margin-top: 30px;
-        }
-
-        .products-section h2 {
-            color: #1a237e;
+            border-radius: 10px;
             margin-bottom: 20px;
-            font-size: 1.5em;
-            border-bottom: 2px solid #4caf50;
-            padding-bottom: 10px;
+            border-left: 4px solid #4caf50;
         }
-
-        .product-count {
-            display: inline-block;
-            background: #4caf50;
-            color: white;
-            padding: 3px 12px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            margin-left: 10px;
-        }
-
-        .table-container {
-            overflow-x: auto;
-            margin-top: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-
+        .info-box p { margin: 5px 0; }
         table {
             width: 100%;
             border-collapse: collapse;
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            min-width: 600px;
+            margin: 20px 0;
         }
-
-        thead {
-            background: linear-gradient(135deg, #1a237e, #283593);
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #1a237e;
             color: white;
         }
-
-        th {
-            padding: 12px 15px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 0.85em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            white-space: nowrap;
-        }
-
-        td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #e0e0e0;
-            color: #1a237e;
-        }
-
-        tbody tr:hover {
-            background: #f5f5f5;
-            transition: background 0.3s ease;
-        }
-
-        tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .empty-value {
-            color: #e53935;
-            font-style: italic;
-        }
-
-        .empty-value::after {
-            content: ' (не найдено)';
-            color: #e53935;
-            font-style: italic;
-        }
-
-        .no-products {
-            text-align: center;
-            padding: 30px;
-            background: #fff3e0;
-            border-radius: 10px;
-            color: #e65100;
-        }
-
-        .actions {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-top: 30px;
-            flex-wrap: wrap;
-        }
-
+        tr:hover { background: #f5f5f5; }
         .btn {
-            padding: 12px 35px;
+            padding: 12px 30px;
             border: none;
             border-radius: 50px;
-            font-size: 1.05em;
+            font-size: 16px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
+            margin: 5px;
+            transition: transform 0.2s;
         }
-
+        .btn:hover { transform: scale(1.05); }
         .btn-primary {
             background: linear-gradient(135deg, #4caf50, #66bb6a);
             color: white;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(76, 175, 80, 0.4);
-        }
-
         .btn-secondary {
             background: linear-gradient(135deg, #2196f3, #64b5f6);
             color: white;
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
         }
-
-        .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
-        }
-
-        .btn-warning {
-            background: linear-gradient(135deg, #ff9800, #ffa726);
-            color: white;
-            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
-        }
-
-        .btn-warning:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(255, 152, 0, 0.4);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(244, 67, 54, 0.4);
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-
-            .info-grid {
-                grid-template-columns: 1fr;
-            }
-
-            th, td {
-                padding: 8px 10px;
-                font-size: 0.85em;
-            }
-
-            .actions {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .btn {
-                width: 100%;
-                text-align: center;
-            }
+        .actions { text-align: center; margin-top: 20px; }
+        .product-count {
+            background: #e3f2fd;
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: inline-block;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <div class="success-icon">✅</div>
-            <h1>Данные успешно извлечены</h1>
-            <div class="subtitle">Информация из приходного ордера для формирования палетных этикеток</div>
+        <h1>📊 Результат обработки PDF</h1>
+
+        <div class="info-box">
+            <p><strong>📅 Дата приемки:</strong> {{ data.дата_приемки or 'Не указана' }}</p>
+            <p><strong>🏢 Поставщик:</strong> {{ data.название_поставщика or 'Не указан' }}</p>
+            <p><strong>📋 Номер ордера:</strong> {{ data.номер_ордера or 'Не указан' }}</p>
+            <p><strong>📦 Количество товаров:</strong> <span class="product-count">{{ data.товары|length }}</span></p>
         </div>
 
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="label">📅 Дата приемки</div>
-                <div class="value">{{ data.дата_приемки if data.дата_приемки else 'Не найдено' }}</div>
-            </div>
-            <div class="info-item">
-                <div class="label">🏢 Название поставщика</div>
-                <div class="value">{{ data.название_поставщика if data.название_поставщика else 'Не найдено' }}</div>
-            </div>
-            <div class="info-item">
-                <div class="label">📋 Номер ордера</div>
-                <div class="value">{{ data.номер_ордера if data.номер_ордера else 'Не найден' }}</div>
-            </div>
-        </div>
-
-        <div class="products-section">
-            <h2>
-                📦 Товары
-                <span class="product-count">{{ data.товары|length }}</span>
-            </h2>
-
-            {% if data.товары %}
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>№</th>
-                                <th>Наименование товара</th>
-                                <th>Номенклатурный номер</th>
-                                <th>Аналитический лист</th>
-                                <th>Партия поставщика</th>
-                                <th>Срок годности</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for product in data.товары %}
-                            <tr>
-                                <td>{{ loop.index }}</td>
-                                <td>
-                                    {% if product.наименование %}
-                                        {{ product.наименование }}
-                                    {% else %}
-                                        <span class="empty-value">Не найдено</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if product.номенклатурный_номер %}
-                                        {{ product.номенклатурный_номер }}
-                                    {% else %}
-                                        <span class="empty-value">Не найдено</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if product.аналитический_лист %}
-                                        <strong>{{ product.аналитический_лист }}</strong>
-                                    {% else %}
-                                        <span class="empty-value">Не найдено</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if product.партия_поставщика %}
-                                        {{ product.партия_поставщика }}
-                                    {% else %}
-                                        <span class="empty-value">Не найдено</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if product.срок_годности %}
-                                        {{ product.срок_годности }}
-                                    {% else %}
-                                        <span class="empty-value">Не найдено</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="no-products">
-                    <p>⚠️ Товары не найдены в приходном ордере</p>
-                </div>
-            {% endif %}
-        </div>
+        <h2>Список товаров</h2>
+        {% if data.товары %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Наименование</th>
+                        <th>Аналитический лист</th>
+                        <th>Партия поставщика</th>
+                        <th>Срок годности</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in data.товары %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ product.наименование }}</td>
+                        <td><strong>{{ product.аналитический_лист }}</strong></td>
+                        <td>{{ product.партия_поставщика or '-' }}</td>
+                        <td>{{ product.срок_годности or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="text-align: center; color: #999; padding: 40px;">Товары не найдены</p>
+        {% endif %}
 
         <div class="actions">
-            <a href="/" class="btn btn-secondary">⬅️ Назад к загрузке</a>
-            {% if data.товары %}
-            <form action="/generate_labels" method="post" style="display: inline;">
-                <input type="hidden" name="products" value='{{ data.товары|tojson }}'>
-                <input type="hidden" name="order_number" value="{{ data.номер_ордера if data.номер_ордера else 'unknown' }}">
-                <button type="submit" class="btn btn-primary">🏷️ Сформировать палетные этикетки ({{ data.товары|length }})</button>
+            <form action="/generate_labels" method="post" id="generateForm">
+                <input type="hidden" name="products" id="productsData">
+                <input type="hidden" name="order_number" value="{{ data.номер_ордера }}">
+                <button type="button" class="btn btn-primary" onclick="submitForm()">📄 Сформировать этикетки</button>
             </form>
-            {% endif %}
+            <a href="/" class="btn btn-secondary">🏠 На главную</a>
         </div>
     </div>
+
+    <script>
+        // Данные товаров для передачи в form
+        const products = {{ data.товары|tojson|safe }};
+
+        function submitForm() {
+            // Кодируем данные в JSON строку с правильными кавычками
+            const productsJson = JSON.stringify(products);
+            document.getElementById('productsData').value = productsJson;
+            document.getElementById('generateForm').submit();
+        }
+    </script>
 </body>
 </html>

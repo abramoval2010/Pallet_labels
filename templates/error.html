@@ -5,77 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ошибка</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
-            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
         }
-
         .container {
-            background: rgba(255, 255, 255, 0.95);
+            background: white;
             border-radius: 20px;
             padding: 50px;
             max-width: 600px;
             width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
             text-align: center;
         }
-
-        .error-icon {
-            font-size: 5em;
-            margin-bottom: 20px;
-        }
-
-        h1 {
-            color: #c62828;
-            font-size: 2em;
-            margin-bottom: 15px;
-        }
-
+        .error-icon { font-size: 80px; margin-bottom: 20px; }
+        h1 { color: #c0392b; margin-bottom: 15px; }
         .error-message {
-            color: #546e7a;
-            font-size: 1.1em;
-            margin-bottom: 30px;
+            color: #555;
+            font-size: 18px;
             line-height: 1.6;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
         }
-
         .btn {
-            padding: 12px 35px;
+            padding: 12px 40px;
+            background: linear-gradient(135deg, #4caf50, #66bb6a);
+            color: white;
             border: none;
             border-radius: 50px;
-            font-size: 1.05em;
+            font-size: 18px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+            transition: transform 0.2s;
         }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
-        }
+        .btn:hover { transform: scale(1.05); }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="error-icon">❌</div>
-        <h1>Произошла ошибка</h1>
+        <h1>Ошибка</h1>
         <div class="error-message">{{ error }}</div>
-        <a href="/" class="btn">⬅️ Вернуться назад</a>
+        <a href="/" class="btn">Вернуться на главную</a>
     </div>
 </body>
 </html>

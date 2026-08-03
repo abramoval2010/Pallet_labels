@@ -34,13 +34,13 @@
 
         .header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
         }
 
         .header h1 {
             color: #1a237e;
             font-size: 2.2em;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             font-weight: 600;
         }
 
@@ -48,6 +48,22 @@
             color: #4a6fa5;
             font-size: 1.1em;
             font-weight: 300;
+        }
+
+        .greeting {
+            text-align: center;
+            font-size: 1.3em;
+            color: #1a237e;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: linear-gradient(135deg, #e8f5e9, #e1f5fe);
+            border-radius: 12px;
+            border-left: 4px solid #4caf50;
+        }
+
+        .greeting .user-name {
+            font-weight: 600;
+            color: #2e7d32;
         }
 
         .menu {
@@ -142,6 +158,8 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            text-decoration: none;
+            display: inline-block;
         }
 
         .btn-primary {
@@ -194,6 +212,17 @@
             box-shadow: 0 6px 25px rgba(255, 152, 0, 0.4);
         }
 
+        .btn-admin {
+            background: linear-gradient(135deg, #9c27b0, #ab47bc);
+            color: white;
+            box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
+        }
+
+        .btn-admin:hover {
+            background: linear-gradient(135deg, #7b1fa2, #8e24aa);
+            box-shadow: 0 6px 25px rgba(156, 39, 176, 0.4);
+        }
+
         .file-name {
             margin-top: 15px;
             color: #4a6fa5;
@@ -205,9 +234,44 @@
             padding-top: 20px;
             border-top: 1px solid #e0e0e0;
             display: flex;
-            justify-content: space-between;
-            gap: 10px;
+            justify-content: center;
+            gap: 15px;
             flex-wrap: wrap;
+        }
+
+        .flash-messages {
+            margin-bottom: 15px;
+        }
+
+        .flash-message {
+            padding: 12px 20px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .flash-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .flash-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .flash-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .flash-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
         }
 
         @media (max-width: 768px) {
@@ -241,6 +305,25 @@
             <h1>🏭 Система формирования палетных этикеток</h1>
             <div class="subtitle">Автоматическое извлечение данных из приходных ордеров</div>
         </div>
+
+        <!-- Приветствие -->
+        <div class="greeting">
+            👋 Добрый день, <span class="user-name">{{ session.user_fname }} {{ session.user_lname }}</span>!
+            <div style="font-size: 0.7em; color: #546e7a; margin-top: 5px;">
+                {{ session.user_rights }} | {{ session.user_plant }}
+            </div>
+        </div>
+
+        <!-- Flash сообщения -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
 
         <div class="menu">
             <div class="menu-item">
@@ -278,7 +361,11 @@
 
             <div class="menu-footer">
                 <a href="/settings" class="btn btn-settings">⚙️ Настройки</a>
-                <a href="/exit" class="btn btn-danger">🚪 Выход из программы</a>
+                {% if session.user_rights == 'Администратор' %}
+                    <a href="/admin" class="btn btn-admin">👥 База пользователей</a>
+                {% endif %}
+                <a href="/change_password" class="btn btn-secondary">🔑 Сменить пароль</a>
+                <a href="/logout" class="btn btn-danger">🚪 Выйти</a>
             </div>
         </div>
     </div>
