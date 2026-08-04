@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import shutil
 from contextlib import contextmanager
+import io
 
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash, jsonify
 from werkzeug.utils import secure_filename
@@ -21,7 +22,7 @@ import fitz  # PyMuPDF
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.section import WD_ORIENT
+from docx.enum.section import WD_ORIENT, WD_SECTION_START
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -796,11 +797,15 @@ def calculate_pallets(quantity, palletization):
 
 
 # ============================================================
-# ФУНКЦИИ ГЕНЕРАЦИИ ЭТИКЕТОК
+# ФУНКЦИЯ ГЕНЕРАЦИИ ЭТИКЕТОК
 # ============================================================
 
 def create_pallet_labels_file(all_products, order_number, save_path=None, sop_code=None):
-    """Создает файл с палетными этикетками"""
+    """
+    Создает файл с палетными этикетками.
+    Каждый аналитический лист дублируется столько раз, сколько указано в поле 'pallets'.
+    Каждая этикетка находится на отдельной странице.
+    """
     if save_path is None:
         settings = load_settings()
         save_path = settings.get('save_path', os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки'))
@@ -818,9 +823,11 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
         print(f"Ошибка создания папки: {e}")
         save_path = os.path.join(os.path.expanduser('~'), 'Documents')
 
-    merged_doc = Document()
+    # Создаем новый документ
+    doc = Document()
 
-    for section in merged_doc.sections:
+    # Настраиваем первую страницу
+    for section in doc.sections:
         section.orientation = WD_ORIENT.LANDSCAPE
         section.page_width = Inches(11.69)
         section.page_height = Inches(8.27)
@@ -829,18 +836,16 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
         section.left_margin = Inches(0.15)
         section.right_margin = Inches(0.15)
 
-    for idx, product in enumerate(all_products):
-        if idx > 0:
-            merged_doc.add_page_break()
-            for section in merged_doc.sections:
-                section.orientation = WD_ORIENT.LANDSCAPE
-                section.page_width = Inches(11.69)
-                section.page_height = Inches(8.27)
-                section.top_margin = Inches(0.15)
-                section.bottom_margin = Inches(0.15)
-                section.left_margin = Inches(0.15)
-                section.right_margin = Inches(0.15)
+    total_labels = 0
+    first_page = True
 
+    for product in all_products:
+        # Получаем количество паллет для этого товара
+        pallets_count = product.get('pallets', 1)
+        if pallets_count < 1:
+            pallets_count = 1
+
+        # Рассчитываем размеры шрифтов для этого товара
         product_name = product.get('наименование', 'Не указано')
         supplier_series = product.get('партия_поставщика', 'Не указана')
         analytic_list = product.get('аналитический_лист', 'Не указан')
@@ -877,81 +882,107 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
         if analytic_len > 15:
             font_sizes['analytic'] = max(42, font_sizes['analytic'] - 10)
 
-        table = merged_doc.add_table(rows=1, cols=1)
-        table.autofit = False
-        table.allow_autofit = False
-        table.columns[0].width = Inches(10.8)
+        # Создаем паллеты для этого товара
+        for pallet_num in range(pallets_count):
+            # Добавляем разрыв страницы перед каждой этикеткой, кроме первой
+            if not first_page:
+                doc.add_page_break()
+                # Настраиваем новую секцию
+                if doc.sections:
+                    section = doc.sections[-1]
+                    section.orientation = WD_ORIENT.LANDSCAPE
+                    section.page_width = Inches(11.69)
+                    section.page_height = Inches(8.27)
+                    section.top_margin = Inches(0.15)
+                    section.bottom_margin = Inches(0.15)
+                    section.left_margin = Inches(0.15)
+                    section.right_margin = Inches(0.15)
+            else:
+                first_page = False
 
-        cell = table.cell(0, 0)
-        cell.vertical_alignment = WD_ALIGN_PARAGRAPH.CENTER
-        cell.paragraphs[0].clear()
+            # Создаем таблицу для этикетки
+            table = doc.add_table(rows=1, cols=1)
+            table.autofit = False
+            table.allow_autofit = False
+            table.columns[0].width = Inches(10.8)
 
-        p1 = cell.add_paragraph()
-        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p1.paragraph_format.space_before = Pt(2)
-        p1.paragraph_format.space_after = Pt(2)
-        run1 = p1.add_run('ООО «Верофарм»')
-        run1.italic = True
-        run1.bold = True
-        run1.font.size = Pt(font_sizes['header'])
-        run1.font.name = 'Calibri'
+            cell = table.cell(0, 0)
+            cell.vertical_alignment = WD_ALIGN_PARAGRAPH.CENTER
+            cell.paragraphs[0].clear()
 
-        p2 = cell.add_paragraph()
-        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p2.paragraph_format.space_before = Pt(5)
-        p2.paragraph_format.space_after = Pt(5)
-        run2 = p2.add_run(product_name)
-        run2.italic = True
-        run2.bold = True
-        run2.font.size = Pt(font_sizes['product'])
-        run2.font.name = 'Calibri'
+            # ООО «Верофарм»
+            p1 = cell.add_paragraph()
+            p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p1.paragraph_format.space_before = Pt(2)
+            p1.paragraph_format.space_after = Pt(2)
+            run1 = p1.add_run('ООО «Верофарм»')
+            run1.italic = True
+            run1.bold = True
+            run1.font.size = Pt(font_sizes['header'])
+            run1.font.name = 'Calibri'
 
-        supplier_text = f"п. {supplier_series}" if supplier_series and supplier_series != 'Не указана' else supplier_series
-        p3 = cell.add_paragraph()
-        p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p3.paragraph_format.space_before = Pt(4)
-        p3.paragraph_format.space_after = Pt(4)
-        run3 = p3.add_run(supplier_text)
-        run3.italic = True
-        run3.bold = False
-        run3.font.size = Pt(font_sizes['supplier'])
-        run3.font.name = 'Calibri'
+            # Название товара
+            p2 = cell.add_paragraph()
+            p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p2.paragraph_format.space_before = Pt(5)
+            p2.paragraph_format.space_after = Pt(5)
+            run2 = p2.add_run(product_name)
+            run2.italic = True
+            run2.bold = True
+            run2.font.size = Pt(font_sizes['product'])
+            run2.font.name = 'Calibri'
 
-        p4 = cell.add_paragraph()
-        p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p4.paragraph_format.space_before = Pt(4)
-        p4.paragraph_format.space_after = Pt(4)
-        run4 = p4.add_run(f'АЛ {analytic_list}')
-        run4.italic = True
-        run4.bold = True
-        run4.font.size = Pt(font_sizes['analytic'])
-        run4.font.name = 'Calibri'
+            # Серия поставщика
+            supplier_text = f"п. {supplier_series}" if supplier_series and supplier_series != 'Не указана' else supplier_series
+            p3 = cell.add_paragraph()
+            p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p3.paragraph_format.space_before = Pt(4)
+            p3.paragraph_format.space_after = Pt(4)
+            run3 = p3.add_run(supplier_text)
+            run3.italic = True
+            run3.bold = False
+            run3.font.size = Pt(font_sizes['supplier'])
+            run3.font.name = 'Calibri'
 
-        p5 = cell.add_paragraph()
-        p5.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        p5.paragraph_format.space_before = Pt(8)
-        p5.paragraph_format.space_after = Pt(2)
-        run5 = p5.add_run(sop_code)
-        run5.italic = False
-        run5.bold = True
-        run5.font.size = Pt(font_sizes['code'])
-        run5.font.name = 'Calibri'
+            # Аналитический лист
+            p4 = cell.add_paragraph()
+            p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p4.paragraph_format.space_before = Pt(4)
+            p4.paragraph_format.space_after = Pt(4)
+            run4 = p4.add_run(f'АЛ {analytic_list}')
+            run4.italic = True
+            run4.bold = True
+            run4.font.size = Pt(font_sizes['analytic'])
+            run4.font.name = 'Calibri'
+
+            # Код
+            p5 = cell.add_paragraph()
+            p5.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p5.paragraph_format.space_before = Pt(8)
+            p5.paragraph_format.space_after = Pt(2)
+            run5 = p5.add_run(sop_code)
+            run5.italic = False
+            run5.bold = True
+            run5.font.size = Pt(font_sizes['code'])
+            run5.font.name = 'Calibri'
+
+            total_labels += 1
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"Информационный лист {order_number}_{timestamp}.docx"
     filepath = os.path.join(save_path, filename)
 
     try:
-        merged_doc.save(filepath)
+        doc.save(filepath)
     except PermissionError:
         fallback_path = os.path.join(os.path.expanduser('~'), 'Documents')
         filepath = os.path.join(fallback_path, filename)
-        merged_doc.save(filepath)
+        doc.save(filepath)
     except Exception as e:
         print(f"Ошибка сохранения файла: {e}")
         temp_dir = tempfile.gettempdir()
         filepath = os.path.join(temp_dir, filename)
-        merged_doc.save(filepath)
+        doc.save(filepath)
 
     return filepath
 
@@ -1755,12 +1786,16 @@ def generate_labels():
         open_in_word(filepath)
 
         db.log_action(session['user'], 'GENERATE_LABELS',
-                      f"Сгенерировано {len(products)} этикеток для заказа {order_number}")
+                      f"Сгенерировано этикеток для заказа {order_number}")
+
+        # Подсчитываем общее количество сгенерированных этикеток
+        total_pallets = sum([p.get('pallets', 1) for p in products])
 
         return render_template('success.html',
                                filepath=filepath,
                                product_count=len(products),
-                               order_number=order_number)
+                               order_number=order_number,
+                               total_pallets=total_pallets)
     except Exception as e:
         print(f"Ошибка в generate_labels: {e}")
         return render_template('error.html', error=f'Ошибка при формировании этикеток: {str(e)}')
