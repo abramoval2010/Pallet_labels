@@ -206,71 +206,65 @@ class MaterialsDatabase:
             cursor.execute("SELECT COUNT(*) FROM materials")
             return cursor.fetchone()[0]
 
+    from openpyxl import load_workbook
+
     def validate_and_import_from_excel(self, filepath):
-        """Проверяет и импортирует данные из Excel файла"""
         try:
-            df = pd.read_excel(filepath, header=None)
+            wb = load_workbook(filepath, data_only=True)
+            ws = wb.active
 
-            if df.empty:
-                return False, "Файл пуст"
-
-            header_row = 0
-            first_row = df.iloc[0]
-            is_header = False
-
-            if isinstance(first_row[0], str) and not first_row[0].isdigit():
-                is_header = True
-            elif isinstance(first_row[1], str) and len(str(first_row[1])) > 0:
-                is_header = True
-
-            if is_header:
-                header_row = 1
-                df = df.iloc[1:].reset_index(drop=True)
-
-            if df.shape[1] < 3:
-                return False, "Файл должен содержать минимум 3 колонки (SAP код, Название, Палетизация)"
+            # Определяем, есть ли заголовок
+            first_row = [cell.value for cell in ws[1]]
+            is_header = any(isinstance(cell, str) and not str(cell).isdigit() for cell in first_row[:3])
+            start_row = 2 if is_header else 1
 
             errors = []
             materials_to_add = []
             materials_to_update = []
 
-            for idx, row in df.iterrows():
-                sap_value = row[0]
-                if pd.isna(sap_value):
-                    errors.append(f"Строка {idx + 2}: SAP код не может быть пустым")
+            for row_idx in range(start_row, ws.max_row + 1):
+                row = [cell.value for cell in ws[row_idx]]
+                if not any(row):  # пустая строка
+                    continue
+
+                sap_value = row[0] if len(row) > 0 else None
+                material_name = row[1] if len(row) > 1 else None
+                palletization_value = row[2] if len(row) > 2 else 0
+
+                if sap_value is None:
+                    errors.append(f"Строка {row_idx}: SAP код не может быть пустым")
                     continue
 
                 try:
                     sap_code = int(sap_value)
                     if len(str(sap_code)) != 8:
                         errors.append(
-                            f"Строка {idx + 2}: SAP код должен содержать 8 цифр (текущее значение: {sap_code})")
+                            f"Строка {row_idx}: SAP код должен содержать 8 цифр (текущее значение: {sap_code})")
                         continue
                 except (ValueError, TypeError):
-                    errors.append(f"Строка {idx + 2}: SAP код должен быть числом (текущее значение: {sap_value})")
+                    errors.append(f"Строка {row_idx}: SAP код должен быть числом (текущее значение: {sap_value})")
                     continue
 
-                material_name = str(row[1]) if not pd.isna(row[1]) else ''
-                if not material_name.strip():
-                    errors.append(f"Строка {idx + 2}: Название материала не может быть пустым")
+                if not material_name or not str(material_name).strip():
+                    errors.append(f"Строка {row_idx}: Название материала не может быть пустым")
                     continue
 
-                palletization_value = row[2] if not pd.isna(row[2]) else 0
                 try:
-                    palletization = int(palletization_value)
+                    palletization = int(palletization_value) if palletization_value is not None else 0
                     if palletization < 0:
                         errors.append(
-                            f"Строка {idx + 2}: Палетизация не может быть отрицательной (текущее значение: {palletization})")
+                            f"Строка {row_idx}: Палетизация не может быть отрицательной (текущее значение: {palletization})")
                         continue
                 except (ValueError, TypeError):
                     errors.append(
-                        f"Строка {idx + 2}: Палетизация должна быть числом (текущее значение: {palletization_value})")
+                        f"Строка {row_idx}: Палетизация должна быть числом (текущее значение: {palletization_value})")
                     continue
 
-                if df.shape[1] > 3:
-                    for col_idx in range(3, df.shape[1]):
-                        if not pd.isna(row[col_idx]) and str(row[col_idx]).strip():
-                            errors.append(f"Строка {idx + 2}: Обнаружены данные в дополнительной колонке {col_idx + 1}")
+                # Проверяем наличие дополнительных колонок
+                if len(row) > 3:
+                    for col_idx in range(3, len(row)):
+                        if row[col_idx] is not None and str(row[col_idx]).strip():
+                            errors.append(f"Строка {row_idx}: Обнаружены данные в дополнительной колонке {col_idx + 1}")
                             break
 
                 material_data = {
@@ -286,7 +280,7 @@ class MaterialsDatabase:
                     existing_name = self.get_material_by_name(material_name.strip())
                     if existing_name:
                         errors.append(
-                            f"Строка {idx + 2}: Материал с названием '{material_name.strip()}' уже существует в базе (SAP: {existing_name['sap_code']})")
+                            f"Строка {row_idx}: Материал с названием '{material_name.strip()}' уже существует в базе (SAP: {existing_name['sap_code']})")
                     else:
                         materials_to_add.append(material_data)
 
