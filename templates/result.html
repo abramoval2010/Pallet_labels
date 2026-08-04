@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1300px;
+            max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -65,6 +65,7 @@
             z-index: 10;
         }
         tr:hover { background: #f5f5f5; }
+        tr.selected { background: #e8f5e9; }
         .btn {
             padding: 12px 30px;
             border: none;
@@ -107,6 +108,20 @@
         }
         .btn-toggle.active:hover {
             background: linear-gradient(135deg, #1e88e5, #42a5f5);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: white;
+        }
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #d32f2f, #e53935);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #2e7d32, #43a047);
+            color: white;
+        }
+        .btn-success:hover {
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
         }
         .actions {
             text-align: center;
@@ -159,6 +174,24 @@
             grid-template-columns: 1fr 1fr;
             gap: 10px 30px;
         }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #4caf50;
+        }
+        .selected-count {
+            background: #e3f2fd;
+            padding: 5px 15px;
+            border-radius: 10px;
+            display: inline-block;
+            font-size: 14px;
+        }
         @media (max-width: 768px) {
             .container { padding: 20px; }
             th, td { padding: 8px 10px; font-size: 13px; }
@@ -181,12 +214,22 @@
             <p><span class="label">📦 Количество палет:</span> <span class="value product-count" style="background: #fff3cd;">{{ total_pallets }}</span></p>
         </div>
 
-        <h2>Список товаров</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+            <h2 style="margin: 0;">Список товаров</h2>
+            <div>
+                <span class="selected-count" id="selectedCount">Выбрано: {{ data.товары|length }}</span>
+                <button class="btn btn-danger" id="toggleAllBtn" onclick="toggleAll()" style="font-size: 14px; padding: 8px 20px;">
+                    Убрать все
+                </button>
+            </div>
+        </div>
+
         {% if data.товары %}
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
+                            <th style="min-width: 40px; text-align: center;">✓</th>
                             <th style="min-width: 40px;">№</th>
                             <th style="min-width: 120px;">SAP код</th>
                             <th style="min-width: 250px;">Наименование</th>
@@ -199,7 +242,17 @@
                     </thead>
                     <tbody>
                         {% for product in data.товары %}
-                        <tr>
+                        <tr id="row_{{ loop.index0 }}">
+                            <td style="text-align: center;">
+                                <div class="checkbox-container">
+                                    <input type="checkbox"
+                                           class="product-checkbox"
+                                           id="chk_{{ loop.index0 }}"
+                                           data-index="{{ loop.index0 }}"
+                                           checked
+                                           onchange="updateSelectedCount()">
+                                </div>
+                            </td>
                             <td>{{ loop.index }}</td>
                             <td>
                                 {{ product.sap_code_display or '-' }}
@@ -245,6 +298,7 @@
                 <input type="hidden" name="order_number" value="{{ data.номер_ордера }}">
                 <input type="hidden" name="supplier_name" value="{{ data.название_поставщика or '' }}">
                 <input type="hidden" name="order_date" value="{{ data.дата_приемки or '' }}">
+                <input type="hidden" name="selected_indices" id="selectedIndicesData">
                 <button type="button" class="btn btn-primary" onclick="submitForm()">📄 Сформировать этикетки</button>
             </form>
 
@@ -256,8 +310,62 @@
         // Данные товаров для передачи в form
         const products = {{ data.товары|tojson|safe }};
         let isAllOnePallet = false;
+        let allChecked = true;
+
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.product-checkbox');
+            const checked = document.querySelectorAll('.product-checkbox:checked');
+            const count = document.getElementById('selectedCount');
+            count.textContent = 'Выбрано: ' + checked.length + ' из ' + checkboxes.length;
+
+            // Обновляем состояние кнопки "Убрать все" / "Добавить все"
+            const btn = document.getElementById('toggleAllBtn');
+            if (checked.length === 0) {
+                btn.textContent = 'Добавить все';
+                btn.className = 'btn btn-success';
+            } else if (checked.length === checkboxes.length) {
+                btn.textContent = 'Убрать все';
+                btn.className = 'btn btn-danger';
+            } else {
+                btn.textContent = 'Убрать все';
+                btn.className = 'btn btn-danger';
+            }
+
+            allChecked = (checked.length === checkboxes.length);
+        }
+
+        function toggleAll() {
+            const checkboxes = document.querySelectorAll('.product-checkbox');
+            const checked = document.querySelectorAll('.product-checkbox:checked');
+            const btn = document.getElementById('toggleAllBtn');
+
+            if (checked.length === 0) {
+                // Добавляем все
+                checkboxes.forEach(cb => cb.checked = true);
+                btn.textContent = 'Убрать все';
+                btn.className = 'btn btn-danger';
+            } else {
+                // Убираем все
+                checkboxes.forEach(cb => cb.checked = false);
+                btn.textContent = 'Добавить все';
+                btn.className = 'btn btn-success';
+            }
+            updateSelectedCount();
+        }
+
+        // Инициализация счетчика
+        updateSelectedCount();
 
         function submitForm() {
+            // Собираем выбранные индексы
+            const checkboxes = document.querySelectorAll('.product-checkbox');
+            const selectedIndices = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    selectedIndices.push(parseInt(cb.dataset.index));
+                }
+            });
+
             // Обновляем данные о паллетах из полей ввода
             const palletsInputs = document.querySelectorAll('.pallets-input');
             palletsInputs.forEach(input => {
@@ -268,8 +376,17 @@
                 }
             });
 
+            // Если нет выбранных товаров, показываем предупреждение
+            if (selectedIndices.length === 0) {
+                alert('Не выбрано ни одного товара для формирования этикеток');
+                return;
+            }
+
             const productsJson = JSON.stringify(products);
+            const selectedIndicesJson = JSON.stringify(selectedIndices);
+
             document.getElementById('productsData').value = productsJson;
+            document.getElementById('selectedIndicesData').value = selectedIndicesJson;
             document.getElementById('generateForm').submit();
         }
 

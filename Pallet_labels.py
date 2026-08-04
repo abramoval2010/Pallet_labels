@@ -983,9 +983,10 @@ def get_font_and_spacing_settings(product_name, font_settings):
         }
 
 
-def create_pallet_labels_file(all_products, order_number, supplier_name, order_date, save_path=None, sop_code=None):
+def create_pallet_labels_file(all_products, order_number, supplier_name, order_date, selected_indices, save_path=None,
+                              sop_code=None):
     """
-    Создает файл с палетными этикетками.
+    Создает файл с палетными этикетками только для выбранных товаров.
     Каждый аналитический лист дублируется столько раз, сколько указано в поле 'pallets'.
     Каждая этикетка находится на отдельной странице.
     """
@@ -1026,7 +1027,12 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
     total_labels = 0
     first_page = True
 
-    for product in all_products:
+    # Проходим только по выбранным товарам
+    for idx, product in enumerate(all_products):
+        # Проверяем, выбран ли этот товар
+        if idx not in selected_indices:
+            continue
+
         # Получаем количество паллет для этого товара
         pallets_count = product.get('pallets', 1)
         if pallets_count < 1:
@@ -1172,7 +1178,7 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
         filepath = get_unique_filename(temp_dir, base_name, '.docx')
         doc.save(filepath)
 
-    return filepath
+    return filepath, total_labels
 
 
 def open_in_word(filepath):
@@ -2038,6 +2044,7 @@ def generate_labels():
         order_number = request.form.get('order_number')
         supplier_name = request.form.get('supplier_name', '')
         order_date = request.form.get('order_date', '')
+        selected_indices_json = request.form.get('selected_indices', '[]')
 
         if not products_json or not order_number:
             flash('Нет данных для формирования этикеток', 'danger')
@@ -2056,24 +2063,40 @@ def generate_labels():
             flash('Нет товаров для формирования этикеток', 'danger')
             return redirect(url_for('index'))
 
+        # Получаем выбранные индексы
+        try:
+            selected_indices = json.loads(selected_indices_json)
+        except json.JSONDecodeError:
+            selected_indices = list(range(len(products)))
+
+        # Фильтруем только существующие индексы
+        selected_indices = [i for i in selected_indices if i < len(products)]
+
+        if not selected_indices:
+            flash('Не выбрано ни одного товара для формирования этикеток', 'warning')
+            return redirect(url_for('index'))
+
         settings = load_settings()
         save_path = settings.get('save_path')
         sop_code = settings.get('sop_code', 'RUPD.VLG.05.04.C01')
 
-        filepath = create_pallet_labels_file(products, order_number, supplier_name, order_date, save_path, sop_code)
+        filepath, total_labels = create_pallet_labels_file(products, order_number, supplier_name, order_date,
+                                                           selected_indices, save_path, sop_code)
+
+        if total_labels == 0:
+            flash('Не сгенерировано ни одной этикетки (нет выбранных товаров)', 'warning')
+            return redirect(url_for('index'))
+
         open_in_word(filepath)
 
         db.log_action(session['user'], 'GENERATE_LABELS',
-                      f"Сгенерировано этикеток для заказа {order_number}")
-
-        # Подсчитываем общее количество сгенерированных этикеток
-        total_pallets = sum([p.get('pallets', 1) for p in products])
+                      f"Сгенерировано {total_labels} этикеток для заказа {order_number}")
 
         return render_template('success.html',
                                filepath=filepath,
                                product_count=len(products),
                                order_number=order_number,
-                               total_pallets=total_pallets)
+                               total_pallets=total_labels)
     except Exception as e:
         print(f"Ошибка в generate_labels: {e}")
         flash(f'Ошибка при формировании этикеток: {str(e)}', 'danger')
