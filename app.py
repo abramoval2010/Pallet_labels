@@ -17,7 +17,7 @@ import io
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash, jsonify
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-import pandas as pd
+#import pandas as pd
 from openpyxl import load_workbook
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
