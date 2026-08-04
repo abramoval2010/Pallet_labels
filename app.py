@@ -13,11 +13,11 @@ import tempfile
 import shutil
 from contextlib import contextmanager
 import io
+import traceback
 
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash, jsonify
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-#import pandas as pd
 from openpyxl import load_workbook
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
@@ -27,22 +27,32 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 # Пытаемся импортировать PyMuPDF, если его нет - используем pdfplumber
+PDF_LIB = None
 try:
     import fitz
 
     PDF_LIB = 'fitz'
     print("✅ Используется PyMuPDF (fitz) для парсинга PDF")
-except ImportError:
-    import pdfplumber
+except ImportError as e:
+    print(f"⚠️ PyMuPDF не найден: {e}")
+    try:
+        import pdfplumber
 
-    PDF_LIB = 'pdfplumber'
-    print("✅ Используется pdfplumber для парсинга PDF")
+        PDF_LIB = 'pdfplumber'
+        print("✅ Используется pdfplumber для парсинга PDF")
+    except ImportError as e2:
+        print(f"❌ pdfplumber также не найден: {e2}")
+        print("❌ Нет доступных библиотек для парсинга PDF!")
 
 # Импорт конфигурации
 try:
     from config import Config
+
+    print("✅ Конфигурация загружена из config.py")
 except ImportError:
-    # Если config.py нет, создаем конфигурацию по умолчанию
+    print("⚠️ config.py не найден, используем настройки по умолчанию")
+
+
     class Config:
         SECRET_KEY = secrets.token_hex(32)
         UPLOAD_FOLDER = 'uploads'
@@ -58,6 +68,7 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Для Render: сохраняем файлы в папке приложения
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+print(f"📁 Базовая директория: {BASE_DIR}")
 
 # Переназначаем пути к файлам в папку приложения
 SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
@@ -65,6 +76,10 @@ DATABASE_FILE = os.path.join(BASE_DIR, 'users.db')
 MATERIALS_DATABASE_FILE = os.path.join(BASE_DIR, 'materials.db')
 LAST_FOLDER_FILE = os.path.join(BASE_DIR, 'last_folder.json')
 LAST_FILE_FILE = os.path.join(BASE_DIR, 'last_file.json')
+
+print(f"📁 Файл настроек: {SETTINGS_FILE}")
+print(f"📁 База пользователей: {DATABASE_FILE}")
+print(f"📁 База материалов: {MATERIALS_DATABASE_FILE}")
 
 
 # ============================================================
@@ -76,26 +91,42 @@ def extract_text_from_pdf(pdf_path):
     Универсальная функция извлечения текста из PDF.
     Работает с PyMuPDF и pdfplumber.
     """
+    print(f"\n{'=' * 60}")
+    print(f"📄 ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ PDF: {pdf_path}")
+    print(f"{'=' * 60}")
+
     try:
         if PDF_LIB == 'fitz':
-            # PyMuPDF
+            print("🔧 Используется PyMuPDF (fitz)")
             doc = fitz.open(pdf_path)
             text = ""
-            for page in doc:
-                text += page.get_text()
+            for page_num, page in enumerate(doc):
+                page_text = page.get_text()
+                text += page_text
+                print(f"   Страница {page_num + 1}: {len(page_text)} символов")
             doc.close()
+            print(f"✅ Итого извлечено {len(text)} символов")
             return text
-        else:
-            # pdfplumber
+        elif PDF_LIB == 'pdfplumber':
+            print("🔧 Используется pdfplumber")
             text = ""
             with pdfplumber.open(pdf_path) as pdf:
-                for page in pdf.pages:
+                print(f"   Количество страниц: {len(pdf.pages)}")
+                for i, page in enumerate(pdf.pages):
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + "\n"
+                        print(f"   Страница {i + 1}: {len(page_text)} символов")
+                    else:
+                        print(f"   ⚠️ Страница {i + 1}: текст не найден")
+            print(f"✅ Итого извлечено {len(text)} символов")
             return text
+        else:
+            print("❌ Нет доступных библиотек для парсинга PDF")
+            return None
     except Exception as e:
-        print(f"Ошибка открытия PDF: {e}")
+        print(f"❌ Ошибка открытия PDF: {e}")
+        traceback.print_exc()
         return None
 
 
@@ -123,13 +154,31 @@ def parse_quantity_from_string(text):
 def extract_data_from_pdf(pdf_path):
     """Извлекает данные из PDF-файла приходного ордера"""
 
+    print(f"\n{'=' * 60}")
+    print(f"🔍 ПАРСИНГ PDF: {pdf_path}")
+    print(f"{'=' * 60}")
+
     # Извлекаем текст из PDF
     text = extract_text_from_pdf(pdf_path)
     if text is None:
+        print("❌ Текст не извлечен")
         return None
+
+    # Выводим первые 1000 символов для отладки
+    print(f"\n📄 ПЕРВЫЕ 1000 СИМВОЛОВ ТЕКСТА:")
+    print(f"{'-' * 60}")
+    print(text[:1000])
+    print(f"{'-' * 60}\n")
 
     # Разбиваем на строки и очищаем
     lines = [line.strip() for line in text.split('\n') if line.strip()]
+
+    print(f"📊 Всего строк: {len(lines)}")
+    print(f"\n📋 ПЕРВЫЕ 30 СТРОК (для анализа):")
+    print(f"{'-' * 60}")
+    for i, line in enumerate(lines[:30]):
+        print(f"  {i + 1:3d}: {line}")
+    print(f"{'-' * 60}\n")
 
     result = {
         'дата_приемки': None,
@@ -139,18 +188,24 @@ def extract_data_from_pdf(pdf_path):
     }
 
     # 1) Номер приходного ордера
+    print("🔍 Поиск номера приходного ордера...")
     for line in lines:
         if 'ПРИХОДНЫЙ ОРДЕР №' in line or 'ПРИХОДНЫЙ ОРДЕР N' in line:
             order_match = re.search(r'№?\s*(\d+)', line)
             if order_match:
                 result['номер_ордера'] = order_match.group(1)
+                print(f"   ✅ Найден номер: {result['номер_ордера']}")
                 break
+    if not result['номер_ордера']:
+        print("   ⚠️ Номер ордера не найден")
 
     # 2) Дата приемки
+    print("\n🔍 Поиск даты приемки...")
     for line in lines:
         if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
             if '2028' not in line and 'годности' not in line:
                 result['дата_приемки'] = line
+                print(f"   ✅ Найдена дата: {result['дата_приемки']}")
                 break
 
     if not result['дата_приемки']:
@@ -159,34 +214,65 @@ def extract_data_from_pdf(pdf_path):
                 date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[i + 1])
                 if date_match:
                     result['дата_приемки'] = date_match.group(1)
+                    print(f"   ✅ Найдена дата (альтернативно): {result['дата_приемки']}")
                     break
+    if not result['дата_приемки']:
+        print("   ⚠️ Дата приемки не найдена")
 
     # 3) Название поставщика
+    print("\n🔍 Поиск названия поставщика...")
     for line in lines:
         if 'ООО' in line or 'ЗАО' in line or 'ОАО' in line or 'АО' in line or 'ИП' in line:
             if 'ВЕРОФАРМ' not in line and 'Завод' not in line:
                 result['название_поставщика'] = line
+                print(f"   ✅ Найден поставщик: {result['название_поставщика']}")
                 break
+    if not result['название_поставщика']:
+        print("   ⚠️ Название поставщика не найдено")
 
     # 4) Парсинг товаров из таблицы
+    print("\n🔍 Поиск таблицы с товарами...")
     start_index = -1
     end_index = -1
 
     for i, line in enumerate(lines):
         if 'Материальные ценности' in line or 'Материальные ценности' in line.upper():
             start_index = i
+            print(f"   ✅ Найдено начало таблицы: строка {i + 1}")
             break
 
     for i, line in enumerate(lines):
         if line == 'Итого' or line.startswith('Итого') or 'ИТОГО' in line.upper():
             end_index = i
+            print(f"   ✅ Найден конец таблицы: строка {i + 1}")
             break
 
+    if start_index == -1:
+        print("   ⚠️ Начало таблицы не найдено ('Материальные ценности')")
+        print("   🔍 Ищем альтернативные маркеры...")
+        # Ищем альтернативные маркеры
+        for i, line in enumerate(lines):
+            if 'ценности' in line.lower() or 'материал' in line.lower():
+                start_index = i
+                print(f"   ✅ Найдено альтернативное начало: строка {i + 1}")
+                break
+
+    if end_index == -1:
+        print("   🔍 Ищем альтернативный конец таблицы...")
+        for i, line in enumerate(lines):
+            if 'всего' in line.lower() or 'итог' in line.lower():
+                end_index = i
+                print(f"   ✅ Найден альтернативный конец: строка {i + 1}")
+                break
+
     if start_index != -1 and end_index != -1:
+        print(f"\n📊 Таблица найдена: строки {start_index + 1} - {end_index + 1}")
+
         data_start = -1
         for i in range(start_index, end_index):
             if lines[i] == '14' or lines[i].strip() == '14':
                 data_start = i + 1
+                print(f"   ✅ Найдена колонка '14': строка {i + 1}, данные начинаются с {data_start + 1}")
                 break
 
         if data_start != -1:
@@ -200,6 +286,8 @@ def extract_data_from_pdf(pdf_path):
 
             i = data_start
             products = []
+
+            print(f"\n🔍 Начинаем парсинг товаров (строки {i + 1} - {end_index})...")
 
             while i < end_index:
                 line = lines[i]
@@ -313,12 +401,28 @@ def extract_data_from_pdf(pdf_path):
                             'количество': quantity
                         }
                         products.append(product_data)
+                        print(f"   ✅ Найден товар: {product_name[:50]}... (АЛ: {analytic_list})")
 
                     i = last_name_line + 11
                 else:
                     i += 1
 
             result['товары'] = products
+            print(f"\n📊 Всего найдено товаров: {len(products)}")
+        else:
+            print("   ⚠️ Колонка '14' не найдена")
+    else:
+        print(f"   ⚠️ Таблица не найдена (start_index={start_index}, end_index={end_index})")
+
+    print(f"\n{'=' * 60}")
+    print(f"📊 РЕЗУЛЬТАТ ПАРСИНГА:")
+    print(f"   - Номер ордера: {result['номер_ордера'] or 'Не найден'}")
+    print(f"   - Дата приемки: {result['дата_приемки'] or 'Не найдена'}")
+    print(f"   - Поставщик: {result['название_поставщика'] or 'Не найден'}")
+    print(f"   - Товаров: {len(result['товары'])}")
+    if len(result['товары']) > 0:
+        print(f"   - Первый товар: {result['товары'][0]['наименование'][:50]}...")
+    print(f"{'=' * 60}\n")
 
     return result
 
@@ -333,6 +437,7 @@ class MaterialsDatabase:
     def __init__(self, db_file=MATERIALS_DATABASE_FILE):
         self.db_file = db_file
         self.init_database()
+        print(f"📁 База материалов: {self.db_file}")
 
     @contextmanager
     def get_connection(self):
@@ -483,9 +588,11 @@ class MaterialsDatabase:
 
     def validate_and_import_from_excel(self, filepath):
         """Проверяет и импортирует данные из Excel файла (без pandas)"""
+        print(f"📂 Импорт Excel файла: {filepath}")
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
+            print(f"   Активный лист: {ws.title}")
 
             # Определяем, есть ли заголовок
             is_header = False
@@ -493,8 +600,10 @@ class MaterialsDatabase:
             if first_row and any(isinstance(cell, str) and not str(cell).isdigit() for cell in first_row[:2]):
                 is_header = True
                 start_row = 2
+                print(f"   Обнаружен заголовок, данные начинаются со строки {start_row}")
             else:
                 start_row = 1
+                print(f"   Заголовка нет, данные начинаются со строки {start_row}")
 
             errors = []
             materials_to_add = []
@@ -590,9 +699,12 @@ class MaterialsDatabase:
                 if success:
                     added_count += 1
 
+            print(f"✅ Импорт завершен: добавлено {added_count}, обновлено {updated_count}")
             return True, f"Успешно обработано: добавлено {added_count} материалов, обновлено {updated_count} материалов"
 
         except Exception as e:
+            print(f"❌ Ошибка при импорте: {e}")
+            traceback.print_exc()
             return False, f"Ошибка при обработке файла: {str(e)}"
 
 
@@ -607,6 +719,7 @@ class UserDatabase:
         self.db_file = db_file
         self.master_key = self._get_master_key()
         self.init_database()
+        print(f"📁 База пользователей: {self.db_file}")
 
     def _get_master_key(self):
         """Получает или создает мастер-ключ для шифрования"""
@@ -956,8 +1069,11 @@ class UserDatabase:
 # ИНИЦИАЛИЗАЦИЯ БАЗ ДАННЫХ
 # ============================================================
 
+print("\n🚀 ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ")
+print("=" * 60)
 db = UserDatabase(DATABASE_FILE)
 materials_db = MaterialsDatabase(MATERIALS_DATABASE_FILE)
+print("=" * 60 + "\n")
 
 
 # ============================================================
@@ -1426,6 +1542,7 @@ def index():
         return redirect(url_for('login'))
     except Exception as e:
         print(f"Ошибка в index: {e}")
+        traceback.print_exc()
         return redirect(url_for('login'))
 
 
@@ -1471,6 +1588,7 @@ def login():
         return render_template('login.html')
     except Exception as e:
         print(f"Ошибка в login: {e}")
+        traceback.print_exc()
         flash('Ошибка при входе в систему', 'danger')
         return render_template('login.html')
 
@@ -1520,6 +1638,7 @@ def change_password():
         return render_template('change_password.html')
     except Exception as e:
         print(f"Ошибка в change_password: {e}")
+        traceback.print_exc()
         flash('Ошибка при смене пароля', 'danger')
         return redirect(url_for('index'))
 
@@ -1533,7 +1652,6 @@ def admin_panel():
         return render_template('admin.html', users=users, audit_log=audit_log)
     except Exception as e:
         print(f"Ошибка в admin_panel: {e}")
-        import traceback
         traceback.print_exc()
         flash(f'Ошибка загрузки панели администратора: {str(e)}', 'danger')
         return redirect(url_for('settings_page'))
@@ -1578,6 +1696,7 @@ def add_user():
         return redirect(url_for('admin_panel'))
     except Exception as e:
         print(f"Ошибка в add_user: {e}")
+        traceback.print_exc()
         flash('Ошибка при добавлении пользователя', 'danger')
         return redirect(url_for('admin_panel'))
 
@@ -1595,6 +1714,7 @@ def delete_user(login):
         return redirect(url_for('admin_panel'))
     except Exception as e:
         print(f"Ошибка в delete_user: {e}")
+        traceback.print_exc()
         flash('Ошибка при удалении пользователя', 'danger')
         return redirect(url_for('admin_panel'))
 
@@ -1612,6 +1732,7 @@ def block_user(login):
         return redirect(url_for('admin_panel'))
     except Exception as e:
         print(f"Ошибка в block_user: {e}")
+        traceback.print_exc()
         flash('Ошибка при блокировке пользователя', 'danger')
         return redirect(url_for('admin_panel'))
 
@@ -1625,6 +1746,7 @@ def unblock_user(login):
         return redirect(url_for('admin_panel'))
     except Exception as e:
         print(f"Ошибка в unblock_user: {e}")
+        traceback.print_exc()
         flash('Ошибка при разблокировке пользователя', 'danger')
         return redirect(url_for('admin_panel'))
 
@@ -1655,6 +1777,7 @@ def update_user(login):
         return redirect(url_for('admin_panel'))
     except Exception as e:
         print(f"Ошибка в update_user: {e}")
+        traceback.print_exc()
         flash('Ошибка при обновлении пользователя', 'danger')
         return redirect(url_for('admin_panel'))
 
@@ -1667,6 +1790,7 @@ def materials_page():
         return render_template('materials.html', materials=materials)
     except Exception as e:
         print(f"Ошибка в materials_page: {e}")
+        traceback.print_exc()
         flash('Ошибка загрузки данных материалов', 'danger')
         return redirect(url_for('settings_page'))
 
@@ -1732,6 +1856,7 @@ def update_materials():
         return redirect(url_for('materials_page'))
     except Exception as e:
         print(f"Ошибка в update_materials: {e}")
+        traceback.print_exc()
         flash(f'Ошибка при сохранении данных: {str(e)}', 'danger')
         return redirect(url_for('materials_page'))
 
@@ -1745,6 +1870,7 @@ def delete_material(sap_code):
         return redirect(url_for('materials_page'))
     except Exception as e:
         print(f"Ошибка в delete_material: {e}")
+        traceback.print_exc()
         flash(f'Ошибка при удалении материала: {str(e)}', 'danger')
         return redirect(url_for('materials_page'))
 
@@ -1787,6 +1913,7 @@ def import_materials():
         return redirect(url_for('materials_page'))
     except Exception as e:
         print(f"Ошибка в import_materials: {e}")
+        traceback.print_exc()
         flash(f'Ошибка при импорте: {str(e)}', 'danger')
         return redirect(url_for('import_materials'))
 
@@ -1794,18 +1921,26 @@ def import_materials():
 @app.route('/upload', methods=['POST'])
 @labels_access_required
 def upload_file():
+    print("\n" + "=" * 60)
+    print("📤 ПОЛУЧЕН ЗАПРОС НА ЗАГРУЗКУ PDF")
+    print("=" * 60)
+
     try:
         if 'file' not in request.files:
+            print("❌ Файл не выбран")
             flash('Файл не выбран', 'warning')
             return redirect(url_for('index'))
 
         file = request.files['file']
+        print(f"📄 Имя файла: {file.filename}")
 
         if file.filename == '':
+            print("❌ Имя файла пустое")
             flash('Файл не выбран', 'warning')
             return redirect(url_for('index'))
 
         if not file.filename.lower().endswith('.pdf'):
+            print(f"❌ Неверный формат: {file.filename}")
             flash('Пожалуйста, загрузите файл в формате PDF', 'danger')
             return redirect(url_for('index'))
 
@@ -1813,18 +1948,24 @@ def upload_file():
         file_path = request.form.get('file_path', '')
         if file_path:
             save_last_file(file_path)
+            print(f"💾 Сохранен путь к файлу: {file_path}")
 
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
+        print(f"💾 Файл сохранен: {filepath}")
 
         try:
             data = extract_data_from_pdf(filepath)
             os.remove(filepath)
+            print(f"🗑️ Временный файл удален: {filepath}")
 
             if not data or not data['дата_приемки'] and not data['название_поставщика'] and not data['товары']:
+                print("❌ Данные не извлечены")
                 flash('Не удалось извлечь данные из PDF-файла. Проверьте формат файла.', 'danger')
                 return redirect(url_for('index'))
+
+            print(f"✅ Данные успешно извлечены: {len(data['товары'])} товаров")
 
             total_pallets = 0
             for product in data['товары']:
@@ -1854,15 +1995,20 @@ def upload_file():
                 total_pallets += product['pallets']
 
             db.log_action(session['user'], 'UPLOAD_PDF', f"Загружен PDF: {filename}")
+            print(f"📊 Всего паллет: {total_pallets}")
+            print("=" * 60 + "\n")
 
             return render_template('result.html', data=data, total_pallets=total_pallets)
         except Exception as e:
             if os.path.exists(filepath):
                 os.remove(filepath)
+            print(f"❌ Ошибка при обработке: {e}")
+            traceback.print_exc()
             flash(f'Ошибка при обработке файла: {str(e)}', 'danger')
             return redirect(url_for('index'))
     except Exception as e:
-        print(f"Ошибка в upload_file: {e}")
+        print(f"❌ Ошибка в upload_file: {e}")
+        traceback.print_exc()
         flash(f'Ошибка при загрузке файла: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
@@ -1871,22 +2017,31 @@ def upload_file():
 @labels_access_required
 def upload_last():
     """Загрузка последнего приходного ордера по сохраненному пути"""
+    print("\n" + "=" * 60)
+    print("📤 ПОЛУЧЕН ЗАПРОС НА ЗАГРУЗКУ ПОСЛЕДНЕГО ФАЙЛА")
+    print("=" * 60)
+
     try:
         last_file = load_last_file()
+        print(f"📄 Последний файл: {last_file}")
 
         if not last_file or not os.path.exists(last_file):
+            print("❌ Файл не найден")
             flash('Последний использованный файл не найден. Сначала выберите файл вручную.', 'warning')
             return redirect(url_for('index'))
 
         filename = secure_filename(os.path.basename(last_file))
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         shutil.copy2(last_file, temp_path)
+        print(f"💾 Файл скопирован: {temp_path}")
 
         try:
             data = extract_data_from_pdf(temp_path)
             os.remove(temp_path)
+            print(f"🗑️ Временный файл удален: {temp_path}")
 
             if not data or not data['дата_приемки'] and not data['название_поставщика'] and not data['товары']:
+                print("❌ Данные не извлечены")
                 flash('Не удалось извлечь данные из PDF-файла. Файл поврежден или имеет неверный формат.', 'danger')
                 return redirect(url_for('index'))
 
@@ -1924,10 +2079,13 @@ def upload_last():
         except Exception as e:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+            print(f"❌ Ошибка при обработке: {e}")
+            traceback.print_exc()
             flash(f'Ошибка при обработке файла: {str(e)}', 'danger')
             return redirect(url_for('index'))
     except Exception as e:
-        print(f"Ошибка в upload_last: {e}")
+        print(f"❌ Ошибка в upload_last: {e}")
+        traceback.print_exc()
         flash(f'Ошибка при загрузке последнего файла: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
@@ -2025,6 +2183,7 @@ def generate_labels():
                                total_pallets=total_labels)
     except Exception as e:
         print(f"Ошибка в generate_labels: {e}")
+        traceback.print_exc()
         flash(f'Ошибка при формировании этикеток: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
@@ -2045,6 +2204,7 @@ def download_file(filename):
         return send_file(filepath, as_attachment=True, download_name=filename)
     except Exception as e:
         print(f"Ошибка при скачивании: {e}")
+        traceback.print_exc()
         flash('Ошибка при скачивании файла', 'danger')
         return redirect(url_for('index'))
 
@@ -2150,7 +2310,6 @@ def settings_page():
                                font_settings=font_settings)
     except Exception as e:
         print(f"Ошибка в settings_page: {e}")
-        import traceback
         traceback.print_exc()
         flash(f'Ошибка загрузки настроек: {str(e)}', 'danger')
         return redirect(url_for('index'))
@@ -2163,4 +2322,6 @@ def exit_app():
 
 if __name__ == '__main__':
     load_settings()
+    print("\n🚀 ЗАПУСК ПРИЛОЖЕНИЯ")
+    print("=" * 60)
     app.run(debug=True, host='0.0.0.0', port=5000)
