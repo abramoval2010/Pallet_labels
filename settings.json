@@ -1,5 +1,5 @@
 {
-    "save_path": "C:\\",
+    "save_path": "C:\\Users\\Александр\\Documents\\Палетные этикетки",
     "sop_code": "RUPD.VLG.05.04.C01",
     "font_settings": {
         "header_size": 12,
@@ -11,6 +11,11 @@
         "supplier_size_long": 36,
         "analytic_size": 117,
         "code_size": 14,
-        "line_spacing": 0.8
+        "line_spacing": 0.8,
+        "line_spacing_short": 1.5,
+        "line_spacing_medium": 1.0,
+        "line_spacing_long": 0.8,
+        "short_name_threshold": 25,
+        "medium_name_threshold": 40
     }
 }

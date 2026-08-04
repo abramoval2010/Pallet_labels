@@ -2155,7 +2155,6 @@ def settings_page():
                         return redirect(url_for('settings_page'))
 
             if font_settings:
-                # Обновляем только переданные ключи
                 if 'font_settings' not in settings:
                     settings['font_settings'] = {}
                 settings['font_settings'].update(font_settings)
@@ -2182,7 +2181,7 @@ def settings_page():
                                current_path=current_path,
                                path_parts=path_parts,
                                subdirs=subdirs,
-                               os_sep=os_sep,
+                               os_sep=os.sep,
                                is_admin=(session.get('user_rights') == 'Администратор'),
                                material_count=material_count,
                                font_settings=font_settings)
@@ -2190,7 +2189,7 @@ def settings_page():
         print(f"Ошибка в settings_page: {e}")
         import traceback
         traceback.print_exc()
-        flash('Ошибка загрузки настроек', 'danger')
+        flash(f'Ошибка загрузки настроек: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
 
