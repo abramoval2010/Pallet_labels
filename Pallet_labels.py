@@ -1694,6 +1694,7 @@ def upload_file():
                                        error='Не удалось извлечь данные из PDF-файла. Проверьте формат файла.')
 
             # Обогащаем данные о товарах информацией о палетизации
+            total_pallets = 0
             for product in data['товары']:
                 sap_code = product.get('номенклатурный_номер')
                 product['sap_code_display'] = sap_code if sap_code else '-'
@@ -1719,10 +1720,11 @@ def upload_file():
                 quantity = product.get('количество', 0)
                 palletization = product.get('palletization', 0)
                 product['pallets'] = calculate_pallets(quantity, palletization)
+                total_pallets += product['pallets']
 
             db.log_action(session['user'], 'UPLOAD_PDF', f"Загружен PDF: {filename}")
 
-            return render_template('result.html', data=data)
+            return render_template('result.html', data=data, total_pallets=total_pallets)
         except Exception as e:
             if os.path.exists(filepath):
                 os.remove(filepath)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Результат обработки</title>
+    <title>Приходный ордер</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1300px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -24,6 +24,7 @@
             color: #1a237e;
             margin-bottom: 20px;
             text-align: center;
+            font-size: 2em;
         }
         .info-box {
             background: #e8f5e9;
@@ -31,8 +32,13 @@
             border-radius: 10px;
             margin-bottom: 20px;
             border-left: 4px solid #4caf50;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px 30px;
         }
         .info-box p { margin: 5px 0; }
+        .info-box .label { font-weight: 600; color: #1a237e; }
+        .info-box .value { color: #333; }
         .table-wrapper {
             overflow-x: auto;
             max-height: 500px;
@@ -113,10 +119,9 @@
         }
         .product-count {
             background: #e3f2fd;
-            padding: 10px 20px;
+            padding: 5px 15px;
             border-radius: 10px;
             display: inline-block;
-            margin: 10px 0;
         }
         .pallets-input {
             width: 80px;
@@ -149,24 +154,31 @@
         }
         .badge-found { background: #4caf50; color: white; }
         .badge-not-found { background: #f44336; color: white; }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 30px;
+        }
         @media (max-width: 768px) {
             .container { padding: 20px; }
             th, td { padding: 8px 10px; font-size: 13px; }
             .pallets-input { width: 60px; }
             .actions { flex-direction: column; }
             .actions .btn { width: 100%; }
+            .info-box { grid-template-columns: 1fr; }
+            .info-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 Результат обработки PDF</h1>
+        <h1>📄 Приходный ордер №{{ data.номер_ордера or 'Не указан' }}</h1>
 
         <div class="info-box">
-            <p><strong>📅 Дата приемки:</strong> {{ data.дата_приемки or 'Не указана' }}</p>
-            <p><strong>🏢 Поставщик:</strong> {{ data.название_поставщика or 'Не указан' }}</p>
-            <p><strong>📋 Номер ордера:</strong> {{ data.номер_ордера or 'Не указан' }}</p>
-            <p><strong>📦 Количество товаров:</strong> <span class="product-count">{{ data.товары|length }}</span></p>
+            <p><span class="label">📅 Дата приемки:</span> <span class="value">{{ data.дата_приемки or 'Не указана' }}</span></p>
+            <p><span class="label">🏢 Поставщик:</span> <span class="value">{{ data.название_поставщика or 'Не указан' }}</span></p>
+            <p><span class="label">📦 Количество товаров:</span> <span class="value product-count">{{ data.товары|length }}</span></p>
+            <p><span class="label">📦 Количество палет:</span> <span class="value product-count" style="background: #fff3cd;">{{ total_pallets }}</span></p>
         </div>
 
         <h2>Список товаров</h2>
@@ -178,6 +190,7 @@
                             <th style="min-width: 40px;">№</th>
                             <th style="min-width: 120px;">SAP код</th>
                             <th style="min-width: 250px;">Наименование</th>
+                            <th style="min-width: 150px;">Партия поставщика</th>
                             <th style="min-width: 120px;">Аналитический лист</th>
                             <th style="min-width: 80px;">Кол-во</th>
                             <th style="min-width: 100px;">Палетизация</th>
@@ -199,6 +212,7 @@
                                 {% endif %}
                             </td>
                             <td>{{ product.наименование }}</td>
+                            <td>{{ product.партия_поставщика or '-' }}</td>
                             <td><strong>{{ product.аналитический_лист }}</strong></td>
                             <td>{{ product.количество or '-' }}</td>
                             <td>{{ product.palletization or 0 }}</td>
