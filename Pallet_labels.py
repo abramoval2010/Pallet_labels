@@ -18,7 +18,7 @@ from flask import Flask, render_template, request, redirect, url_for, send_file,
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
-import fitz  # PyMuPDF
+from openpyxl import load_workbook
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
@@ -26,8 +26,27 @@ from docx.enum.section import WD_ORIENT, WD_SECTION_START
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+# Пытаемся импортировать PyMuPDF, если его нет - используем pdfplumber
+try:
+    import fitz
+
+    PDF_LIB = 'fitz'
+    print("✅ Используется PyMuPDF (fitz) для парсинга PDF")
+except ImportError:
+    import pdfplumber
+
+    PDF_LIB = 'pdfplumber'
+    print("✅ Используется pdfplumber для парсинга PDF")
+
 # Импорт конфигурации
-from config import Config
+try:
+    from config import Config
+except ImportError:
+    # Если config.py нет, создаем конфигурацию по умолчанию
+    class Config:
+        SECRET_KEY = secrets.token_hex(32)
+        UPLOAD_FOLDER = 'uploads'
+        MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
 app = Flask(__name__)
 app.secret_key = Config.SECRET_KEY
@@ -49,7 +68,263 @@ LAST_FILE_FILE = os.path.join(BASE_DIR, 'last_file.json')
 
 
 # ============================================================
-# БАЗА ДАННЫХ МАСТЕР-ДАННЫХ МАТЕРИАЛОВ (SQLite)
+# УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ИЗВЛЕЧЕНИЯ ТЕКСТА ИЗ PDF
+# ============================================================
+
+def extract_text_from_pdf(pdf_path):
+    """
+    Универсальная функция извлечения текста из PDF.
+    Работает с PyMuPDF и pdfplumber.
+    """
+    try:
+        if PDF_LIB == 'fitz':
+            # PyMuPDF
+            doc = fitz.open(pdf_path)
+            text = ""
+            for page in doc:
+                text += page.get_text()
+            doc.close()
+            return text
+        else:
+            # pdfplumber
+            text = ""
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+            return text
+    except Exception as e:
+        print(f"Ошибка открытия PDF: {e}")
+        return None
+
+
+def parse_quantity_from_string(text):
+    """
+    Извлекает число из строки, учитывая пробелы между разрядами.
+    Например: "24 000" -> 24000, "1 500" -> 1500
+    """
+    if not text:
+        return None
+
+    # Удаляем все пробелы из строки
+    cleaned = text.replace(' ', '').replace('\u00a0', '').replace('\t', '')
+
+    # Пробуем найти число в строке
+    match = re.search(r'(\d+)', cleaned)
+    if match:
+        try:
+            return int(match.group(1))
+        except:
+            return None
+    return None
+
+
+def extract_data_from_pdf(pdf_path):
+    """Извлекает данные из PDF-файла приходного ордера"""
+
+    # Извлекаем текст из PDF
+    text = extract_text_from_pdf(pdf_path)
+    if text is None:
+        return None
+
+    # Разбиваем на строки и очищаем
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+
+    result = {
+        'дата_приемки': None,
+        'название_поставщика': None,
+        'номер_ордера': None,
+        'товары': []
+    }
+
+    # 1) Номер приходного ордера
+    for line in lines:
+        if 'ПРИХОДНЫЙ ОРДЕР №' in line or 'ПРИХОДНЫЙ ОРДЕР N' in line:
+            order_match = re.search(r'№?\s*(\d+)', line)
+            if order_match:
+                result['номер_ордера'] = order_match.group(1)
+                break
+
+    # 2) Дата приемки
+    for line in lines:
+        if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
+            if '2028' not in line and 'годности' not in line:
+                result['дата_приемки'] = line
+                break
+
+    if not result['дата_приемки']:
+        for i, line in enumerate(lines):
+            if 'составления' in line.lower() and i + 1 < len(lines):
+                date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[i + 1])
+                if date_match:
+                    result['дата_приемки'] = date_match.group(1)
+                    break
+
+    # 3) Название поставщика
+    for line in lines:
+        if 'ООО' in line or 'ЗАО' in line or 'ОАО' in line or 'АО' in line or 'ИП' in line:
+            if 'ВЕРОФАРМ' not in line and 'Завод' not in line:
+                result['название_поставщика'] = line
+                break
+
+    # 4) Парсинг товаров из таблицы
+    start_index = -1
+    end_index = -1
+
+    for i, line in enumerate(lines):
+        if 'Материальные ценности' in line or 'Материальные ценности' in line.upper():
+            start_index = i
+            break
+
+    for i, line in enumerate(lines):
+        if line == 'Итого' or line.startswith('Итого') or 'ИТОГО' in line.upper():
+            end_index = i
+            break
+
+    if start_index != -1 and end_index != -1:
+        data_start = -1
+        for i in range(start_index, end_index):
+            if lines[i] == '14' or lines[i].strip() == '14':
+                data_start = i + 1
+                break
+
+        if data_start != -1:
+            header_keywords = [
+                'наименование', 'сорт', 'размер', 'марка', 'код',
+                'единица измерения', 'количество', 'цена', 'сумма',
+                'без учета', 'всего с учетом', 'номер паспорта',
+                'партия', 'поставщика', 'партия поставщика',
+                'срок годности', 'паспорта'
+            ]
+
+            i = data_start
+            products = []
+
+            while i < end_index:
+                line = lines[i]
+
+                if not line:
+                    i += 1
+                    continue
+
+                if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
+                    i += 1
+                    continue
+
+                if re.match(r'^[\d\s,]+$', line) and len(line) > 3:
+                    i += 1
+                    continue
+
+                if line == 'X' or line == 'x':
+                    i += 1
+                    continue
+
+                is_header = False
+                line_lower = line.lower()
+                for keyword in header_keywords:
+                    if keyword in line_lower:
+                        is_header = True
+                        break
+
+                if is_header:
+                    i += 1
+                    continue
+
+                if re.search(r'[А-ЯЁA-Z]', line) and not re.match(r'^[\d\s,]+$', line):
+                    product_name_lines = [line]
+                    current_pos = i + 1
+                    last_name_line = i
+                    name_start_line = i
+
+                    while current_pos < end_index:
+                        next_line = lines[current_pos]
+
+                        nomencl_match = re.search(r'\b(\d{8})\b', next_line)
+                        if nomencl_match:
+                            if not nomencl_match.group(1).startswith(('8', '7')):
+                                if nomencl_match.group(1) not in ['48797491', '21000101']:
+                                    last_name_line = current_pos - 1
+                                    break
+
+                        if re.search(r'[А-ЯЁA-Z]', next_line) and not re.match(r'^[\d\s,]+$', next_line):
+                            skip_words = ['кг', 'шт', 'г', 'л', 'м', 'уп', 'пач', 'итого',
+                                          'x', 'принял', 'сдал', 'должность', 'подпись',
+                                          'расшифровка', 'номер', 'паспорта']
+                            if next_line.lower() not in skip_words:
+                                product_name_lines.append(next_line)
+                                current_pos += 1
+                            else:
+                                break
+                        else:
+                            break
+
+                    if last_name_line == i:
+                        last_name_line = current_pos - 1
+
+                    product_name = ' '.join(product_name_lines)
+
+                    # Номенклатурный номер
+                    nomencl_number = None
+                    nomencl_line = last_name_line + 1
+                    if nomencl_line < len(lines):
+                        nomencl_match = re.search(r'\b(\d{8})\b', lines[nomencl_line])
+                        if nomencl_match:
+                            if not nomencl_match.group(1).startswith(('8', '7')):
+                                if nomencl_match.group(1) not in ['48797491', '21000101']:
+                                    nomencl_number = nomencl_match.group(1)
+
+                    # Аналитический лист
+                    analytic_list = None
+                    batch_line = last_name_line + 8
+                    if batch_line < len(lines):
+                        batch_match = re.search(r'\b(1\d{9})\b', lines[batch_line])
+                        if batch_match:
+                            analytic_list = batch_match.group(1)
+
+                    # Партия поставщика
+                    supplier_batch = None
+                    supplier_line = last_name_line + 9
+                    if supplier_line < len(lines):
+                        supplier_batch = lines[supplier_line]
+
+                    # Срок годности
+                    expiration_date = None
+                    expiration_line = last_name_line + 10
+                    if expiration_line < len(lines):
+                        date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[expiration_line])
+                        if date_match:
+                            expiration_date = date_match.group(1)
+
+                    # Количество
+                    quantity = None
+                    quantity_line_index = name_start_line + 5
+                    if quantity_line_index < len(lines):
+                        quantity_line = lines[quantity_line_index]
+                        quantity = parse_quantity_from_string(quantity_line)
+
+                    if analytic_list:
+                        product_data = {
+                            'наименование': product_name,
+                            'номенклатурный_номер': nomencl_number,
+                            'аналитический_лист': analytic_list,
+                            'партия_поставщика': supplier_batch,
+                            'срок_годности': expiration_date,
+                            'количество': quantity
+                        }
+                        products.append(product_data)
+
+                    i = last_name_line + 11
+                else:
+                    i += 1
+
+            result['товары'] = products
+
+    return result
+
+
+# ============================================================
+# БАЗА ДАННЫХ МАСТЕР-ДАННЫХ МАТЕРИАЛОВ
 # ============================================================
 
 class MaterialsDatabase:
@@ -206,31 +481,30 @@ class MaterialsDatabase:
             cursor.execute("SELECT COUNT(*) FROM materials")
             return cursor.fetchone()[0]
 
-    from openpyxl import load_workbook
-
     def validate_and_import_from_excel(self, filepath):
+        """Проверяет и импортирует данные из Excel файла (без pandas)"""
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
 
             # Определяем, есть ли заголовок
+            is_header = False
             first_row = [cell.value for cell in ws[1]]
-            is_header = any(isinstance(cell, str) and not str(cell).isdigit() for cell in first_row[:3])
-            start_row = 2 if is_header else 1
+            if first_row and any(isinstance(cell, str) and not str(cell).isdigit() for cell in first_row[:2]):
+                is_header = True
+                start_row = 2
+            else:
+                start_row = 1
 
             errors = []
             materials_to_add = []
             materials_to_update = []
 
             for row_idx in range(start_row, ws.max_row + 1):
-                row = [cell.value for cell in ws[row_idx]]
-                if not any(row):  # пустая строка
-                    continue
+                row = [ws.cell(row=row_idx, column=col).value for col in range(1, 4)]
 
-                sap_value = row[0] if len(row) > 0 else None
-                material_name = row[1] if len(row) > 1 else None
-                palletization_value = row[2] if len(row) > 2 else 0
-
+                # Проверяем SAP код
+                sap_value = row[0]
                 if sap_value is None:
                     errors.append(f"Строка {row_idx}: SAP код не может быть пустым")
                     continue
@@ -245,12 +519,16 @@ class MaterialsDatabase:
                     errors.append(f"Строка {row_idx}: SAP код должен быть числом (текущее значение: {sap_value})")
                     continue
 
-                if not material_name or not str(material_name).strip():
+                # Проверяем название материала
+                material_name = str(row[1]) if row[1] else ''
+                if not material_name.strip():
                     errors.append(f"Строка {row_idx}: Название материала не может быть пустым")
                     continue
 
+                # Проверяем палетизацию
+                palletization_value = row[2] if row[2] else 0
                 try:
-                    palletization = int(palletization_value) if palletization_value is not None else 0
+                    palletization = int(palletization_value)
                     if palletization < 0:
                         errors.append(
                             f"Строка {row_idx}: Палетизация не может быть отрицательной (текущее значение: {palletization})")
@@ -261,10 +539,10 @@ class MaterialsDatabase:
                     continue
 
                 # Проверяем наличие дополнительных колонок
-                if len(row) > 3:
-                    for col_idx in range(3, len(row)):
-                        if row[col_idx] is not None and str(row[col_idx]).strip():
-                            errors.append(f"Строка {row_idx}: Обнаружены данные в дополнительной колонке {col_idx + 1}")
+                if ws.max_column > 3:
+                    for col_idx in range(4, ws.max_column + 1):
+                        if ws.cell(row=row_idx, column=col_idx).value is not None:
+                            errors.append(f"Строка {row_idx}: Обнаружены данные в дополнительной колонке {col_idx}")
                             break
 
                 material_data = {
@@ -799,22 +1077,6 @@ def get_subdirectories(path):
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ============================================================
 
-def parse_quantity_from_string(text):
-    """Извлекает число из строки, учитывая пробелы между разрядами"""
-    if not text:
-        return None
-
-    cleaned = text.replace(' ', '').replace('\u00a0', '').replace('\t', '')
-
-    match = re.search(r'(\d+)', cleaned)
-    if match:
-        try:
-            return int(match.group(1))
-        except:
-            return None
-    return None
-
-
 def calculate_pallets(quantity, palletization):
     """Рассчитывает количество паллет"""
     if not quantity:
@@ -1071,7 +1333,6 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
         doc.save(filepath)
     except Exception as e:
         print(f"Ошибка сохранения файла: {e}")
-        # Пробуем сохранить во временную папку
         temp_dir = tempfile.gettempdir()
         filepath = get_unique_filename(temp_dir, base_name, '.docx')
         doc.save(filepath)
@@ -1092,207 +1353,6 @@ def open_in_word(filepath):
     except Exception as e:
         print(f"Ошибка при открытии файла: {e}")
         return False
-
-
-# ============================================================
-# ПАРСИНГ PDF
-# ============================================================
-
-def extract_data_from_pdf(pdf_path):
-    """Извлекает данные из PDF-файла приходного ордера"""
-    try:
-        doc = fitz.open(pdf_path)
-        text = ""
-        for page in doc:
-            text += page.get_text()
-        doc.close()
-    except Exception as e:
-        print(f"Ошибка открытия PDF: {e}")
-        return None
-
-    lines = [line.strip() for line in text.split('\n') if line.strip()]
-
-    result = {
-        'дата_приемки': None,
-        'название_поставщика': None,
-        'номер_ордера': None,
-        'товары': []
-    }
-
-    for line in lines:
-        if 'ПРИХОДНЫЙ ОРДЕР №' in line:
-            order_match = re.search(r'№\s*(\d+)', line)
-            if order_match:
-                result['номер_ордера'] = order_match.group(1)
-                break
-
-    for line in lines:
-        if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
-            if '2028' not in line and 'годности' not in line:
-                result['дата_приемки'] = line
-                break
-
-    if not result['дата_приемки']:
-        for i, line in enumerate(lines):
-            if 'составления' in line.lower() and i + 1 < len(lines):
-                date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[i + 1])
-                if date_match:
-                    result['дата_приемки'] = date_match.group(1)
-                    break
-
-    for line in lines:
-        if 'ООО' in line or 'ЗАО' in line or 'ОАО' in line or 'АО' in line or 'ИП' in line:
-            if 'ВЕРОФАРМ' not in line and 'Завод' not in line:
-                result['название_поставщика'] = line
-                break
-
-    start_index = -1
-    end_index = -1
-
-    for i, line in enumerate(lines):
-        if 'Материальные ценности' in line:
-            start_index = i
-            break
-
-    for i, line in enumerate(lines):
-        if line == 'Итого' or line.startswith('Итого'):
-            end_index = i
-            break
-
-    if start_index != -1 and end_index != -1:
-        data_start = -1
-        for i in range(start_index, end_index):
-            if lines[i] == '14':
-                data_start = i + 1
-                break
-
-        if data_start != -1:
-            header_keywords = [
-                'наименование', 'сорт', 'размер', 'марка', 'код',
-                'единица измерения', 'количество', 'цена', 'сумма',
-                'без учета', 'всего с учетом', 'номер паспорта',
-                'партия', 'поставщика', 'партия поставщика',
-                'срок годности', 'паспорта'
-            ]
-
-            i = data_start
-            products = []
-
-            while i < end_index:
-                line = lines[i]
-
-                if not line:
-                    i += 1
-                    continue
-
-                if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
-                    i += 1
-                    continue
-
-                if re.match(r'^[\d\s,]+$', line) and len(line) > 3:
-                    i += 1
-                    continue
-
-                if line == 'X':
-                    i += 1
-                    continue
-
-                is_header = False
-                line_lower = line.lower()
-                for keyword in header_keywords:
-                    if keyword in line_lower:
-                        is_header = True
-                        break
-
-                if is_header:
-                    i += 1
-                    continue
-
-                if re.search(r'[А-ЯЁA-Z]', line) and not re.match(r'^[\d\s,]+$', line):
-                    product_name_lines = [line]
-                    current_pos = i + 1
-                    last_name_line = i
-                    name_start_line = i
-
-                    while current_pos < end_index:
-                        next_line = lines[current_pos]
-
-                        nomencl_match = re.search(r'\b(\d{8})\b', next_line)
-                        if nomencl_match:
-                            if not nomencl_match.group(1).startswith(('8', '7')):
-                                if nomencl_match.group(1) not in ['48797491', '21000101']:
-                                    last_name_line = current_pos - 1
-                                    break
-
-                        if re.search(r'[А-ЯЁA-Z]', next_line) and not re.match(r'^[\d\s,]+$', next_line):
-                            skip_words = ['кг', 'шт', 'г', 'л', 'м', 'уп', 'пач', 'итого',
-                                          'x', 'принял', 'сдал', 'должность', 'подпись',
-                                          'расшифровка', 'номер', 'паспорта']
-                            if next_line.lower() not in skip_words:
-                                product_name_lines.append(next_line)
-                                current_pos += 1
-                            else:
-                                break
-                        else:
-                            break
-
-                    if last_name_line == i:
-                        last_name_line = current_pos - 1
-
-                    product_name = ' '.join(product_name_lines)
-
-                    nomencl_number = None
-                    nomencl_line = last_name_line + 1
-                    if nomencl_line < len(lines):
-                        nomencl_match = re.search(r'\b(\d{8})\b', lines[nomencl_line])
-                        if nomencl_match:
-                            if not nomencl_match.group(1).startswith(('8', '7')):
-                                if nomencl_match.group(1) not in ['48797491', '21000101']:
-                                    nomencl_number = nomencl_match.group(1)
-
-                    analytic_list = None
-                    batch_line = last_name_line + 8
-                    if batch_line < len(lines):
-                        batch_match = re.search(r'\b(1\d{9})\b', lines[batch_line])
-                        if batch_match:
-                            analytic_list = batch_match.group(1)
-
-                    supplier_batch = None
-                    supplier_line = last_name_line + 9
-                    if supplier_line < len(lines):
-                        supplier_batch = lines[supplier_line]
-
-                    expiration_date = None
-                    expiration_line = last_name_line + 10
-                    if expiration_line < len(lines):
-                        date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[expiration_line])
-                        if date_match:
-                            expiration_date = date_match.group(1)
-
-                    quantity = None
-                    quantity_line_index = name_start_line + 5
-                    if quantity_line_index < len(lines):
-                        quantity_line = lines[quantity_line_index]
-                        quantity = parse_quantity_from_string(quantity_line)
-
-                    if analytic_list:
-                        product_data = {
-                            'наименование': product_name,
-                            'номенклатурный_номер': nomencl_number,
-                            'аналитический_лист': analytic_list,
-                            'партия_поставщика': supplier_batch,
-                            'срок_годности': expiration_date,
-                            'количество': quantity
-                        }
-                        products.append(product_data)
-
-                    i = last_name_line + 11
-                else:
-                    i += 1
-
-            result['товары'] = products
-
-    return result
 
 
 # ============================================================
