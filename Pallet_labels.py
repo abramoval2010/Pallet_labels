@@ -26,28 +26,36 @@ from docx.enum.section import WD_ORIENT, WD_SECTION_START
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+# Импорт конфигурации
+from config import Config
+
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-app.config['SETTINGS_FILE'] = 'settings.json'
-app.config['DATABASE_FILE'] = 'users.db'
-app.config['MATERIALS_DATABASE_FILE'] = 'materials.db'
-app.config['LAST_FOLDER_FILE'] = 'last_folder.json'
-app.config['LAST_FILE_FILE'] = 'last_file.json'
+app.secret_key = Config.SECRET_KEY
+app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
 
 # Создаем папку для загрузок
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# Для Render: сохраняем файлы в папке приложения
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Переназначаем пути к файлам в папку приложения
+SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
+DATABASE_FILE = os.path.join(BASE_DIR, 'users.db')
+MATERIALS_DATABASE_FILE = os.path.join(BASE_DIR, 'materials.db')
+LAST_FOLDER_FILE = os.path.join(BASE_DIR, 'last_folder.json')
+LAST_FILE_FILE = os.path.join(BASE_DIR, 'last_file.json')
+
 
 # ============================================================
-# БАЗА ДАННЫХ МАСТЕР-ДАННЫХ МАТЕРИАЛОВ
+# БАЗА ДАННЫХ МАСТЕР-ДАННЫХ МАТЕРИАЛОВ (SQLite)
 # ============================================================
 
 class MaterialsDatabase:
     """Класс для работы с базой мастер-данных материалов"""
 
-    def __init__(self, db_file='materials.db'):
+    def __init__(self, db_file=MATERIALS_DATABASE_FILE):
         self.db_file = db_file
         self.init_database()
 
@@ -323,14 +331,14 @@ class MaterialsDatabase:
 class UserDatabase:
     """Класс для работы с зашифрованной базой данных пользователей"""
 
-    def __init__(self, db_file='users.db'):
+    def __init__(self, db_file=DATABASE_FILE):
         self.db_file = db_file
         self.master_key = self._get_master_key()
         self.init_database()
 
     def _get_master_key(self):
         """Получает или создает мастер-ключ для шифрования"""
-        key_file = 'master.key'
+        key_file = os.path.join(BASE_DIR, 'master.key')
         if os.path.exists(key_file):
             with open(key_file, 'rb') as f:
                 return f.read()
@@ -676,22 +684,18 @@ class UserDatabase:
 # ИНИЦИАЛИЗАЦИЯ БАЗ ДАННЫХ
 # ============================================================
 
-db = UserDatabase(app.config['DATABASE_FILE'])
-materials_db = MaterialsDatabase(app.config['MATERIALS_DATABASE_FILE'])
+db = UserDatabase(DATABASE_FILE)
+materials_db = MaterialsDatabase(MATERIALS_DATABASE_FILE)
+
 
 # ============================================================
 # ФУНКЦИИ ДЛЯ РАБОТЫ С НАСТРОЙКАМИ
 # ============================================================
 
-SETTINGS_FILE = 'settings.json'
-LAST_FOLDER_FILE = 'last_folder.json'
-LAST_FILE_FILE = 'last_file.json'
-
-
 def load_settings():
     """Загружает настройки из файла"""
     default_settings = {
-        'save_path': os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки'),
+        'save_path': os.path.join(BASE_DIR, 'generated_labels'),
         'sop_code': 'RUPD.VLG.05.04.C01',
         'font_settings': {
             'header_size': 12,
@@ -746,29 +750,6 @@ def save_settings(settings):
         return False
 
 
-def load_last_folder():
-    """Загружает последнюю использованную папку"""
-    try:
-        if os.path.exists(LAST_FOLDER_FILE):
-            with open(LAST_FOLDER_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get('folder_path', '')
-    except Exception as e:
-        print(f"Ошибка загрузки последней папки: {e}")
-    return ''
-
-
-def save_last_folder(folder_path):
-    """Сохраняет последнюю использованную папку"""
-    try:
-        with open(LAST_FOLDER_FILE, 'w', encoding='utf-8') as f:
-            json.dump({'folder_path': folder_path}, f, ensure_ascii=False, indent=4)
-        return True
-    except Exception as e:
-        print(f"Ошибка сохранения последней папки: {e}")
-        return False
-
-
 def load_last_file():
     """Загружает последний использованный файл"""
     try:
@@ -790,45 +771,6 @@ def save_last_file(file_path):
     except Exception as e:
         print(f"Ошибка сохранения последнего файла: {e}")
         return False
-
-
-def find_latest_pdf_in_folder(folder_path):
-    """
-    Находит самый свежий PDF-файл в папке, который корректно парсится.
-    Возвращает путь к файлу или None.
-    """
-    if not folder_path or not os.path.exists(folder_path):
-        return None
-
-    try:
-        pdf_files = []
-        for file in os.listdir(folder_path):
-            if file.lower().endswith('.pdf'):
-                file_path = os.path.join(folder_path, file)
-                try:
-                    mtime = os.path.getmtime(file_path)
-                    pdf_files.append((file_path, mtime))
-                except:
-                    continue
-
-        pdf_files.sort(key=lambda x: x[1], reverse=True)
-
-        if not pdf_files:
-            return None
-
-        for file_path, _ in pdf_files:
-            try:
-                data = extract_data_from_pdf(file_path)
-                if data and data.get('товары') and len(data['товары']) > 0:
-                    return file_path
-            except Exception as e:
-                print(f"Ошибка парсинга {file_path}: {e}")
-                continue
-
-        return None
-    except Exception as e:
-        print(f"Ошибка поиска PDF: {e}")
-        return None
 
 
 def get_available_drives():
@@ -864,10 +806,7 @@ def get_subdirectories(path):
 # ============================================================
 
 def parse_quantity_from_string(text):
-    """
-    Извлекает число из строки, учитывая пробелы между разрядами.
-    Например: "24 000" -> 24000, "1 500" -> 1500
-    """
+    """Извлекает число из строки, учитывая пробелы между разрядами"""
     if not text:
         return None
 
@@ -883,11 +822,7 @@ def parse_quantity_from_string(text):
 
 
 def calculate_pallets(quantity, palletization):
-    """
-    Рассчитывает количество паллет по формуле:
-    - если палетизация > 0: ceil(количество / палетизация)
-    - если палетизация <= 0: 1
-    """
+    """Рассчитывает количество паллет"""
     if not quantity:
         return 1
 
@@ -918,10 +853,7 @@ def clean_filename(text):
 
 
 def get_unique_filename(base_path, base_name, extension='.docx'):
-    """
-    Формирует уникальное имя файла с индексацией при повторении.
-    Возвращает полный путь к файлу.
-    """
+    """Формирует уникальное имя файла с индексацией при повторении"""
     counter = 1
     while True:
         if counter == 1:
@@ -940,10 +872,7 @@ def get_unique_filename(base_path, base_name, extension='.docx'):
 # ============================================================
 
 def get_name_length_category(name_len, font_settings):
-    """
-    Определяет категорию длины названия на основе настроек.
-    Возвращает: 'short', 'medium', 'long'
-    """
+    """Определяет категорию длины названия"""
     short_threshold = font_settings.get('short_name_threshold', 25)
     medium_threshold = font_settings.get('medium_name_threshold', 40)
 
@@ -956,10 +885,7 @@ def get_name_length_category(name_len, font_settings):
 
 
 def get_font_and_spacing_settings(product_name, font_settings):
-    """
-    Определяет размеры шрифтов и межстрочный интервал в зависимости
-    от длины названия товара и настроек пользователя.
-    """
+    """Определяет размеры шрифтов и межстрочный интервал"""
     name_len = len(product_name)
     category = get_name_length_category(name_len, font_settings)
 
@@ -983,7 +909,7 @@ def get_font_and_spacing_settings(product_name, font_settings):
             'line_spacing': font_settings.get('line_spacing_medium', 1.0),
             'category': 'medium'
         }
-    else:  # long
+    else:
         return {
             'header': font_settings.get('header_size', 12),
             'product': font_settings.get('product_size_long', 64),
@@ -997,12 +923,10 @@ def get_font_and_spacing_settings(product_name, font_settings):
 
 def create_pallet_labels_file(all_products, order_number, supplier_name, order_date, selected_indices, save_path=None,
                               sop_code=None):
-    """
-    Создает файл с палетными этикетками только для выбранных товаров.
-    """
+    """Создает файл с палетными этикетками только для выбранных товаров"""
     if save_path is None:
         settings = load_settings()
-        save_path = settings.get('save_path', os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки'))
+        save_path = settings.get('save_path', os.path.join(BASE_DIR, 'generated_labels'))
 
     if sop_code is None:
         settings = load_settings()
@@ -1013,12 +937,10 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
 
     try:
         os.makedirs(save_path, exist_ok=True)
-    except PermissionError:
-        save_path = os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки')
-        os.makedirs(save_path, exist_ok=True)
     except Exception as e:
         print(f"Ошибка создания папки: {e}")
-        save_path = os.path.join(os.path.expanduser('~'), 'Documents')
+        save_path = os.path.join(BASE_DIR, 'generated_labels')
+        os.makedirs(save_path, exist_ok=True)
 
     doc = Document()
 
@@ -1153,12 +1075,9 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
 
     try:
         doc.save(filepath)
-    except PermissionError:
-        fallback_path = os.path.join(os.path.expanduser('~'), 'Documents')
-        filepath = get_unique_filename(fallback_path, base_name, '.docx')
-        doc.save(filepath)
     except Exception as e:
         print(f"Ошибка сохранения файла: {e}")
+        # Пробуем сохранить во временную папку
         temp_dir = tempfile.gettempdir()
         filepath = get_unique_filename(temp_dir, base_name, '.docx')
         doc.save(filepath)
@@ -1905,7 +1824,6 @@ def upload_last():
             flash('Последний использованный файл не найден. Сначала выберите файл вручную.', 'warning')
             return redirect(url_for('index'))
 
-        # Копируем файл в папку загрузок
         filename = secure_filename(os.path.basename(last_file))
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         shutil.copy2(last_file, temp_path)
@@ -2032,7 +1950,16 @@ def generate_labels():
             flash('Не сгенерировано ни одной этикетки (нет выбранных товаров)', 'warning')
             return redirect(url_for('index'))
 
-        open_in_word(filepath)
+        # Для Render: не открываем Word, а показываем ссылку на скачивание
+        if os.environ.get('RENDER'):
+            return render_template('success_render.html',
+                                   filepath=filepath,
+                                   filename=os.path.basename(filepath),
+                                   product_count=len(products),
+                                   order_number=order_number,
+                                   total_pallets=total_labels)
+        else:
+            open_in_word(filepath)
 
         db.log_action(session['user'], 'GENERATE_LABELS',
                       f"Сгенерировано {total_labels} этикеток для заказа {order_number}")
@@ -2048,6 +1975,26 @@ def generate_labels():
         return redirect(url_for('index'))
 
 
+@app.route('/download/<path:filename>')
+@login_required
+def download_file(filename):
+    """Скачивание сгенерированного файла"""
+    try:
+        settings = load_settings()
+        save_path = settings.get('save_path', os.path.join(BASE_DIR, 'generated_labels'))
+        filepath = os.path.join(save_path, filename)
+
+        if not os.path.exists(filepath):
+            flash('Файл не найден', 'danger')
+            return redirect(url_for('index'))
+
+        return send_file(filepath, as_attachment=True, download_name=filename)
+    except Exception as e:
+        print(f"Ошибка при скачивании: {e}")
+        flash('Ошибка при скачивании файла', 'danger')
+        return redirect(url_for('index'))
+
+
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings_page():
@@ -2055,8 +2002,7 @@ def settings_page():
         settings = load_settings()
         drives = get_available_drives()
 
-        current_path = settings.get('save_path',
-                                    os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки'))
+        current_path = settings.get('save_path', os.path.join(BASE_DIR, 'generated_labels'))
 
         path_param = request.args.get('path')
         if path_param and os.path.exists(path_param):

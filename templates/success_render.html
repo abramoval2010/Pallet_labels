@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Успешно</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #81c784 0%, #a5d6a7 50%, #c8e6c9 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+        .success-icon { font-size: 80px; margin-bottom: 20px; }
+        h1 { color: #2e7d32; margin-bottom: 15px; }
+        .info {
+            background: #e8f5e9;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .info p { margin: 8px 0; }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: scale(1.05); }
+        .btn-primary {
+            background: linear-gradient(135deg, #4caf50, #66bb6a);
+            color: white;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #2196f3, #64b5f6);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #2e7d32, #43a047);
+            color: white;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .stat-item {
+            background: #e3f2fd;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .stat-item strong {
+            color: #1a237e;
+        }
+        .download-link {
+            display: inline-block;
+            margin: 15px 0;
+            padding: 15px 30px;
+            background: #4caf50;
+            color: white;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .download-link:hover {
+            background: #388e3c;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✅</div>
+        <h1>Этикетки успешно сформированы!</h1>
+
+        <div class="info">
+            <div class="stats">
+                <span class="stat-item">📋 Номер заказа: <strong>{{ order_number }}</strong></span>
+                <span class="stat-item">📦 Уникальных товаров: <strong>{{ product_count }}</strong></span>
+                <span class="stat-item">📄 Всего палет: <strong>{{ total_pallets }}</strong></span>
+            </div>
+            <p style="margin-top: 15px;">
+                <strong>📁 Файл готов к скачиванию:</strong>
+                <br>
+                <a href="{{ url_for('download_file', filename=filename) }}" class="download-link">
+                    📥 Скачать файл {{ filename }}
+                </a>
+            </p>
+        </div>
+
+        <p style="color: #666; margin: 15px 0; font-size: 14px;">
+            💡 Файл сохранен на сервере. Вы можете скачать его по ссылке выше.
+            <br>
+            <small>Файл будет доступен для скачивания в течение 24 часов.</small>
+        </p>
+
+        <div>
+            <a href="/" class="btn btn-primary">🏠 На главную</a>
+            <a href="/settings" class="btn btn-secondary">⚙️ Настройки</a>
+        </div>
+    </div>
+</body>
+</html>
