@@ -202,30 +202,23 @@ def extract_data_from_pdf(pdf_path):
     # 2) Дата приемки
     print("\n🔍 Поиск даты приемки...")
     for line in lines:
-        if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
-            if '2028' not in line and 'годности' not in line:
-                result['дата_приемки'] = line
-                print(f"   ✅ Найдена дата: {result['дата_приемки']}")
+        date_match = re.search(r'\b(\d{2}\.\d{2}\.\d{4})\b', line)
+        if date_match:
+            date = date_match.group(1)
+            if not date.startswith('2028') and 'годности' not in line.lower():
+                result['дата_приемки'] = date
+                print(f"   ✅ Найдена дата: {date}")
                 break
-
-    if not result['дата_приемки']:
-        for i, line in enumerate(lines):
-            if 'составления' in line.lower() and i + 1 < len(lines):
-                date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[i + 1])
-                if date_match:
-                    result['дата_приемки'] = date_match.group(1)
-                    print(f"   ✅ Найдена дата (альтернативно): {result['дата_приемки']}")
-                    break
     if not result['дата_приемки']:
         print("   ⚠️ Дата приемки не найдена")
 
     # 3) Название поставщика
     print("\n🔍 Поиск названия поставщика...")
     for line in lines:
-        if 'ООО' in line or 'ЗАО' in line or 'ОАО' in line or 'АО' in line or 'ИП' in line:
+        if re.search(r'(ООО|ЗАО|ОАО|АО|ИП)\s+["«]', line):
             if 'ВЕРОФАРМ' not in line and 'Завод' not in line:
                 result['название_поставщика'] = line
-                print(f"   ✅ Найден поставщик: {result['название_поставщика']}")
+                print(f"   ✅ Найден поставщик: {line}")
                 break
     if not result['название_поставщика']:
         print("   ⚠️ Название поставщика не найдено")
@@ -236,183 +229,178 @@ def extract_data_from_pdf(pdf_path):
     end_index = -1
 
     for i, line in enumerate(lines):
-        if 'Материальные ценности' in line or 'Материальные ценности' in line.upper():
+        if 'Материальные ценности' in line:
             start_index = i
             print(f"   ✅ Найдено начало таблицы: строка {i + 1}")
             break
 
     for i, line in enumerate(lines):
-        if line == 'Итого' or line.startswith('Итого') or 'ИТОГО' in line.upper():
+        if line == 'Итого' or line.startswith('Итого'):
             end_index = i
             print(f"   ✅ Найден конец таблицы: строка {i + 1}")
             break
 
     if start_index == -1:
-        print("   ⚠️ Начало таблицы не найдено ('Материальные ценности')")
-        print("   🔍 Ищем альтернативные маркеры...")
-        # Ищем альтернативные маркеры
-        for i, line in enumerate(lines):
-            if 'ценности' in line.lower() or 'материал' in line.lower():
-                start_index = i
-                print(f"   ✅ Найдено альтернативное начало: строка {i + 1}")
-                break
+        print("   ⚠️ Начало таблицы не найдено")
+        return result
 
     if end_index == -1:
-        print("   🔍 Ищем альтернативный конец таблицы...")
-        for i, line in enumerate(lines):
-            if 'всего' in line.lower() or 'итог' in line.lower():
-                end_index = i
-                print(f"   ✅ Найден альтернативный конец: строка {i + 1}")
+        print("   ⚠️ Конец таблицы не найден")
+        return result
+
+    print(f"\n📊 Таблица найдена: строки {start_index + 1} - {end_index + 1}")
+
+    # Ищем строку с номерами колонок (содержит '14')
+    data_start = -1
+    for i in range(start_index, end_index):
+        if re.search(r'\b14\b', lines[i]):
+            data_start = i + 1
+            print(f"   ✅ Найдена колонка '14' в строке {i + 1}: {lines[i]}")
+            break
+
+    if data_start == -1:
+        print("   ⚠️ Колонка '14' не найдена")
+        return result
+
+    # Парсим товары
+    products = []
+    i = data_start
+
+    while i < end_index:
+        line = lines[i]
+
+        if not line:
+            i += 1
+            continue
+
+        # Пропускаем строки с датами
+        if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
+            i += 1
+            continue
+
+        # Пропускаем строки, состоящие только из цифр и пробелов
+        if re.match(r'^[\d\s,]+$', line) and len(line) > 3:
+            i += 1
+            continue
+
+        # Пропускаем строки с 'X'
+        if line == 'X' or line == 'x':
+            i += 1
+            continue
+
+        # Пропускаем заголовки
+        header_keywords = [
+            'наименование', 'сорт', 'размер', 'марка', 'код',
+            'единица измерения', 'количество', 'цена', 'сумма',
+            'без учета', 'всего с учетом', 'номер паспорта',
+            'партия', 'поставщика', 'партия поставщика',
+            'срок годности', 'паспорта'
+        ]
+        is_header = False
+        line_lower = line.lower()
+        for keyword in header_keywords:
+            if keyword in line_lower:
+                is_header = True
                 break
 
-    if start_index != -1 and end_index != -1:
-        print(f"\n📊 Таблица найдена: строки {start_index + 1} - {end_index + 1}")
+        if is_header:
+            i += 1
+            continue
 
-        data_start = -1
-        for i in range(start_index, end_index):
-            if lines[i] == '14' or lines[i].strip() == '14':
-                data_start = i + 1
-                print(f"   ✅ Найдена колонка '14': строка {i + 1}, данные начинаются с {data_start + 1}")
-                break
+        # Проверяем, что строка содержит буквы (начало названия товара)
+        if re.search(r'[А-ЯЁA-Z]', line) and not re.match(r'^[\d\s,]+$', line):
+            product_name_lines = [line]
+            current_pos = i + 1
+            last_name_line = i
+            name_start_line = i
 
-        if data_start != -1:
-            header_keywords = [
-                'наименование', 'сорт', 'размер', 'марка', 'код',
-                'единица измерения', 'количество', 'цена', 'сумма',
-                'без учета', 'всего с учетом', 'номер паспорта',
-                'партия', 'поставщика', 'партия поставщика',
-                'срок годности', 'паспорта'
-            ]
+            # Собираем название товара
+            while current_pos < end_index:
+                next_line = lines[current_pos]
 
-            i = data_start
-            products = []
-
-            print(f"\n🔍 Начинаем парсинг товаров (строки {i + 1} - {end_index})...")
-
-            while i < end_index:
-                line = lines[i]
-
-                if not line:
-                    i += 1
-                    continue
-
-                if re.match(r'\d{2}\.\d{2}\.\d{4}', line):
-                    i += 1
-                    continue
-
-                if re.match(r'^[\d\s,]+$', line) and len(line) > 3:
-                    i += 1
-                    continue
-
-                if line == 'X' or line == 'x':
-                    i += 1
-                    continue
-
-                is_header = False
-                line_lower = line.lower()
-                for keyword in header_keywords:
-                    if keyword in line_lower:
-                        is_header = True
-                        break
-
-                if is_header:
-                    i += 1
-                    continue
-
-                if re.search(r'[А-ЯЁA-Z]', line) and not re.match(r'^[\d\s,]+$', line):
-                    product_name_lines = [line]
-                    current_pos = i + 1
-                    last_name_line = i
-                    name_start_line = i
-
-                    while current_pos < end_index:
-                        next_line = lines[current_pos]
-
-                        nomencl_match = re.search(r'\b(\d{8})\b', next_line)
-                        if nomencl_match:
-                            if not nomencl_match.group(1).startswith(('8', '7')):
-                                if nomencl_match.group(1) not in ['48797491', '21000101']:
-                                    last_name_line = current_pos - 1
-                                    break
-
-                        if re.search(r'[А-ЯЁA-Z]', next_line) and not re.match(r'^[\d\s,]+$', next_line):
-                            skip_words = ['кг', 'шт', 'г', 'л', 'м', 'уп', 'пач', 'итого',
-                                          'x', 'принял', 'сдал', 'должность', 'подпись',
-                                          'расшифровка', 'номер', 'паспорта']
-                            if next_line.lower() not in skip_words:
-                                product_name_lines.append(next_line)
-                                current_pos += 1
-                            else:
-                                break
-                        else:
+                # Проверяем, не начался ли следующий товар (строка с 8-значным числом)
+                nomencl_match = re.search(r'\b(\d{8})\b', next_line)
+                if nomencl_match:
+                    if not nomencl_match.group(1).startswith(('8', '7')):
+                        if nomencl_match.group(1) not in ['48797491', '21000101']:
+                            last_name_line = current_pos - 1
                             break
 
-                    if last_name_line == i:
-                        last_name_line = current_pos - 1
-
-                    product_name = ' '.join(product_name_lines)
-
-                    # Номенклатурный номер
-                    nomencl_number = None
-                    nomencl_line = last_name_line + 1
-                    if nomencl_line < len(lines):
-                        nomencl_match = re.search(r'\b(\d{8})\b', lines[nomencl_line])
-                        if nomencl_match:
-                            if not nomencl_match.group(1).startswith(('8', '7')):
-                                if nomencl_match.group(1) not in ['48797491', '21000101']:
-                                    nomencl_number = nomencl_match.group(1)
-
-                    # Аналитический лист
-                    analytic_list = None
-                    batch_line = last_name_line + 8
-                    if batch_line < len(lines):
-                        batch_match = re.search(r'\b(1\d{9})\b', lines[batch_line])
-                        if batch_match:
-                            analytic_list = batch_match.group(1)
-
-                    # Партия поставщика
-                    supplier_batch = None
-                    supplier_line = last_name_line + 9
-                    if supplier_line < len(lines):
-                        supplier_batch = lines[supplier_line]
-
-                    # Срок годности
-                    expiration_date = None
-                    expiration_line = last_name_line + 10
-                    if expiration_line < len(lines):
-                        date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[expiration_line])
-                        if date_match:
-                            expiration_date = date_match.group(1)
-
-                    # Количество
-                    quantity = None
-                    quantity_line_index = name_start_line + 5
-                    if quantity_line_index < len(lines):
-                        quantity_line = lines[quantity_line_index]
-                        quantity = parse_quantity_from_string(quantity_line)
-
-                    if analytic_list:
-                        product_data = {
-                            'наименование': product_name,
-                            'номенклатурный_номер': nomencl_number,
-                            'аналитический_лист': analytic_list,
-                            'партия_поставщика': supplier_batch,
-                            'срок_годности': expiration_date,
-                            'количество': quantity
-                        }
-                        products.append(product_data)
-                        print(f"   ✅ Найден товар: {product_name[:50]}... (АЛ: {analytic_list})")
-
-                    i = last_name_line + 11
+                # Продолжаем собирать название, если строка содержит буквы
+                if re.search(r'[А-ЯЁA-Z]', next_line) and not re.match(r'^[\d\s,]+$', next_line):
+                    skip_words = ['кг', 'шт', 'г', 'л', 'м', 'уп', 'пач', 'итого',
+                                  'x', 'принял', 'сдал', 'должность', 'подпись',
+                                  'расшифровка', 'номер', 'паспорта']
+                    if next_line.lower() not in skip_words:
+                        product_name_lines.append(next_line)
+                        current_pos += 1
+                    else:
+                        break
                 else:
-                    i += 1
+                    break
 
-            result['товары'] = products
-            print(f"\n📊 Всего найдено товаров: {len(products)}")
+            if last_name_line == i:
+                last_name_line = current_pos - 1
+
+            product_name = ' '.join(product_name_lines)
+
+            # Номенклатурный номер
+            nomencl_number = None
+            nomencl_line = last_name_line + 1
+            if nomencl_line < len(lines):
+                nomencl_match = re.search(r'\b(\d{8})\b', lines[nomencl_line])
+                if nomencl_match:
+                    if not nomencl_match.group(1).startswith(('8', '7')):
+                        if nomencl_match.group(1) not in ['48797491', '21000101']:
+                            nomencl_number = nomencl_match.group(1)
+
+            # Аналитический лист
+            analytic_list = None
+            batch_line = last_name_line + 8
+            if batch_line < len(lines):
+                batch_match = re.search(r'\b(1\d{9})\b', lines[batch_line])
+                if batch_match:
+                    analytic_list = batch_match.group(1)
+
+            # Партия поставщика
+            supplier_batch = None
+            supplier_line = last_name_line + 9
+            if supplier_line < len(lines):
+                supplier_batch = lines[supplier_line]
+
+            # Срок годности
+            expiration_date = None
+            expiration_line = last_name_line + 10
+            if expiration_line < len(lines):
+                date_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', lines[expiration_line])
+                if date_match:
+                    expiration_date = date_match.group(1)
+
+            # Количество
+            quantity = None
+            quantity_line_index = name_start_line + 5
+            if quantity_line_index < len(lines):
+                quantity_line = lines[quantity_line_index]
+                quantity = parse_quantity_from_string(quantity_line)
+
+            if analytic_list:
+                product_data = {
+                    'наименование': product_name,
+                    'номенклатурный_номер': nomencl_number,
+                    'аналитический_лист': analytic_list,
+                    'партия_поставщика': supplier_batch,
+                    'срок_годности': expiration_date,
+                    'количество': quantity
+                }
+                products.append(product_data)
+                print(f"   ✅ Найден товар: {product_name[:50]}... (АЛ: {analytic_list})")
+
+            i = last_name_line + 11
         else:
-            print("   ⚠️ Колонка '14' не найдена")
-    else:
-        print(f"   ⚠️ Таблица не найдена (start_index={start_index}, end_index={end_index})")
+            i += 1
+
+    result['товары'] = products
+    print(f"\n📊 Всего найдено товаров: {len(products)}")
 
     print(f"\n{'=' * 60}")
     print(f"📊 РЕЗУЛЬТАТ ПАРСИНГА:")
