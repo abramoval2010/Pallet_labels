@@ -223,6 +223,17 @@
             box-shadow: 0 6px 25px rgba(156, 39, 176, 0.4);
         }
 
+        .btn-last {
+            background: linear-gradient(135deg, #00bcd4, #26c6da);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
+        }
+
+        .btn-last:hover {
+            background: linear-gradient(135deg, #0097a7, #00acc1);
+            box-shadow: 0 6px 25px rgba(0, 188, 212, 0.4);
+        }
+
         .file-name {
             margin-top: 15px;
             color: #4a6fa5;
@@ -274,6 +285,14 @@
             border: 1px solid #bee5eb;
         }
 
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 30px 20px;
@@ -293,6 +312,16 @@
             }
 
             .menu-footer .btn {
+                width: 100%;
+                text-align: center;
+            }
+
+            .button-group {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .button-group .btn {
                 width: 100%;
                 text-align: center;
             }
@@ -352,10 +381,15 @@
                     <div class="file-name" id="fileName">Файл не выбран</div>
                 </div>
 
-                <div style="text-align: center; margin-top: 25px;">
+                <div class="button-group">
                     <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
                         🔄 Извлечь данные
                     </button>
+                    <form action="/upload_last" method="post" style="display: inline;">
+                        <button type="submit" class="btn btn-last" id="lastBtn">
+                            📂 Загрузить последний приходный ордер
+                        </button>
+                    </form>
                 </div>
             </form>
 

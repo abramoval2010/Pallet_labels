@@ -21,7 +21,7 @@ import pandas as pd
 import fitz  # PyMuPDF
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.enum.section import WD_ORIENT, WD_SECTION_START
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -33,6 +33,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['SETTINGS_FILE'] = 'settings.json'
 app.config['DATABASE_FILE'] = 'users.db'
 app.config['MATERIALS_DATABASE_FILE'] = 'materials.db'
+app.config['LAST_FOLDER_FILE'] = 'last_folder.json'
 
 # Создаем папку для загрузок
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -682,23 +683,48 @@ materials_db = MaterialsDatabase(app.config['MATERIALS_DATABASE_FILE'])
 # ============================================================
 
 SETTINGS_FILE = 'settings.json'
+LAST_FOLDER_FILE = 'last_folder.json'
 
 
 def load_settings():
     """Загружает настройки из файла"""
     default_settings = {
         'save_path': os.path.join(os.path.expanduser('~'), 'Documents', 'Палетные этикетки'),
-        'sop_code': 'RUPD.VLG.05.04.C01'
+        'sop_code': 'RUPD.VLG.05.04.C01',
+        'font_settings': {
+            'header_size': 12,
+            'product_size_short': 80,
+            'product_size_medium': 72,
+            'product_size_long': 64,
+            'supplier_size_short': 42,
+            'supplier_size_medium': 42,
+            'supplier_size_long': 36,
+            'analytic_size': 117,
+            'code_size': 14,
+            'line_spacing_short': 1.5,
+            'line_spacing_medium': 1.0,
+            'line_spacing_long': 0.8,
+            'short_name_threshold': 25,
+            'medium_name_threshold': 40
+        }
     }
 
     try:
         if os.path.exists(SETTINGS_FILE):
             with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
                 settings = json.load(f)
+                # Проверяем наличие всех ключей
                 if 'save_path' not in settings:
                     settings['save_path'] = default_settings['save_path']
                 if 'sop_code' not in settings:
                     settings['sop_code'] = default_settings['sop_code']
+                if 'font_settings' not in settings:
+                    settings['font_settings'] = default_settings['font_settings']
+                else:
+                    # Проверяем все ключи в font_settings
+                    for key in default_settings['font_settings']:
+                        if key not in settings['font_settings']:
+                            settings['font_settings'][key] = default_settings['font_settings'][key]
                 return settings
         else:
             os.makedirs(default_settings['save_path'], exist_ok=True)
@@ -718,6 +744,74 @@ def save_settings(settings):
     except Exception as e:
         print(f"Ошибка сохранения настроек: {e}")
         return False
+
+
+def load_last_folder():
+    """Загружает последнюю использованную папку"""
+    try:
+        if os.path.exists(LAST_FOLDER_FILE):
+            with open(LAST_FOLDER_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('folder_path', '')
+    except Exception as e:
+        print(f"Ошибка загрузки последней папки: {e}")
+    return ''
+
+
+def save_last_folder(folder_path):
+    """Сохраняет последнюю использованную папку"""
+    try:
+        with open(LAST_FOLDER_FILE, 'w', encoding='utf-8') as f:
+            json.dump({'folder_path': folder_path}, f, ensure_ascii=False, indent=4)
+        return True
+    except Exception as e:
+        print(f"Ошибка сохранения последней папки: {e}")
+        return False
+
+
+def find_latest_pdf_in_folder(folder_path):
+    """
+    Находит самый свежий PDF-файл в папке, который корректно парсится.
+    Возвращает путь к файлу или None.
+    """
+    if not folder_path or not os.path.exists(folder_path):
+        return None
+
+    try:
+        # Получаем все PDF-файлы в папке
+        pdf_files = []
+        for file in os.listdir(folder_path):
+            if file.lower().endswith('.pdf'):
+                file_path = os.path.join(folder_path, file)
+                try:
+                    # Получаем время создания/изменения файла
+                    mtime = os.path.getmtime(file_path)
+                    pdf_files.append((file_path, mtime))
+                except:
+                    continue
+
+        # Сортируем по времени изменения (сначала новые)
+        pdf_files.sort(key=lambda x: x[1], reverse=True)
+
+        if not pdf_files:
+            return None
+
+        # Проверяем каждый файл на возможность парсинга
+        for file_path, _ in pdf_files:
+            try:
+                # Пробуем открыть и распарсить PDF
+                data = extract_data_from_pdf(file_path)
+                if data and data.get('товары') and len(data['товары']) > 0:
+                    # Если парсинг успешен, возвращаем путь
+                    return file_path
+            except Exception as e:
+                print(f"Ошибка парсинга {file_path}: {e}")
+                continue
+
+        return None
+    except Exception as e:
+        print(f"Ошибка поиска PDF: {e}")
+        return None
 
 
 def get_available_drives():
@@ -796,11 +890,100 @@ def calculate_pallets(quantity, palletization):
         return 1
 
 
+def clean_filename(text):
+    """Очищает текст от недопустимых символов для имени файла"""
+    if not text:
+        return 'Неизвестный_поставщик'
+    # Удаляем недопустимые символы для Windows
+    invalid_chars = r'[<>:"/\\|?*]'
+    cleaned = re.sub(invalid_chars, '', text)
+    # Удаляем лишние пробелы
+    cleaned = ' '.join(cleaned.split())
+    # Если после очистки строка пустая, возвращаем значение по умолчанию
+    if not cleaned.strip():
+        return 'Неизвестный_поставщик'
+    return cleaned
+
+
+def get_unique_filename(base_path, base_name, extension='.docx'):
+    """
+    Формирует уникальное имя файла с индексацией при повторении.
+    Возвращает полный путь к файлу.
+    """
+    counter = 1
+    while True:
+        if counter == 1:
+            filename = f"{base_name}{extension}"
+        else:
+            filename = f"{base_name}_{counter}{extension}"
+
+        full_path = os.path.join(base_path, filename)
+        if not os.path.exists(full_path):
+            return full_path
+        counter += 1
+
+
 # ============================================================
 # ФУНКЦИЯ ГЕНЕРАЦИИ ЭТИКЕТОК
 # ============================================================
 
-def create_pallet_labels_file(all_products, order_number, save_path=None, sop_code=None):
+def get_name_length_category(name_len, font_settings):
+    """
+    Определяет категорию длины названия на основе настроек.
+    Возвращает: 'short', 'medium', 'long'
+    """
+    short_threshold = font_settings.get('short_name_threshold', 25)
+    medium_threshold = font_settings.get('medium_name_threshold', 40)
+
+    if name_len < short_threshold:
+        return 'short'
+    elif name_len < medium_threshold:
+        return 'medium'
+    else:
+        return 'long'
+
+
+def get_font_and_spacing_settings(product_name, font_settings):
+    """
+    Определяет размеры шрифтов и межстрочный интервал в зависимости
+    от длины названия товара и настроек пользователя.
+    """
+    name_len = len(product_name)
+    category = get_name_length_category(name_len, font_settings)
+
+    if category == 'short':
+        return {
+            'header': font_settings.get('header_size', 12),
+            'product': font_settings.get('product_size_short', 80),
+            'supplier': font_settings.get('supplier_size_short', 42),
+            'analytic': font_settings.get('analytic_size', 117),
+            'code': font_settings.get('code_size', 14),
+            'line_spacing': font_settings.get('line_spacing_short', 1.5),
+            'category': 'short'
+        }
+    elif category == 'medium':
+        return {
+            'header': font_settings.get('header_size', 12),
+            'product': font_settings.get('product_size_medium', 72),
+            'supplier': font_settings.get('supplier_size_medium', 42),
+            'analytic': font_settings.get('analytic_size', 117),
+            'code': font_settings.get('code_size', 14),
+            'line_spacing': font_settings.get('line_spacing_medium', 1.0),
+            'category': 'medium'
+        }
+    else:  # long
+        return {
+            'header': font_settings.get('header_size', 12),
+            'product': font_settings.get('product_size_long', 64),
+            'supplier': font_settings.get('supplier_size_long', 36),
+            'analytic': font_settings.get('analytic_size', 117),
+            'code': font_settings.get('code_size', 14),
+            'line_spacing': font_settings.get('line_spacing_long', 0.8),
+            'category': 'long'
+        }
+
+
+def create_pallet_labels_file(all_products, order_number, supplier_name, order_date, save_path=None, sop_code=None):
     """
     Создает файл с палетными этикетками.
     Каждый аналитический лист дублируется столько раз, сколько указано в поле 'pallets'.
@@ -813,6 +996,10 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
     if sop_code is None:
         settings = load_settings()
         sop_code = settings.get('sop_code', 'RUPD.VLG.05.04.C01')
+
+    # Загружаем настройки шрифтов
+    settings = load_settings()
+    font_settings = settings.get('font_settings', {})
 
     try:
         os.makedirs(save_path, exist_ok=True)
@@ -845,42 +1032,14 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
         if pallets_count < 1:
             pallets_count = 1
 
-        # Рассчитываем размеры шрифтов для этого товара
+        # Получаем данные товара
         product_name = product.get('наименование', 'Не указано')
         supplier_series = product.get('партия_поставщика', 'Не указана')
         analytic_list = product.get('аналитический_лист', 'Не указан')
 
-        name_len = len(product_name)
-
-        if name_len < 30:
-            font_sizes = {'header': 14, 'product': 82, 'supplier': 60, 'analytic': 76, 'code': 14}
-        elif name_len < 40:
-            font_sizes = {'header': 14, 'product': 74, 'supplier': 58, 'analytic': 68, 'code': 14}
-        else:
-            font_sizes = {'header': 14, 'product': 70, 'supplier': 56, 'analytic': 66, 'code': 14}
-
-        if name_len > 55:
-            font_sizes['product'] = 62
-            font_sizes['supplier'] = 50
-            font_sizes['analytic'] = 58
-        elif name_len > 70:
-            font_sizes['product'] = 54
-            font_sizes['supplier'] = 44
-            font_sizes['analytic'] = 50
-        elif name_len > 85:
-            font_sizes['product'] = 46
-            font_sizes['supplier'] = 38
-            font_sizes['analytic'] = 44
-
-        supplier_len = len(supplier_series) if supplier_series else 0
-        if supplier_len > 25:
-            font_sizes['supplier'] = max(32, font_sizes['supplier'] - 12)
-        elif supplier_len > 18:
-            font_sizes['supplier'] = max(38, font_sizes['supplier'] - 8)
-
-        analytic_len = len(str(analytic_list)) if analytic_list else 0
-        if analytic_len > 15:
-            font_sizes['analytic'] = max(42, font_sizes['analytic'] - 10)
+        # Определяем размеры шрифтов и межстрочный интервал
+        font_settings_dict = get_font_and_spacing_settings(product_name, font_settings)
+        line_spacing = font_settings_dict.get('line_spacing', 1.0)
 
         # Создаем паллеты для этого товара
         for pallet_num in range(pallets_count):
@@ -915,10 +1074,12 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
             p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p1.paragraph_format.space_before = Pt(2)
             p1.paragraph_format.space_after = Pt(2)
+            p1.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+            p1.paragraph_format.line_spacing = line_spacing
             run1 = p1.add_run('ООО «Верофарм»')
             run1.italic = True
             run1.bold = True
-            run1.font.size = Pt(font_sizes['header'])
+            run1.font.size = Pt(font_settings_dict['header'])
             run1.font.name = 'Calibri'
 
             # Название товара
@@ -926,10 +1087,12 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
             p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p2.paragraph_format.space_before = Pt(5)
             p2.paragraph_format.space_after = Pt(5)
+            p2.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+            p2.paragraph_format.line_spacing = line_spacing
             run2 = p2.add_run(product_name)
             run2.italic = True
             run2.bold = True
-            run2.font.size = Pt(font_sizes['product'])
+            run2.font.size = Pt(font_settings_dict['product'])
             run2.font.name = 'Calibri'
 
             # Серия поставщика
@@ -938,10 +1101,12 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
             p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p3.paragraph_format.space_before = Pt(4)
             p3.paragraph_format.space_after = Pt(4)
+            p3.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+            p3.paragraph_format.line_spacing = line_spacing
             run3 = p3.add_run(supplier_text)
             run3.italic = True
             run3.bold = False
-            run3.font.size = Pt(font_sizes['supplier'])
+            run3.font.size = Pt(font_settings_dict['supplier'])
             run3.font.name = 'Calibri'
 
             # Аналитический лист
@@ -949,10 +1114,12 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
             p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p4.paragraph_format.space_before = Pt(4)
             p4.paragraph_format.space_after = Pt(4)
+            p4.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+            p4.paragraph_format.line_spacing = line_spacing
             run4 = p4.add_run(f'АЛ {analytic_list}')
             run4.italic = True
             run4.bold = True
-            run4.font.size = Pt(font_sizes['analytic'])
+            run4.font.size = Pt(font_settings_dict['analytic'])
             run4.font.name = 'Calibri'
 
             # Код
@@ -960,28 +1127,49 @@ def create_pallet_labels_file(all_products, order_number, save_path=None, sop_co
             p5.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             p5.paragraph_format.space_before = Pt(8)
             p5.paragraph_format.space_after = Pt(2)
+            p5.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+            p5.paragraph_format.line_spacing = line_spacing
             run5 = p5.add_run(sop_code)
             run5.italic = False
             run5.bold = True
-            run5.font.size = Pt(font_sizes['code'])
+            run5.font.size = Pt(font_settings_dict['code'])
             run5.font.name = 'Calibri'
 
             total_labels += 1
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"Информационный лист {order_number}_{timestamp}.docx"
-    filepath = os.path.join(save_path, filename)
+    # Формируем имя файла
+    # Очищаем название поставщика от недопустимых символов
+    clean_supplier = clean_filename(supplier_name) if supplier_name else 'Неизвестный_поставщик'
+
+    # Преобразуем дату в формат ДДММГГГГ
+    date_str = ''
+    if order_date:
+        # Пробуем распарсить дату
+        date_match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', order_date)
+        if date_match:
+            date_str = f"{date_match.group(1)}{date_match.group(2)}{date_match.group(3)}"
+        else:
+            # Если дата не распарсилась, используем текущую
+            date_str = datetime.now().strftime("%d%m%Y")
+    else:
+        date_str = datetime.now().strftime("%d%m%Y")
+
+    # Базовое имя файла
+    base_name = f"{clean_supplier}_{order_number}_{date_str}"
+
+    # Получаем уникальное имя файла
+    filepath = get_unique_filename(save_path, base_name, '.docx')
 
     try:
         doc.save(filepath)
     except PermissionError:
         fallback_path = os.path.join(os.path.expanduser('~'), 'Documents')
-        filepath = os.path.join(fallback_path, filename)
+        filepath = get_unique_filename(fallback_path, base_name, '.docx')
         doc.save(filepath)
     except Exception as e:
         print(f"Ошибка сохранения файла: {e}")
         temp_dir = tempfile.gettempdir()
-        filepath = os.path.join(temp_dir, filename)
+        filepath = get_unique_filename(temp_dir, base_name, '.docx')
         doc.save(filepath)
 
     return filepath
@@ -1671,15 +1859,18 @@ def upload_file():
     """Загрузка и обработка PDF файла"""
     try:
         if 'file' not in request.files:
-            return render_template('error.html', error='Файл не выбран')
+            flash('Файл не выбран', 'warning')
+            return redirect(url_for('index'))
 
         file = request.files['file']
 
         if file.filename == '':
-            return render_template('error.html', error='Файл не выбран')
+            flash('Файл не выбран', 'warning')
+            return redirect(url_for('index'))
 
         if not file.filename.lower().endswith('.pdf'):
-            return render_template('error.html', error='Пожалуйста, загрузите файл в формате PDF')
+            flash('Пожалуйста, загрузите файл в формате PDF', 'danger')
+            return redirect(url_for('index'))
 
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -1690,8 +1881,8 @@ def upload_file():
             os.remove(filepath)
 
             if not data or not data['дата_приемки'] and not data['название_поставщика'] and not data['товары']:
-                return render_template('error.html',
-                                       error='Не удалось извлечь данные из PDF-файла. Проверьте формат файла.')
+                flash('Не удалось извлечь данные из PDF-файла. Проверьте формат файла.', 'danger')
+                return redirect(url_for('index'))
 
             # Обогащаем данные о товарах информацией о палетизации
             total_pallets = 0
@@ -1728,10 +1919,90 @@ def upload_file():
         except Exception as e:
             if os.path.exists(filepath):
                 os.remove(filepath)
-            return render_template('error.html', error=f'Ошибка при обработке файла: {str(e)}')
+            flash(f'Ошибка при обработке файла: {str(e)}', 'danger')
+            return redirect(url_for('index'))
     except Exception as e:
         print(f"Ошибка в upload_file: {e}")
-        return render_template('error.html', error=f'Ошибка при загрузке файла: {str(e)}')
+        flash(f'Ошибка при загрузке файла: {str(e)}', 'danger')
+        return redirect(url_for('index'))
+
+
+@app.route('/upload_last', methods=['POST'])
+@labels_access_required
+def upload_last():
+    """Загрузка последнего приходного ордера из запомненной папки"""
+    try:
+        # Загружаем последнюю использованную папку
+        last_folder = load_last_folder()
+
+        if not last_folder or not os.path.exists(last_folder):
+            flash('Папка с последними файлами не найдена. Сначала выберите файл вручную.', 'warning')
+            return redirect(url_for('index'))
+
+        # Ищем последний корректный PDF-файл
+        file_path = find_latest_pdf_in_folder(last_folder)
+
+        if not file_path:
+            flash(
+                'Не найдено ни одного корректного PDF-файла в папке. Проверьте, что в папке есть файлы приходных ордеров.',
+                'warning')
+            return redirect(url_for('index'))
+
+        # Копируем файл в папку загрузок
+        filename = secure_filename(os.path.basename(file_path))
+        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        shutil.copy2(file_path, temp_path)
+
+        try:
+            data = extract_data_from_pdf(temp_path)
+            os.remove(temp_path)
+
+            if not data or not data['дата_приемки'] and not data['название_поставщика'] and not data['товары']:
+                flash('Не удалось извлечь данные из PDF-файла. Файл поврежден или имеет неверный формат.', 'danger')
+                return redirect(url_for('index'))
+
+            # Обогащаем данные о товарах информацией о палетизации
+            total_pallets = 0
+            for product in data['товары']:
+                sap_code = product.get('номенклатурный_номер')
+                product['sap_code_display'] = sap_code if sap_code else '-'
+
+                if sap_code:
+                    try:
+                        sap_code_int = int(sap_code)
+                        material = materials_db.get_material_by_sap(sap_code_int)
+                        if material:
+                            product['palletization'] = material.get('palletization', 0)
+                            product['material_found'] = True
+                        else:
+                            product['palletization'] = 0
+                            product['material_found'] = False
+                    except (ValueError, TypeError):
+                        product['palletization'] = 0
+                        product['material_found'] = False
+                else:
+                    product['palletization'] = 0
+                    product['material_found'] = False
+
+                # Рассчитываем количество паллет
+                quantity = product.get('количество', 0)
+                palletization = product.get('palletization', 0)
+                product['pallets'] = calculate_pallets(quantity, palletization)
+                total_pallets += product['pallets']
+
+            db.log_action(session['user'], 'UPLOAD_LAST_PDF', f"Загружен последний PDF: {os.path.basename(file_path)}")
+
+            flash(f'✅ Успешно загружен последний приходный ордер: {os.path.basename(file_path)}', 'success')
+            return render_template('result.html', data=data, total_pallets=total_pallets)
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            flash(f'Ошибка при обработке файла: {str(e)}', 'danger')
+            return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Ошибка в upload_last: {e}")
+        flash(f'Ошибка при загрузке последнего файла: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 
 @app.route('/recalculate_pallets', methods=['POST'])
@@ -1765,9 +2036,12 @@ def generate_labels():
     try:
         products_json = request.form.get('products')
         order_number = request.form.get('order_number')
+        supplier_name = request.form.get('supplier_name', '')
+        order_date = request.form.get('order_date', '')
 
         if not products_json or not order_number:
-            return render_template('error.html', error='Нет данных для формирования этикеток')
+            flash('Нет данных для формирования этикеток', 'danger')
+            return redirect(url_for('index'))
 
         products_json = products_json.replace("'", '"')
 
@@ -1775,16 +2049,18 @@ def generate_labels():
             products = json.loads(products_json)
         except json.JSONDecodeError as e:
             print(f"Ошибка парсинга JSON: {e}")
-            return render_template('error.html', error=f'Ошибка парсинга данных: {str(e)}')
+            flash(f'Ошибка парсинга данных: {str(e)}', 'danger')
+            return redirect(url_for('index'))
 
         if not products:
-            return render_template('error.html', error='Нет товаров для формирования этикеток')
+            flash('Нет товаров для формирования этикеток', 'danger')
+            return redirect(url_for('index'))
 
         settings = load_settings()
         save_path = settings.get('save_path')
         sop_code = settings.get('sop_code', 'RUPD.VLG.05.04.C01')
 
-        filepath = create_pallet_labels_file(products, order_number, save_path, sop_code)
+        filepath = create_pallet_labels_file(products, order_number, supplier_name, order_date, save_path, sop_code)
         open_in_word(filepath)
 
         db.log_action(session['user'], 'GENERATE_LABELS',
@@ -1800,7 +2076,8 @@ def generate_labels():
                                total_pallets=total_pallets)
     except Exception as e:
         print(f"Ошибка в generate_labels: {e}")
-        return render_template('error.html', error=f'Ошибка при формировании этикеток: {str(e)}')
+        flash(f'Ошибка при формировании этикеток: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -1840,6 +2117,7 @@ def settings_page():
         subdirs = get_subdirectories(current_path)
 
         if request.method == 'POST':
+            # Сохранение пути
             selected_path = request.form.get('selected_path')
             if selected_path:
                 settings['save_path'] = selected_path
@@ -1848,6 +2126,7 @@ def settings_page():
                 flash('Настройки сохранены', 'success')
                 return redirect(url_for('settings_page'))
 
+            # Сохранение номера СОП
             sop_code = request.form.get('sop_code')
             if sop_code:
                 settings['sop_code'] = sop_code.strip()
@@ -1855,6 +2134,36 @@ def settings_page():
                 flash('Номер СОП успешно обновлен', 'success')
                 return redirect(url_for('settings_page'))
 
+            # Сохранение настроек шрифтов и межстрочного интервала
+            font_settings = {}
+            font_keys = ['header_size', 'product_size_short', 'product_size_medium',
+                         'product_size_long', 'supplier_size_short', 'supplier_size_medium',
+                         'supplier_size_long', 'analytic_size', 'code_size',
+                         'line_spacing_short', 'line_spacing_medium', 'line_spacing_long',
+                         'short_name_threshold', 'medium_name_threshold']
+
+            for key in font_keys:
+                value = request.form.get(key)
+                if value is not None:
+                    try:
+                        if key in ['short_name_threshold', 'medium_name_threshold']:
+                            font_settings[key] = int(value)
+                        else:
+                            font_settings[key] = float(value) if 'line_spacing' in key else int(value)
+                    except ValueError:
+                        flash(f'Неверное значение для {key}', 'danger')
+                        return redirect(url_for('settings_page'))
+
+            if font_settings:
+                # Обновляем только переданные ключи
+                if 'font_settings' not in settings:
+                    settings['font_settings'] = {}
+                settings['font_settings'].update(font_settings)
+                save_settings(settings)
+                flash('Настройки шрифтов успешно сохранены', 'success')
+                return redirect(url_for('settings_page'))
+
+            # Навигация по пути
             path_component = request.form.get('path_component')
             if path_component:
                 new_path = path_component
@@ -1865,6 +2174,7 @@ def settings_page():
                 return redirect(url_for('settings_page'))
 
         material_count = materials_db.get_materials_count()
+        font_settings = settings.get('font_settings', {})
 
         return render_template('settings.html',
                                settings=settings,
@@ -1872,9 +2182,10 @@ def settings_page():
                                current_path=current_path,
                                path_parts=path_parts,
                                subdirs=subdirs,
-                               os_sep=os.sep,
+                               os_sep=os_sep,
                                is_admin=(session.get('user_rights') == 'Администратор'),
-                               material_count=material_count)
+                               material_count=material_count,
+                               font_settings=font_settings)
     except Exception as e:
         print(f"Ошибка в settings_page: {e}")
         import traceback

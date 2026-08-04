@@ -1,4 +1,16 @@
 {
     "save_path": "C:\\",
-    "sop_code": "RUPD.VLG.05.04.C01"
+    "sop_code": "RUPD.VLG.05.04.C01",
+    "font_settings": {
+        "header_size": 12,
+        "product_size_short": 80,
+        "product_size_medium": 72,
+        "product_size_long": 64,
+        "supplier_size_short": 42,
+        "supplier_size_medium": 42,
+        "supplier_size_long": 36,
+        "analytic_size": 117,
+        "code_size": 14,
+        "line_spacing": 0.8
+    }
 }

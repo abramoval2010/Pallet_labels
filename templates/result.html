@@ -243,6 +243,8 @@
             <form action="/generate_labels" method="post" id="generateForm" style="display:inline;">
                 <input type="hidden" name="products" id="productsData">
                 <input type="hidden" name="order_number" value="{{ data.номер_ордера }}">
+                <input type="hidden" name="supplier_name" value="{{ data.название_поставщика or '' }}">
+                <input type="hidden" name="order_date" value="{{ data.дата_приемки or '' }}">
                 <button type="button" class="btn btn-primary" onclick="submitForm()">📄 Сформировать этикетки</button>
             </form>
 
