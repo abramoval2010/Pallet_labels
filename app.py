@@ -26,23 +26,15 @@ from docx.enum.section import WD_ORIENT, WD_SECTION_START
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-# Пытаемся импортировать PyMuPDF, если его нет - используем pdfplumber
-PDF_LIB = None
+# Импортируем PyMuPDF (fitz) для парсинга PDF
 try:
     import fitz
 
-    PDF_LIB = 'fitz'
-    print("✅ Используется PyMuPDF (fitz) для парсинга PDF")
+    print("✅ PyMuPDF (fitz) загружен для парсинга PDF")
 except ImportError as e:
-    print(f"⚠️ PyMuPDF не найден: {e}")
-    try:
-        import pdfplumber
-
-        PDF_LIB = 'pdfplumber'
-        print("✅ Используется pdfplumber для парсинга PDF")
-    except ImportError as e2:
-        print(f"❌ pdfplumber также не найден: {e2}")
-        print("❌ Нет доступных библиотек для парсинга PDF!")
+    print(f"❌ Ошибка импорта PyMuPDF: {e}")
+    print("❌ Установите PyMuPDF: pip install PyMuPDF")
+    sys.exit(1)
 
 # Импорт конфигурации
 try:
@@ -83,47 +75,28 @@ print(f"📁 База материалов: {MATERIALS_DATABASE_FILE}")
 
 
 # ============================================================
-# УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ИЗВЛЕЧЕНИЯ ТЕКСТА ИЗ PDF
+# ФУНКЦИЯ ИЗВЛЕЧЕНИЯ ТЕКСТА ИЗ PDF (только PyMuPDF)
 # ============================================================
 
 def extract_text_from_pdf(pdf_path):
     """
-    Универсальная функция извлечения текста из PDF.
-    Работает с PyMuPDF и pdfplumber.
+    Извлекает текст из PDF с помощью PyMuPDF (fitz).
     """
     print(f"\n{'=' * 60}")
     print(f"📄 ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ PDF: {pdf_path}")
     print(f"{'=' * 60}")
 
     try:
-        if PDF_LIB == 'fitz':
-            print("🔧 Используется PyMuPDF (fitz)")
-            doc = fitz.open(pdf_path)
-            text = ""
-            for page_num, page in enumerate(doc):
-                page_text = page.get_text()
-                text += page_text
-                print(f"  Страница {page_num + 1}: {len(page_text)} символов")
-            doc.close()
-            print(f"✅ Итого извлечено {len(text)} символов")
-            return text
-        elif PDF_LIB == 'pdfplumber':
-            print("🔧 Используется pdfplumber")
-            text = ""
-            with pdfplumber.open(pdf_path) as pdf:
-                print(f"  Количество страниц: {len(pdf.pages)}")
-                for i, page in enumerate(pdf.pages):
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-                        print(f"  Страница {i + 1}: {len(page_text)} символов")
-                    else:
-                        print(f"  ⚠️ Страница {i + 1}: текст не найден")
-            print(f"✅ Итого извлечено {len(text)} символов")
-            return text
-        else:
-            print("❌ Нет доступных библиотек для парсинга PDF")
-            return None
+        print("🔧 Используется PyMuPDF (fitz)")
+        doc = fitz.open(pdf_path)
+        text = ""
+        for page_num, page in enumerate(doc):
+            page_text = page.get_text()
+            text += page_text
+            print(f"  Страница {page_num + 1}: {len(page_text)} символов")
+        doc.close()
+        print(f"✅ Итого извлечено {len(text)} символов")
+        return text
     except Exception as e:
         print(f"❌ Ошибка открытия PDF: {e}")
         traceback.print_exc()
