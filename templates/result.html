@@ -1,472 +1,488 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Приходный ордер</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        }
-        h1 {
-            color: #1a237e;
-            margin-bottom: 20px;
-            text-align: center;
-            font-size: 2em;
-        }
-        .info-box {
-            background: #e8f5e9;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border-left: 4px solid #4caf50;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 5px 30px;
-        }
-        .info-box p { margin: 5px 0; }
-        .info-box .label { font-weight: 600; color: #1a237e; }
-        .info-box .value { color: #333; }
-        .table-wrapper {
-            overflow-x: auto;
-            max-height: 500px;
-            overflow-y: auto;
-            border-radius: 10px;
-            border: 1px solid #e0e0e0;
-            margin: 20px 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background: #1a237e;
-            color: white;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        tr:hover { background: #f5f5f5; }
-        tr.selected { background: #e8f5e9; }
-        .btn {
-            padding: 12px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            margin: 5px;
-            transition: all 0.3s ease;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #4caf50, #66bb6a);
-            color: white;
-        }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #43a047, #4caf50);
-        }
-        .btn-secondary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-        }
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, #1e88e5, #42a5f5);
-        }
-        .btn-toggle {
-            background: linear-gradient(135deg, #ff9800, #ffa726);
-            color: white;
-        }
-        .btn-toggle:hover {
-            background: linear-gradient(135deg, #f57c00, #fb8c00);
-        }
-        .btn-toggle.active {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-        }
-        .btn-toggle.active:hover {
-            background: linear-gradient(135deg, #1e88e5, #42a5f5);
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-        }
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #d32f2f, #e53935);
-        }
-        .btn-success {
-            background: linear-gradient(135deg, #2e7d32, #43a047);
-            color: white;
-        }
-        .btn-success:hover {
-            background: linear-gradient(135deg, #1b5e20, #2e7d32);
-        }
-        .actions {
-            text-align: center;
-            margin-top: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            align-items: center;
-        }
-        .product-count {
-            background: #e3f2fd;
-            padding: 5px 15px;
-            border-radius: 10px;
-            display: inline-block;
-        }
-        .pallets-input {
-            width: 80px;
-            padding: 6px 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 14px;
-            text-align: center;
-            transition: border-color 0.3s;
-        }
-        .pallets-input:focus {
-            outline: none;
-            border-color: #2196f3;
-        }
-        /* Убираем стрелки для ввода числа */
-        .pallets-input::-webkit-outer-spin-button,
-        .pallets-input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        .pallets-input[type=number] {
-            -moz-appearance: textfield;
-        }
-        .badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .badge-found { background: #4caf50; color: white; }
-        .badge-not-found { background: #f44336; color: white; }
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px 30px;
-        }
-        .checkbox-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .checkbox-container input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: #4caf50;
-        }
-        .selected-count {
-            background: #e3f2fd;
-            padding: 5px 15px;
-            border-radius: 10px;
-            display: inline-block;
-            font-size: 14px;
-        }
-        @media (max-width: 768px) {
-            .container { padding: 20px; }
-            th, td { padding: 8px 10px; font-size: 13px; }
-            .pallets-input { width: 60px; }
-            .actions { flex-direction: column; }
-            .actions .btn { width: 100%; }
-            .info-box { grid-template-columns: 1fr; }
-            .info-grid { grid-template-columns: 1fr; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,
+initial-scale=1.0">
+<title>Приходный ордер</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+min-height: 100vh;
+background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784
+70%, #a5d6a7 100%);
+padding: 20px;
+}
+.container {
+max-width: 1400px;
+margin: 0 auto;
+background: white;
+border-radius: 20px;
+padding: 40px;
+box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+h1 {
+color: #1a237e;
+margin-bottom: 20px;
+text-align: center;
+font-size: 2em;
+}
+.info-box {
+background: #e8f5e9;
+padding: 20px;
+border-radius: 10px;
+margin-bottom: 20px;
+border-left: 4px solid #4caf50;
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 5px 30px;
+}
+.info-box p { margin: 5px 0; }
+.info-box .label { font-weight: 600; color: #1a237e; }
+.info-box .value { color: #333; }
+.table-wrapper {
+overflow-x: auto;
+max-height: 500px;
+overflow-y: auto;
+border-radius: 10px;
+border: 1px solid #e0e0e0;
+margin: 20px 0;
+}
+table {
+width: 100%;
+border-collapse: collapse;
+font-size: 14px;
+}
+th, td {
+padding: 12px 15px;
+text-align: left;
+border-bottom: 1px solid #ddd;
+}
+th {
+background: #1a237e;
+color: white;
+position: sticky;
+top: 0;
+z-index: 10;
+}
+tr:hover { background: #f5f5f5; }
+tr.selected { background: #e8f5e9; }
+.btn {
+padding: 12px 30px;
+border: none;
+border-radius: 50px;
+font-size: 16px;
+font-weight: 500;
+cursor: pointer;
+text-decoration: none;
+display: inline-block;
+margin: 5px;
+transition: all 0.3s ease;
+}
+.btn:hover {
+transform: translateY(-2px);
+box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+.btn-primary {
+background: linear-gradient(135deg, #4caf50, #66bb6a);
+color: white;
+}
+.btn-primary:hover {
+background: linear-gradient(135deg, #43a047, #4caf50);
+}
+.btn-secondary {
+background: linear-gradient(135deg, #2196f3, #64b5f6);
+color: white;
+}
+.btn-secondary:hover {
+background: linear-gradient(135deg, #1e88e5, #42a5f5);
+}
+.btn-toggle {
+background: linear-gradient(135deg, #ff9800, #ffa726);
+color: white;
+}
+.btn-toggle:hover {
+background: linear-gradient(135deg, #f57c00, #fb8c00);
+}
+.btn-toggle.active {
+background: linear-gradient(135deg, #2196f3, #64b5f6);
+}
+.btn-toggle.active:hover {
+background: linear-gradient(135deg, #1e88e5, #42a5f5);
+}
+.btn-danger {
+background: linear-gradient(135deg, #f44336, #ef5350);
+color: white;
+}
+.btn-danger:hover {
+background: linear-gradient(135deg, #d32f2f, #e53935);
+}
+.btn-success {
+background: linear-gradient(135deg, #2e7d32, #43a047);
+color: white;
+}
+.btn-success:hover {
+background: linear-gradient(135deg, #1b5e20, #2e7d32);
+}
+.actions {
+text-align: center;
+margin-top: 20px;
+display: flex;
+flex-wrap: wrap;
+gap: 10px;
+justify-content: center;
+align-items: center;
+}
+.product-count {
+background: #e3f2fd;
+padding: 5px 15px;
+border-radius: 10px;
+display: inline-block;
+}
+.pallets-input {
+width: 80px;
+padding: 6px 10px;
+border: 2px solid #e0e0e0;
+border-radius: 6px;
+font-size: 14px;
+text-align: center;
+transition: border-color 0.3s;
+}
+.pallets-input:focus {
+outline: none;
+border-color: #2196f3;
+}
+/* Убираем стрелки для ввода числа */
+.pallets-input::-webkit-outer-spin-button,
+.pallets-input::-webkit-inner-spin-button {
+-webkit-appearance: none;
+margin: 0;
+}
+.pallets-input[type=number] {
+-moz-appearance: textfield;
+}
+.badge {
+display: inline-block;
+padding: 3px 10px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: bold;
+}
+.badge-found { background: #4caf50; color: white; }
+.badge-not-found { background: #f44336; color: white; }
+.info-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 10px 30px;
+}
+.checkbox-container {
+display: flex;
+align-items: center;
+justify-content: center;
+}
+.checkbox-container input[type="checkbox"] {
+width: 20px;
+height: 20px;
+cursor: pointer;
+accent-color: #4caf50;
+}
+.selected-count {
+background: #e3f2fd;
+padding: 5px 15px;
+border-radius: 10px;
+display: inline-block;
+font-size: 14px;
+}
+@media (max-width: 768px) {
+.container { padding: 20px; }
+th, td { padding: 8px 10px; font-size: 13px; }
+.pallets-input { width: 60px; }
+.actions { flex-direction: column; }
+.actions .btn { width: 100%; }
+.info-box { grid-template-columns: 1fr; }
+.info-grid { grid-template-columns: 1fr; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>📄 Приходный ордер №{{ data.номер_ордера or 'Не указан' }}</h1>
+<div class="container">
+<h1>📄 Приходный ордер №{{ data.номер_ордера or 'Не указан'
+}}</h1>
 
-        <div class="info-box">
-            <p><span class="label">📅 Дата приемки:</span> <span class="value">{{ data.дата_приемки or 'Не указана' }}</span></p>
-            <p><span class="label">🏢 Поставщик:</span> <span class="value">{{ data.название_поставщика or 'Не указан' }}</span></p>
-            <p><span class="label">📦 Количество товаров:</span> <span class="value product-count">{{ data.товары|length }}</span></p>
-            <p><span class="label">📦 Количество палет:</span> <span class="value product-count" style="background: #fff3cd;">{{ total_pallets }}</span></p>
-        </div>
+<div class="info-box">
+<p><span class="label">📅 Дата приемки:</span> <span
+class="value">{{ data.дата_приемки or 'Не указана'
+}}</span></p>
+<p><span class="label">🏢 Поставщик:</span> <span
+class="value">{{ data.название_поставщика or 'Не указан'
+}}</span></p>
+<p><span class="label">📦 Количество товаров:</span> <span
+class="value product-count">{{ data.товары|length }}</span></p>
+<p><span class="label">📦 Количество палет:</span> <span
+class="value product-count" style="background: #fff3cd;">{{
+total_pallets }}</span></p>
+</div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
-            <h2 style="margin: 0;">Список товаров</h2>
-            <div>
-                <span class="selected-count" id="selectedCount">Выбрано: {{ data.товары|length }}</span>
-                <button class="btn btn-danger" id="toggleAllBtn" onclick="toggleAll()" style="font-size: 14px; padding: 8px 20px;">
-                    Убрать все
-                </button>
-            </div>
-        </div>
+<div style="display: flex; justify-content: space-between;
+align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+<h2 style="margin: 0;">Список товаров</h2>
+<div>
+<span class="selected-count" id="selectedCount">Выбрано: {{
+data.товары|length }}</span>
+<button class="btn btn-danger" id="toggleAllBtn"
+onclick="toggleAll()" style="font-size: 14px; padding: 8px 20px;">
+Убрать все
+</button>
+</div>
+</div>
 
-        {% if data.товары %}
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="min-width: 40px; text-align: center;">✓</th>
-                            <th style="min-width: 40px;">№</th>
-                            <th style="min-width: 120px;">SAP код</th>
-                            <th style="min-width: 250px;">Наименование</th>
-                            <th style="min-width: 150px;">Партия поставщика</th>
-                            <th style="min-width: 120px;">Аналитический лист</th>
-                            <th style="min-width: 80px;">Кол-во</th>
-                            <th style="min-width: 100px;">Палетизация</th>
-                            <th style="min-width: 150px;">Кол-во паллет</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for product in data.товары %}
-                        <tr id="row_{{ loop.index0 }}">
-                            <td style="text-align: center;">
-                                <div class="checkbox-container">
-                                    <input type="checkbox"
-                                           class="product-checkbox"
-                                           id="chk_{{ loop.index0 }}"
-                                           data-index="{{ loop.index0 }}"
-                                           checked
-                                           onchange="updateSelectedCount()">
-                                </div>
-                            </td>
-                            <td>{{ loop.index }}</td>
-                            <td>
-                                {{ product.sap_code_display or '-' }}
-                                {% if product.sap_code_display and product.sap_code_display != '-' %}
-                                    {% if product.material_found %}
-                                        <span class="badge badge-found">✓</span>
-                                    {% else %}
-                                        <span class="badge badge-not-found">✗</span>
-                                    {% endif %}
-                                {% endif %}
-                            </td>
-                            <td>{{ product.наименование }}</td>
-                            <td>{{ product.партия_поставщика or '-' }}</td>
-                            <td><strong>{{ product.аналитический_лист }}</strong></td>
-                            <td>{{ product.количество or '-' }}</td>
-                            <td>{{ product.palletization or 0 }}</td>
-                            <td>
-                                <input type="number"
-                                       class="pallets-input"
-                                       id="pallets_{{ loop.index0 }}"
-                                       value="{{ product.pallets or 1 }}"
-                                       min="1"
-                                       step="1"
-                                       data-index="{{ loop.index0 }}"
-                                       onkeydown="return event.key !== '-'">
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <p style="text-align: center; color: #999; padding: 40px;">Товары не найдены</p>
-        {% endif %}
+{% if data.товары %}
+<div class="table-wrapper">
+<table>
+<thead>
+<tr>
+<th style="min-width: 40px; text-align: center;">✓</th>
+<th style="min-width: 40px;">№</th>
+<th style="min-width: 120px;">SAP код</th>
+<th style="min-width: 250px;">Наименование</th>
+<th style="min-width: 150px;">Партия поставщика</th>
+<th style="min-width: 120px;">Аналитический лист</th>
+<th style="min-width: 80px;">Кол-во</th>
+<th style="min-width: 100px;">Палетизация</th>
+<th style="min-width: 150px;">Кол-во паллет</th>
+</tr>
+</thead>
+<tbody>
+{% for product in data.товары %}
+<tr id="row_{{ loop.index0 }}">
+<td style="text-align: center;">
+<div class="checkbox-container">
+<input type="checkbox"
+class="product-checkbox"
+id="chk_{{ loop.index0 }}"
+data-index="{{ loop.index0 }}"
+checked
+onchange="updateSelectedCount()">
+</div>
+</td>
+<td>{{ loop.index }}</td>
+<td>{{ product.sap_code_display or '-' }}</td>
+<td>{{ product.наименование }}</td>
+<td>{{ product.партия_поставщика or '-' }}</td>
+<td><strong>{{ product.аналитический_лист }}</strong></td>
+<td>{{ product.количество or '-' }}</td>
+<td>{{ product.palletization or 0 }}</td>
+<td>
+<input type="number"
+class="pallets-input"
+id="pallets_{{ loop.index0 }}"
+value="{{ product.pallets or 1 }}"
+min="1"
+step="1"
+data-index="{{ loop.index0 }}"
+onkeydown="return event.key !== '-'">
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p style="text-align: center; color: #999; padding: 40px;">Товары не
+найдены</p>
+{% endif %}
 
-        <div class="actions">
-            <button class="btn btn-toggle" id="togglePalletsBtn" onclick="togglePallets()">
-                📦 Сделать все по 1 палету
-            </button>
+<div class="actions">
+<button class="btn btn-toggle" id="togglePalletsBtn"
+onclick="togglePallets()">
+📦 Сделать все по 1 палету
+</button>
 
-            <form action="/generate_labels" method="post" id="generateForm" style="display:inline;">
-                <input type="hidden" name="products" id="productsData">
-                <input type="hidden" name="order_number" value="{{ data.номер_ордера }}">
-                <input type="hidden" name="supplier_name" value="{{ data.название_поставщика or '' }}">
-                <input type="hidden" name="order_date" value="{{ data.дата_приемки or '' }}">
-                <input type="hidden" name="selected_indices" id="selectedIndicesData">
-                <button type="button" class="btn btn-primary" onclick="submitForm()">📄 Сформировать этикетки</button>
-            </form>
+<form action="/generate_labels" method="post" id="generateForm"
+style="display:inline;">
+<input type="hidden" name="products" id="productsData">
+<input type="hidden" name="order_number" value="{{
+data.номер_ордера }}">
+<input type="hidden" name="supplier_name" value="{{
+data.название_поставщика or '' }}">
+<input type="hidden" name="order_date" value="{{ data.дата_приемки
+or '' }}">
+<input type="hidden" name="selected_indices"
+id="selectedIndicesData">
+<button type="button" class="btn btn-primary"
+onclick="submitForm()">📄 Сформировать этикетки</button>
+</form>
 
-            <a href="/" class="btn btn-secondary">🏠 На главную</a>
-        </div>
-    </div>
+<a href="/" class="btn btn-secondary">🏠 На главную</a>
+</div>
+</div>
 
-    <script>
-        // Данные товаров для передачи в form
-        const products = {{ data.товары|tojson|safe }};
-        let isAllOnePallet = false;
-        let allChecked = true;
+<script>
+// Данные товаров для передачи в form
+const products = {{ data.товары|tojson|safe }};
+let isAllOnePallet = false;
+let allChecked = true;
 
-        function updateSelectedCount() {
-            const checkboxes = document.querySelectorAll('.product-checkbox');
-            const checked = document.querySelectorAll('.product-checkbox:checked');
-            const count = document.getElementById('selectedCount');
-            count.textContent = 'Выбрано: ' + checked.length + ' из ' + checkboxes.length;
+function updateSelectedCount() {
+const checkboxes = document.querySelectorAll('.product-checkbox');
+const checked =
+document.querySelectorAll('.product-checkbox:checked');
+const count = document.getElementById('selectedCount');
+count.textContent = 'Выбрано: ' + checked.length + ' из ' +
+checkboxes.length;
 
-            // Обновляем состояние кнопки "Убрать все" / "Добавить все"
-            const btn = document.getElementById('toggleAllBtn');
-            if (checked.length === 0) {
-                btn.textContent = 'Добавить все';
-                btn.className = 'btn btn-success';
-            } else if (checked.length === checkboxes.length) {
-                btn.textContent = 'Убрать все';
-                btn.className = 'btn btn-danger';
-            } else {
-                btn.textContent = 'Убрать все';
-                btn.className = 'btn btn-danger';
-            }
+// Обновляем состояние кнопки "Убрать все" / "Добавить все"
+const btn = document.getElementById('toggleAllBtn');
+if (checked.length === 0) {
+btn.textContent = 'Добавить все';
+btn.className = 'btn btn-success';
+} else if (checked.length === checkboxes.length) {
+btn.textContent = 'Убрать все';
+btn.className = 'btn btn-danger';
+} else {
+btn.textContent = 'Убрать все';
+btn.className = 'btn btn-danger';
+}
 
-            allChecked = (checked.length === checkboxes.length);
-        }
+allChecked = (checked.length === checkboxes.length);
+}
 
-        function toggleAll() {
-            const checkboxes = document.querySelectorAll('.product-checkbox');
-            const checked = document.querySelectorAll('.product-checkbox:checked');
-            const btn = document.getElementById('toggleAllBtn');
+function toggleAll() {
+const checkboxes = document.querySelectorAll('.product-checkbox');
+const checked =
+document.querySelectorAll('.product-checkbox:checked');
+const btn = document.getElementById('toggleAllBtn');
 
-            if (checked.length === 0) {
-                // Добавляем все
-                checkboxes.forEach(cb => cb.checked = true);
-                btn.textContent = 'Убрать все';
-                btn.className = 'btn btn-danger';
-            } else {
-                // Убираем все
-                checkboxes.forEach(cb => cb.checked = false);
-                btn.textContent = 'Добавить все';
-                btn.className = 'btn btn-success';
-            }
-            updateSelectedCount();
-        }
+if (checked.length === 0) {
+// Добавляем все
+checkboxes.forEach(cb => cb.checked = true);
+btn.textContent = 'Убрать все';
+btn.className = 'btn btn-danger';
+} else {
+// Убираем все
+checkboxes.forEach(cb => cb.checked = false);
+btn.textContent = 'Добавить все';
+btn.className = 'btn btn-success';
+}
+updateSelectedCount();
+}
 
-        // Инициализация счетчика
-        updateSelectedCount();
+// Инициализация счетчика
+updateSelectedCount();
 
-        function submitForm() {
-            // Собираем выбранные индексы
-            const checkboxes = document.querySelectorAll('.product-checkbox');
-            const selectedIndices = [];
-            checkboxes.forEach(cb => {
-                if (cb.checked) {
-                    selectedIndices.push(parseInt(cb.dataset.index));
-                }
-            });
+function submitForm() {
+// Собираем выбранные индексы
+const checkboxes = document.querySelectorAll('.product-checkbox');
+const selectedIndices = [];
+checkboxes.forEach(cb => {
+if (cb.checked) {
+selectedIndices.push(parseInt(cb.dataset.index));
+}
+});
 
-            // Обновляем данные о паллетах из полей ввода
-            const palletsInputs = document.querySelectorAll('.pallets-input');
-            palletsInputs.forEach(input => {
-                const index = parseInt(input.dataset.index);
-                const value = parseInt(input.value);
-                if (!isNaN(value) && value > 0) {
-                    products[index].pallets = value;
-                }
-            });
+// Обновляем данные о паллетах из полей ввода
+const palletsInputs = document.querySelectorAll('.pallets-input');
+palletsInputs.forEach(input => {
+const index = parseInt(input.dataset.index);
+const value = parseInt(input.value);
+if (!isNaN(value) && value > 0) {
+products[index].pallets = value;
+}
+});
 
-            // Если нет выбранных товаров, показываем предупреждение
-            if (selectedIndices.length === 0) {
-                alert('Не выбрано ни одного товара для формирования этикеток');
-                return;
-            }
+// Если нет выбранных товаров, показываем предупреждение
+if (selectedIndices.length === 0) {
+alert('Не выбрано ни одного товара для формирования этикеток');
+return;
+}
 
-            const productsJson = JSON.stringify(products);
-            const selectedIndicesJson = JSON.stringify(selectedIndices);
+const productsJson = JSON.stringify(products);
+const selectedIndicesJson = JSON.stringify(selectedIndices);
 
-            document.getElementById('productsData').value = productsJson;
-            document.getElementById('selectedIndicesData').value = selectedIndicesJson;
-            document.getElementById('generateForm').submit();
-        }
+document.getElementById('productsData').value = productsJson;
+document.getElementById('selectedIndicesData').value =
+selectedIndicesJson;
+document.getElementById('generateForm').submit();
+}
 
-        function togglePallets() {
-            const btn = document.getElementById('togglePalletsBtn');
-            const inputs = document.querySelectorAll('.pallets-input');
+function togglePallets() {
+const btn = document.getElementById('togglePalletsBtn');
+const inputs = document.querySelectorAll('.pallets-input');
 
-            if (!isAllOnePallet) {
-                // Режим: все по 1 палету
-                inputs.forEach(input => {
-                    input.value = 1;
-                    const index = parseInt(input.dataset.index);
-                    products[index].pallets = 1;
-                });
-                btn.textContent = '🔄 Пересчитать число палет';
-                btn.classList.add('active');
-                isAllOnePallet = true;
-            } else {
-                // Режим: пересчитать палеты по формуле
-                btn.textContent = '⏳ Пересчет...';
-                btn.disabled = true;
+if (!isAllOnePallet) {
+// Режим: все по 1 палету
+inputs.forEach(input => {
+input.value = 1;
+const index = parseInt(input.dataset.index);
+products[index].pallets = 1;
+});
+btn.textContent = '🔄 Пересчитать число палет';
+btn.classList.add('active');
+isAllOnePallet = true;
+} else {
+// Режим: пересчитать палеты по формуле
+btn.textContent = '⏳ Пересчет...';
+btn.disabled = true;
 
-                // Собираем данные о продуктах для пересчета
-                const productsData = products.map(p => ({
-                    количество: p.количество,
-                    palletization: p.palletization
-                }));
+// Собираем данные о продуктах для пересчета
+const productsData = products.map(p => ({
+количество: p.количество,
+palletization: p.palletization
+}));
 
-                fetch('/recalculate_pallets', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ products: productsData })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const pallets = data.pallets;
-                        const inputs = document.querySelectorAll('.pallets-input');
-                        inputs.forEach((input, idx) => {
-                            const value = pallets[idx] || 1;
-                            input.value = value;
-                            const index = parseInt(input.dataset.index);
-                            products[index].pallets = value;
-                        });
-                        btn.textContent = '📦 Сделать все по 1 палету';
-                        btn.classList.remove('active');
-                        isAllOnePallet = false;
-                    } else {
-                        alert('Ошибка при пересчете: ' + data.error);
-                        btn.textContent = '🔄 Пересчитать число палет';
-                    }
-                })
-                .catch(error => {
-                    alert('Ошибка при пересчете');
-                    btn.textContent = '🔄 Пересчитать число палет';
-                })
-                .finally(() => {
-                    btn.disabled = false;
-                });
-            }
-        }
+fetch('/recalculate_pallets', {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+},
+body: JSON.stringify({ products: productsData })
+})
+.then(response => response.json())
+.then(data => {
+if (data.success) {
+const pallets = data.pallets;
+const inputs = document.querySelectorAll('.pallets-input');
+inputs.forEach((input, idx) => {
+const value = pallets[idx] || 1;
+input.value = value;
+const index = parseInt(input.dataset.index);
+products[index].pallets = value;
+});
+btn.textContent = '📦 Сделать все по 1 палету';
+btn.classList.remove('active');
+isAllOnePallet = false;
+} else {
+alert('Ошибка при пересчете: ' + data.error);
+btn.textContent = '🔄 Пересчитать число палет';
+}
+})
+.catch(error => {
+alert('Ошибка при пересчете');
+btn.textContent = '🔄 Пересчитать число палет';
+})
+.finally(() => {
+btn.disabled = false;
+});
+}
+}
 
-        // Запрещаем ввод минуса
-        document.querySelectorAll('.pallets-input').forEach(input => {
-            input.addEventListener('input', function() {
-                // Проверяем, что нет минуса
-                if (this.value.includes('-')) {
-                    this.value = this.value.replace(/-/g, '');
-                }
-            });
+// Запрещаем ввод минуса
+document.querySelectorAll('.pallets-input').forEach(input => {
+input.addEventListener('input', function() {
+// Проверяем, что нет минуса
+if (this.value.includes('-')) {
+this.value = this.value.replace(/-/g, '');
+}
+});
 
-            input.addEventListener('keydown', function(e) {
-                if (e.key === '-' || e.key === 'Minus') {
-                    e.preventDefault();
-                    return false;
-                }
-            });
-        });
-    </script>
+input.addEventListener('keydown', function(e) {
+if (e.key === '-' || e.key === 'Minus') {
+e.preventDefault();
+return false;
+}
+});
+});
+</script>
 </body>
 </html>
