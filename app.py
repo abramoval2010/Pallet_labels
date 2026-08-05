@@ -26,15 +26,10 @@ from docx.enum.section import WD_ORIENT, WD_SECTION_START
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-# Импортируем PyMuPDF (fitz) для парсинга PDF
-try:
-    import fitz
+# Используем только PyMuPDF (fitz)
+import fitz
 
-    print("✅ PyMuPDF (fitz) загружен для парсинга PDF")
-except ImportError as e:
-    print(f"❌ Ошибка импорта PyMuPDF: {e}")
-    print("❌ Установите PyMuPDF: pip install PyMuPDF")
-    sys.exit(1)
+PDF_LIB = 'fitz'
 
 # Импорт конфигурации
 try:
@@ -60,7 +55,6 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Для Render: сохраняем файлы в папке приложения
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-print(f"📁 Базовая директория: {BASE_DIR}")
 
 # Переназначаем пути к файлам в папку приложения
 SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
@@ -69,25 +63,18 @@ MATERIALS_DATABASE_FILE = os.path.join(BASE_DIR, 'materials.db')
 LAST_FOLDER_FILE = os.path.join(BASE_DIR, 'last_folder.json')
 LAST_FILE_FILE = os.path.join(BASE_DIR, 'last_file.json')
 
-print(f"📁 Файл настроек: {SETTINGS_FILE}")
-print(f"📁 База пользователей: {DATABASE_FILE}")
-print(f"📁 База материалов: {MATERIALS_DATABASE_FILE}")
-
 
 # ============================================================
-# ФУНКЦИЯ ИЗВЛЕЧЕНИЯ ТЕКСТА ИЗ PDF (только PyMuPDF)
+# УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ИЗВЛЕЧЕНИЯ ТЕКСТА ИЗ PDF
 # ============================================================
 
 def extract_text_from_pdf(pdf_path):
     """
-    Извлекает текст из PDF с помощью PyMuPDF (fitz).
+    Универсальная функция извлечения текста из PDF.
+    Работает с PyMuPDF.
     """
-    print(f"\n{'=' * 60}")
-    print(f"📄 ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ PDF: {pdf_path}")
-    print(f"{'=' * 60}")
-
+    print(f"\n📄 ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ PDF: {pdf_path}")
     try:
-        print("🔧 Используется PyMuPDF (fitz)")
         doc = fitz.open(pdf_path)
         text = ""
         for page_num, page in enumerate(doc):
@@ -103,29 +90,8 @@ def extract_text_from_pdf(pdf_path):
         return None
 
 
-def parse_quantity_from_string(text):
-    """
-    Извлекает число из строки, учитывая пробелы между разрядами.
-    Например: "24 000" -> 24000, "1 500" -> 1500
-    """
-    if not text:
-        return None
-
-    # Удаляем все пробелы из строки
-    cleaned = text.replace(' ', '').replace('\u00a0', '').replace('\t', '')
-
-    # Пробуем найти число в строке
-    match = re.search(r'(\d+)', cleaned)
-    if match:
-        try:
-            return int(match.group(1))
-        except:
-            return None
-    return None
-
-
 def extract_data_from_pdf(pdf_path):
-    """Извлекает данные из PDF-файла приходного ордера с улучшенным парсингом товаров"""
+    """Извлекает данные из PDF-файла приходного ордера"""
     print(f"\n{'=' * 60}")
     print(f"🔍 ПАРСИНГ PDF: {pdf_path}")
     print(f"{'=' * 60}")
@@ -177,7 +143,6 @@ def extract_data_from_pdf(pdf_path):
         date_match = re.search(r'\b(\d{2}\.\d{2}\.\d{4})\b', line)
         if date_match:
             date = date_match.group(1)
-            # Проверяем, что это не срок годности (не 2028+ и не содержит слово "годности")
             if not date.startswith('2028') and 'годности' not in line.lower():
                 result['дата_приемки'] = date
                 print(f" ✅ Найдена дата: {date}")
@@ -188,12 +153,9 @@ def extract_data_from_pdf(pdf_path):
     # 3) Название поставщика
     print("\n🔍 Поиск названия поставщика...")
     for line in lines:
-        # Ищем ООО, ЗАО, ОАО, АО, ИП с кавычками или без
         supplier_match = re.search(r'(ООО|ЗАО|ОАО|АО|ИП)\s*["«]?([^"«»]+)["»]?', line)
         if supplier_match:
-            # Проверяем, что это не наша организация
             if 'ВЕРОФАРМ' not in line.upper() and 'ЗАВОД' not in line.upper():
-                # Получаем полное название
                 full_match = re.search(
                     r'(ООО\s*["«]?[^"»]+["»]?|ЗАО\s*["«]?[^"»]+["»]?|ОАО\s*["«]?[^"»]+["»]?|АО\s*["«]?[^"»]+["»]?|ИП\s*["«]?[^"»]+["»]?)',
                     line)
@@ -201,14 +163,13 @@ def extract_data_from_pdf(pdf_path):
                     result['название_поставщика'] = full_match.group(1)
                     print(f" ✅ Найден поставщик: {result['название_поставщика']}")
                     break
-
     if not result['название_поставщика']:
         print(" ⚠️ Название поставщика не найдено")
 
-    # 4) НОВЫЙ АЛГОРИТМ ПАРСИНГА ТОВАРОВ (на основе смещения строк)
+    # 4) ПАРСИНГ ТОВАРОВ
     print("\n🔍 Поиск таблицы с товарами...")
 
-    # Находим начало таблицы (строка с "Материальные ценности")
+    # Находим начало таблицы
     start_index = -1
     for i, line in enumerate(lines):
         if 'Материальные ценности' in line:
@@ -216,17 +177,38 @@ def extract_data_from_pdf(pdf_path):
             print(f" ✅ Найдено начало таблицы: строка {i + 1}")
             break
 
-    # Находим конец таблицы (строка с "Итого")
+    # Находим конец таблицы
     end_index = -1
     for i, line in enumerate(lines):
-        if 'Итого' in line and ('X' in line or 'x' in line or 'Итого' in line):
-            end_index = i
-            print(f" ✅ Найден конец таблицы: строка {i + 1}")
-            break
+        if line == 'Итого' or 'Итого' in line:
+            if i + 1 < len(lines) and (lines[i + 1] == 'X' or lines[i + 1] == 'x'):
+                end_index = i + 1
+                print(f" ✅ Найден конец таблицы: строки {i + 1} (Итого) и {i + 2} (X)")
+                break
+            elif 'X' in line or 'x' in line:
+                end_index = i
+                print(f" ✅ Найден конец таблицы: строка {i + 1} (Итого X)")
+                break
+
+    if end_index == -1:
+        for i, line in enumerate(lines):
+            if line == 'X' or line == 'x' or line.startswith('X'):
+                if i > 0 and ('Итого' in lines[i - 1] or 'Итого' in lines[i]):
+                    end_index = i
+                    print(f" ✅ Найден конец таблицы (альтернативный): строка {i + 1}")
+                    break
 
     if start_index == -1:
         print(" ⚠️ Начало таблицы не найдено")
         return result
+
+    if end_index == -1:
+        print(" ⚠️ Конец таблицы не найден, ищем альтернативный конец...")
+        for i, line in enumerate(lines):
+            if 'Принял' in line or 'Сдал' in line:
+                end_index = i - 1
+                print(f" ✅ Найден альтернативный конец таблицы (перед 'Принял'): строка {end_index + 1}")
+                break
 
     if end_index == -1:
         print(" ⚠️ Конец таблицы не найден")
@@ -234,7 +216,7 @@ def extract_data_from_pdf(pdf_path):
 
     print(f"\n📊 Таблица найдена: строки {start_index + 1} - {end_index + 1}")
 
-    # Собираем все строки таблицы
+    # Собираем строки таблицы
     table_lines = lines[start_index:end_index + 1]
 
     # Выводим содержимое таблицы для отладки
@@ -244,171 +226,173 @@ def extract_data_from_pdf(pdf_path):
         print(f"  {idx + 1:3d}: {line}")
     print(f"{'-' * 60}\n")
 
-    # Находим строку с "14" (маркер начала данных)
+    # Находим маркер "14"
     marker_index = -1
     for i, line in enumerate(table_lines):
-        if re.search(r'\b14\b', line):
+        if line == '14' or re.search(r'\b14\b', line):
             marker_index = i
-            print(f" ✅ Найден маркер '14' в строке {i + 1} (внутри таблицы): {line}")
+            print(f" ✅ Найден маркер '14' в строке {i + 1}")
             break
 
     if marker_index == -1:
-        print(" ⚠️ Маркер '14' не найден, пытаемся парсить без него")
-        marker_index = 0
+        for i, line in enumerate(table_lines):
+            if re.search(r'\b1\s+2\s+3\s+4\s+5\s+6\s+7\s+8\s+9\s+10\s+11\s+12\s+13\s+14\b', line):
+                marker_index = i
+                print(f" ✅ Найден маркер '1..14' в строке {i + 1} (альтернативный)")
+                break
 
-    # Находим все позиции SAP-кодов
-    sap_positions = []
-    for idx, line in enumerate(table_lines):
+    if marker_index == -1:
+        print(" ⚠️ Маркер не найден, парсинг невозможен")
+        return result
+
+    # ПАРСИНГ ТОВАРОВ С ЖЕСТКИМИ ПРАВИЛАМИ
+    # Правила:
+    # - Название: строки от marker_index + 1 до номенклатурного номера
+    # - Номенклатурный номер (SAP): 8 цифр
+    # - Количество: SAP + 4 строки (число с пробелом как разделитель разрядов)
+    # - Аналитический лист: SAP + 7 строк (10 цифр, начинается с 1)
+    # - Партия поставщика: SAP + 8 строк (любой формат)
+    # - Срок годности: SAP + 9 строк (дата в формате ДД.ММ.ГГГГ)
+
+    print("\n🔍 ПАРСИНГ ТОВАРОВ (жесткие правила):")
+    print("   - Название: до номенклатурного номера")
+    print("   - Количество: SAP + 4 строки")
+    print("   - Аналитический лист: SAP + 7 строк")
+    print("   - Партия поставщика: SAP + 8 строк")
+    print("   - Срок годности: SAP + 9 строк")
+
+    products = []
+    i = 0
+
+    while i < len(table_lines):
+        line = table_lines[i]
+
+        # Пропускаем служебные строки
+        if any(keyword in line.lower() for keyword in
+               ['итого', 'x', 'принял', 'сдал', 'должность', 'подпись', 'материальные ценности', 'измерения',
+                'количество', 'цена']):
+            i += 1
+            continue
+
+        # Ищем номенклатурный номер (SAP) - 8 цифр
         nomencl_match = re.search(r'\b(\d{8})\b', line)
         if nomencl_match:
             nomencl_number = nomencl_match.group(1)
+
+            # Проверяем, что это не служебный номер
             if (not nomencl_number.startswith(('8', '7')) and
                     nomencl_number not in ['48797491', '21000101', '0315003']):
-                sap_positions.append(idx)
 
-    print(f"  Найдено SAP-кодов: {len(sap_positions)}")
+                print(f"\n  🔍 Найден SAP-код: {nomencl_number} в строке {i + 1}")
+                sap_row = i
 
-    # Парсим товары
-    products = []
+                # --- 1. НАЗВАНИЕ (строки от marker_index + 1 до SAP) ---
+                name_parts = []
+                for j in range(sap_row - 1, marker_index, -1):
+                    prev_line = table_lines[j]
+                    # Проверяем, что строка содержит буквы и не является служебной
+                    if (re.search(r'[А-ЯЁA-Z]', prev_line) and
+                            not re.match(r'^\d+$', prev_line) and
+                            not any(keyword in prev_line.lower() for keyword in ['итого', 'x', 'принял', 'сдал'])):
+                        name_parts.insert(0, prev_line)
+                    else:
+                        break
+                product_name = ' '.join(name_parts).strip() if name_parts else 'Не указано'
+                print(f"  📦 Название: {product_name[:80]}...")
 
-    # Для каждого SAP-кода собираем данные
-    for pos_idx, sap_idx in enumerate(sap_positions):
-        nomencl_number = re.search(r'\b(\d{8})\b', table_lines[sap_idx]).group(1)
-        print(f"\n  🔍 Обработка SAP-кода: {nomencl_number} в строке {sap_idx + 1}")
-
-        # --- СОБИРАЕМ НАЗВАНИЕ ТОВАРА ---
-        # Для первого товара: от маркера "14" до первого SAP-кода
-        # Для остальных: от (предыдущий SAP + 10) до текущего SAP
-        if pos_idx == 0:
-            start_search = marker_index + 1
-        else:
-            start_search = sap_positions[pos_idx - 1] + 10
-
-        end_search = sap_idx
-
-        product_name_parts = []
-        for j in range(start_search, end_search):
-            if j < len(table_lines):
-                product_name_parts.append(table_lines[j])
-
-        product_name = ' '.join(product_name_parts).strip() if product_name_parts else 'Не указано'
-        print(f"  📦 Название товара: {product_name[:80]}...")
-
-        # --- ИЗВЛЕКАЕМ КОЛИЧЕСТВО (через 4 строки после SAP-кода) ---
-        quantity_row = sap_idx + 4
-        quantity = None
-        if quantity_row < len(table_lines):
-            quantity_line = table_lines[quantity_row]
-            # Ищем число с пробелами между разрядами (например "648 000")
-            qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)\s*ШТ', quantity_line)
-            if qty_match:
-                qty_str = qty_match.group(1).replace(' ', '')
-                try:
-                    quantity = int(qty_str)
-                    print(f"  📊 Количество (строка {quantity_row + 1}): {quantity}")
-                except:
-                    pass
-            else:
-                # Пробуем найти просто число в строке
-                alt_qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)', quantity_line)
-                if alt_qty_match:
-                    qty_str = alt_qty_match.group(1).replace(' ', '')
-                    try:
-                        quantity = int(qty_str)
-                        print(f"  📊 Количество (строка {quantity_row + 1}, альтернативное): {quantity}")
-                    except:
-                        pass
-
-        # Если не нашли количество, пробуем в строках +3, +4, +5
-        if quantity is None:
-            for offset in [3, 4, 5]:
-                check_row = sap_idx + offset
-                if check_row < len(table_lines):
-                    check_line = table_lines[check_row]
-                    qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)\s*ШТ', check_line)
+                # --- 2. КОЛИЧЕСТВО (SAP + 4 строки) - ЖЕСТКО ---
+                quantity = None
+                qty_row = sap_row + 4
+                if qty_row < len(table_lines):
+                    qty_line = table_lines[qty_row]
+                    # Ищем число с пробелами между разрядами (например "6 500")
+                    qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)', qty_line)
                     if qty_match:
                         qty_str = qty_match.group(1).replace(' ', '')
                         try:
                             quantity = int(qty_str)
-                            print(f"  📊 Количество (строка {check_row + 1}, поиск по диапазону): {quantity}")
-                            break
+                            print(f"  📊 Количество (строка {qty_row + 1}): {quantity}")
                         except:
-                            pass
+                            print(f"  ⚠️ Ошибка преобразования количества: {qty_str}")
 
-        # --- ИЗВЛЕКАЕМ АНАЛИТИЧЕСКИЙ ЛИСТ (через 7 строк после SAP-кода) ---
-        analytic_row = sap_idx + 7
-        analytic_list = None
-        if analytic_row < len(table_lines):
-            analytic_line = table_lines[analytic_row]
-            # Ищем 10-значное число
-            analytic_match = re.search(r'\b(\d{10})\b', analytic_line)
-            if analytic_match:
-                potential = analytic_match.group(1)
-                if not potential.startswith('49'):
-                    analytic_list = potential
-                    print(f"  📋 Аналитический лист (строка {analytic_row + 1}): {analytic_list}")
-            else:
-                # Пробуем найти 10 цифр в строке (без границ слова)
-                alt_match = re.search(r'(\d{10})', analytic_line)
-                if alt_match:
-                    potential = alt_match.group(1)
-                    if not potential.startswith('49'):
-                        analytic_list = potential
-                        print(f"  📋 Аналитический лист (строка {analytic_row + 1}, альтернативный): {analytic_list}")
+                if quantity is None:
+                    print(f"  ⚠️ Количество не найдено в строке {qty_row + 1}")
 
-        # Если не нашли, пробуем в строках +6, +7, +8
-        if analytic_list is None:
-            for offset in [6, 7, 8]:
-                check_row = sap_idx + offset
-                if check_row < len(table_lines):
-                    check_line = table_lines[check_row]
-                    check_match = re.search(r'\b(\d{10})\b', check_line)
-                    if check_match:
-                        potential = check_match.group(1)
-                        if not potential.startswith('49'):
-                            analytic_list = potential
+                # --- 3. АНАЛИТИЧЕСКИЙ ЛИСТ (SAP + 7 строк) - ЖЕСТКО ---
+                analytic_list = None
+                analytic_row = sap_row + 7
+                if analytic_row < len(table_lines):
+                    analytic_line = table_lines[analytic_row]
+                    # Ищем 10 цифр, начинающихся с 1
+                    analytic_match = re.search(r'\b(1\d{9})\b', analytic_line)
+                    if analytic_match:
+                        analytic_list = analytic_match.group(1)
+                        print(f"  📋 Аналитический лист (строка {analytic_row + 1}): {analytic_list}")
+                    else:
+                        # Пробуем найти любое 10-значное число
+                        alt_match = re.search(r'\b(\d{10})\b', analytic_line)
+                        if alt_match:
+                            potential = alt_match.group(1)
+                            if not potential.startswith('49'):  # не номер заказа
+                                analytic_list = potential
+                                print(
+                                    f"  📋 Аналитический лист (строка {analytic_row + 1}, альтернативный): {analytic_list}")
+
+                if analytic_list is None:
+                    print(f"  ⚠️ Аналитический лист не найден в строке {analytic_row + 1}")
+
+                # --- 4. ПАРТИЯ ПОСТАВЩИКА (SAP + 8 строк) - ЖЕСТКО, ЛЮБОЙ ФОРМАТ ---
+                supplier_batch = None
+                batch_row = sap_row + 8
+                if batch_row < len(table_lines):
+                    batch_line = table_lines[batch_row]
+                    # Берем всю строку как партию (удаляем только дату, если есть)
+                    clean_batch = re.sub(r'\d{2}\.\d{2}\.\d{4}', '', batch_line).strip()
+                    if clean_batch:
+                        supplier_batch = clean_batch
+                        print(f"  🏷️ Партия поставщика (строка {batch_row + 1}): {supplier_batch}")
+                    else:
+                        # Если строка пустая после удаления даты, берем все, что не похоже на дату
+                        if not re.match(r'^\d{2}\.\d{2}\.\d{4}$', batch_line):
+                            supplier_batch = batch_line
                             print(
-                                f"  📋 Аналитический лист (строка {check_row + 1}, поиск по диапазону): {analytic_list}")
-                            break
+                                f"  🏷️ Партия поставщика (строка {batch_row + 1}, без удаления даты): {supplier_batch}")
 
-        # --- ИЗВЛЕКАЕМ ПАРТИЮ ПОСТАВЩИКА (строго через 8 строк после SAP-кода) ---
-        supplier_row = sap_idx + 8
-        supplier_batch = None
-        if supplier_row < len(table_lines):
-            supplier_line = table_lines[supplier_row]
-            # Берем всю строку целиком как партию поставщика
-            if supplier_line.strip():
-                supplier_batch = supplier_line.strip()
-                print(f"  🏷️ Партия поставщика (строка {supplier_row + 1}): {supplier_batch}")
+                if supplier_batch is None:
+                    print(f"  ⚠️ Партия поставщика не найдена в строке {batch_row + 1}")
 
-        # --- ИЗВЛЕКАЕМ СРОК ГОДНОСТИ ---
-        expiration_date = None
-        for offset in [7, 8, 9, 10]:
-            check_row = sap_idx + offset
-            if check_row < len(table_lines):
-                check_line = table_lines[check_row]
-                exp_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', check_line)
-                if exp_match:
-                    exp_date = exp_match.group(1)
-                    if exp_date != result.get('дата_приемки'):
-                        expiration_date = exp_date
-                        print(f"  📅 Срок годности (строка {check_row + 1}): {expiration_date}")
-                        break
+                # --- 5. СРОК ГОДНОСТИ (SAP + 9 строк) - ЖЕСТКО ---
+                expiration_date = None
+                exp_row = sap_row + 9
+                if exp_row < len(table_lines):
+                    exp_line = table_lines[exp_row]
+                    exp_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', exp_line)
+                    if exp_match:
+                        exp_date = exp_match.group(1)
+                        if exp_date != result.get('дата_приемки'):
+                            expiration_date = exp_date
+                            print(f"  📅 Срок годности (строка {exp_row + 1}): {expiration_date}")
 
-        # --- ДОБАВЛЯЕМ ТОВАР ---
-        if analytic_list:
-            product_data = {
-                'наименование': product_name,
-                'номенклатурный_номер': nomencl_number,
-                'аналитический_лист': analytic_list,
-                'партия_поставщика': supplier_batch,
-                'срок_годности': expiration_date,
-                'количество': quantity
-            }
-            products.append(product_data)
-            print(f"  ✅ Товар добавлен: {product_name[:50]}... (АЛ: {analytic_list})")
-        else:
-            print(f"  ⚠️ Товар пропущен (нет аналитического листа): {product_name[:50]}...")
+                if expiration_date is None:
+                    print(f"  ⚠️ Срок годности не найден в строке {exp_row + 1}")
+
+                # Добавляем товар (даже если нет аналитического листа)
+                product_data = {
+                    'наименование': product_name,
+                    'номенклатурный_номер': nomencl_number,
+                    'аналитический_лист': analytic_list if analytic_list else 'Не найден',
+                    'партия_поставщика': supplier_batch if supplier_batch else 'Не найдена',
+                    'срок_годности': expiration_date if expiration_date else 'Не найден',
+                    'количество': quantity if quantity else 'Не найдено'
+                }
+                products.append(product_data)
+                print(f"  ✅ Товар добавлен: {product_name[:50]}...")
+                print(f"     Количество: {quantity if quantity else 'Не найдено'}")
+                print(f"     АЛ: {analytic_list if analytic_list else 'Не найден'}")
+                print(f"     Партия: {supplier_batch if supplier_batch else 'Не найдена'}")
+                print(f"     Срок годности: {expiration_date if expiration_date else 'Не найден'}")
+
+        i += 1
 
     result['товары'] = products
     print(f"\n📊 Всего найдено товаров: {len(products)}")
@@ -439,7 +423,6 @@ class MaterialsDatabase:
     def __init__(self, db_file=MATERIALS_DATABASE_FILE):
         self.db_file = db_file
         self.init_database()
-        print(f"📁 База материалов: {self.db_file}")
 
     @contextmanager
     def get_connection(self):
@@ -486,8 +469,6 @@ class MaterialsDatabase:
 
         for material in default_materials:
             self.add_material(material)
-
-        print(f"✅ Создано {len(default_materials)} тестовых материалов")
 
     def add_material(self, material_data):
         """Добавляет новый материал в базу"""
@@ -590,22 +571,17 @@ class MaterialsDatabase:
 
     def validate_and_import_from_excel(self, filepath):
         """Проверяет и импортирует данные из Excel файла (без pandas)"""
-        print(f"📂 Импорт Excel файла: {filepath}")
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
-            print(f"  Активный лист: {ws.title}")
 
-            # Определяем, есть ли заголовок
             is_header = False
             first_row = [cell.value for cell in ws[1]]
             if first_row and any(isinstance(cell, str) and not str(cell).isdigit() for cell in first_row[:2]):
                 is_header = True
                 start_row = 2
-                print(f"  Обнаружен заголовок, данные начинаются со строки {start_row}")
             else:
                 start_row = 1
-                print(f"  Заголовка нет, данные начинаются со строки {start_row}")
 
             errors = []
             materials_to_add = []
@@ -614,7 +590,6 @@ class MaterialsDatabase:
             for row_idx in range(start_row, ws.max_row + 1):
                 row = [ws.cell(row=row_idx, column=col).value for col in range(1, 4)]
 
-                # Проверяем SAP код
                 sap_value = row[0]
                 if sap_value is None:
                     errors.append(f"Строка {row_idx}: SAP код не может быть пустым")
@@ -630,13 +605,11 @@ class MaterialsDatabase:
                     errors.append(f"Строка {row_idx}: SAP код должен быть числом (текущее значение: {sap_value})")
                     continue
 
-                # Проверяем название материала
                 material_name = str(row[1]) if row[1] else ''
                 if not material_name.strip():
                     errors.append(f"Строка {row_idx}: Название материала не может быть пустым")
                     continue
 
-                # Проверяем палетизацию
                 palletization_value = row[2] if row[2] else 0
                 try:
                     palletization = int(palletization_value)
@@ -649,7 +622,6 @@ class MaterialsDatabase:
                         f"Строка {row_idx}: Палетизация должна быть числом (текущее значение: {palletization_value})")
                     continue
 
-                # Проверяем наличие дополнительных колонок
                 if ws.max_column > 3:
                     for col_idx in range(4, ws.max_column + 1):
                         if ws.cell(row=row_idx, column=col_idx).value is not None:
@@ -701,7 +673,6 @@ class MaterialsDatabase:
                 if success:
                     added_count += 1
 
-            print(f"✅ Импорт завершен: добавлено {added_count}, обновлено {updated_count}")
             return True, f"Успешно обработано: добавлено {added_count} материалов, обновлено {updated_count} материалов"
 
         except Exception as e:
@@ -721,7 +692,6 @@ class UserDatabase:
         self.db_file = db_file
         self.master_key = self._get_master_key()
         self.init_database()
-        print(f"📁 База пользователей: {self.db_file}")
 
     def _get_master_key(self):
         """Получает или создает мастер-ключ для шифрования"""
@@ -791,7 +761,6 @@ class UserDatabase:
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
             if 'status' not in columns:
-                print("🔧 Добавляем колонку status в таблицу users")
                 cursor.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'")
                 conn.commit()
                 cursor.execute("UPDATE users SET status = 'active' WHERE status IS NULL")
@@ -866,8 +835,6 @@ class UserDatabase:
 
         for user in default_users:
             self.add_user(user)
-
-        print(f"✅ Создано {len(default_users)} пользователей в базе данных")
 
     def add_user(self, user_data):
         """Добавляет нового пользователя в базу"""
@@ -1072,11 +1039,8 @@ class UserDatabase:
 # ИНИЦИАЛИЗАЦИЯ БАЗ ДАННЫХ
 # ============================================================
 
-print("\n🚀 ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ")
-print("=" * 60)
 db = UserDatabase(DATABASE_FILE)
 materials_db = MaterialsDatabase(MATERIALS_DATABASE_FILE)
-print("=" * 60 + "\n")
 
 
 # ============================================================
@@ -1138,29 +1102,6 @@ def save_settings(settings):
         return True
     except Exception as e:
         print(f"Ошибка сохранения настроек: {e}")
-        return False
-
-
-def load_last_file():
-    """Загружает последний использованный файл"""
-    try:
-        if os.path.exists(LAST_FILE_FILE):
-            with open(LAST_FILE_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            return data.get('file_path', '')
-    except Exception as e:
-        print(f"Ошибка загрузки последнего файла: {e}")
-    return ''
-
-
-def save_last_file(file_path):
-    """Сохраняет последний использованный файл"""
-    try:
-        with open(LAST_FILE_FILE, 'w', encoding='utf-8') as f:
-            json.dump({'file_path': file_path}, f, ensure_ascii=False, indent=4)
-        return True
-    except Exception as e:
-        print(f"Ошибка сохранения последнего файла: {e}")
         return False
 
 
@@ -1313,7 +1254,6 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
     try:
         os.makedirs(save_path, exist_ok=True)
     except Exception as e:
-        print(f"Ошибка создания папки: {e}")
         save_path = os.path.join(BASE_DIR, 'generated_labels')
         os.makedirs(save_path, exist_ok=True)
 
@@ -1451,7 +1391,6 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
     try:
         doc.save(filepath)
     except Exception as e:
-        print(f"Ошибка сохранения файла: {e}")
         temp_dir = tempfile.gettempdir()
         filepath = get_unique_filename(temp_dir, base_name, '.docx')
         doc.save(filepath)
@@ -1470,7 +1409,6 @@ def open_in_word(filepath):
             subprocess.run(['xdg-open', filepath])
         return True
     except Exception as e:
-        print(f"Ошибка при открытии файла: {e}")
         return False
 
 
@@ -1503,6 +1441,21 @@ def admin_required(f):
     return decorated_function
 
 
+def manager_required(f):
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('Пожалуйста, войдите в систему', 'warning')
+            return redirect(url_for('login'))
+        user_rights = session.get('user_rights')
+        if user_rights not in ['Администратор', 'Менеджер ОСЛ']:
+            flash('Доступ запрещен. Требуются права Администратора или Менеджера ОСЛ.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+
+    decorated_function.__name__ = f.__name__
+    return decorated_function
+
+
 def labels_access_required(f):
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
@@ -1514,11 +1467,7 @@ def labels_access_required(f):
 
         has_access = False
 
-        if user_rights == 'Администратор':
-            has_access = True
-        elif user_rights == 'Оператор СиМ' and user_plant == 'Вольгинский':
-            has_access = True
-        elif user_rights == 'Менеджер ОСЛ' and user_plant == 'Вольгинский':
+        if user_rights in ['Администратор', 'Оператор СиМ', 'Менеджер ОСЛ'] and user_plant == 'Вольгинский':
             has_access = True
 
         if not has_access:
@@ -1539,9 +1488,7 @@ def labels_access_required(f):
 def index():
     try:
         if 'user' in session:
-            settings = load_settings()
-            last_file = load_last_file()
-            return render_template('index.html', settings=settings, last_file=last_file)
+            return render_template('index.html')
         return redirect(url_for('login'))
     except Exception as e:
         print(f"Ошибка в index: {e}")
@@ -1647,12 +1594,13 @@ def change_password():
 
 
 @app.route('/admin')
-@admin_required
+@manager_required
 def admin_panel():
     try:
         users = db.get_all_users()
         audit_log = db.get_audit_log(50)
-        return render_template('admin.html', users=users, audit_log=audit_log)
+        user_rights = session.get('user_rights')
+        return render_template('admin.html', users=users, audit_log=audit_log, user_rights=user_rights)
     except Exception as e:
         print(f"Ошибка в admin_panel: {e}")
         traceback.print_exc()
@@ -1661,7 +1609,7 @@ def admin_panel():
 
 
 @app.route('/admin/add_user', methods=['POST'])
-@admin_required
+@manager_required
 def add_user():
     try:
         login = request.form.get('login', '').strip()
@@ -1673,6 +1621,12 @@ def add_user():
         plant = request.form.get('plant', 'Вольгинский')
         rights = request.form.get('rights', 'Оператор СиМ')
         status = request.form.get('status', 'active')
+
+        user_rights = session.get('user_rights')
+
+        if user_rights == 'Менеджер ОСЛ' and rights != 'Оператор СиМ':
+            flash('Менеджер ОСЛ может создавать только пользователей с правами "Оператор СиМ"', 'danger')
+            return redirect(url_for('admin_panel'))
 
         if not login or not email or not password:
             flash('Логин, email и пароль обязательны для заполнения', 'warning')
@@ -1723,12 +1677,20 @@ def delete_user(login):
 
 
 @app.route('/admin/block_user/<login>', methods=['POST'])
-@admin_required
+@manager_required
 def block_user(login):
     try:
         if login == session['user']:
             flash('Нельзя заблокировать самого себя', 'danger')
             return redirect(url_for('admin_panel'))
+
+        user_rights = session.get('user_rights')
+        target_user = db.find_user(login)
+
+        if user_rights == 'Менеджер ОСЛ':
+            if not target_user or target_user.get('rights') != 'Оператор СиМ':
+                flash('Менеджер ОСЛ может блокировать только пользователей с правами "Оператор СиМ"', 'danger')
+                return redirect(url_for('admin_panel'))
 
         success, message = db.block_user(login)
         flash(message, 'success' if success else 'danger')
@@ -1741,9 +1703,17 @@ def block_user(login):
 
 
 @app.route('/admin/unblock_user/<login>', methods=['POST'])
-@admin_required
+@manager_required
 def unblock_user(login):
     try:
+        user_rights = session.get('user_rights')
+        target_user = db.find_user(login)
+
+        if user_rights == 'Менеджер ОСЛ':
+            if not target_user or target_user.get('rights') != 'Оператор СиМ':
+                flash('Менеджер ОСЛ может разблокировать только пользователей с правами "Оператор СиМ"', 'danger')
+                return redirect(url_for('admin_panel'))
+
         success, message = db.unblock_user(login)
         flash(message, 'success' if success else 'danger')
         return redirect(url_for('admin_panel'))
@@ -1785,8 +1755,29 @@ def update_user(login):
         return redirect(url_for('admin_panel'))
 
 
+@app.route('/admin/get_user_data/<login>')
+@manager_required
+def get_user_data(login):
+    try:
+        user = db.find_user(login)
+        if user:
+            return jsonify({
+                'success': True,
+                'email': user.get('email', ''),
+                'fname': user.get('fname', ''),
+                'lname': user.get('lname', ''),
+                'enterprise': user.get('enterprise', 'ООО "Верофарм"'),
+                'plant': user.get('plant', 'Вольгинский'),
+                'rights': user.get('rights', 'Оператор СиМ'),
+                'status': user.get('status', 'active')
+            })
+        return jsonify({'success': False, 'error': 'Пользователь не найден'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/materials')
-@admin_required
+@manager_required
 def materials_page():
     try:
         materials = materials_db.get_all_materials()
@@ -1799,7 +1790,7 @@ def materials_page():
 
 
 @app.route('/materials/update', methods=['POST'])
-@admin_required
+@manager_required
 def update_materials():
     try:
         materials_data = request.form.get('materials_data')
@@ -1865,7 +1856,7 @@ def update_materials():
 
 
 @app.route('/materials/delete/<int:sap_code>', methods=['POST'])
-@admin_required
+@manager_required
 def delete_material(sap_code):
     try:
         success, message = materials_db.delete_material(sap_code)
@@ -1879,7 +1870,7 @@ def delete_material(sap_code):
 
 
 @app.route('/materials/import', methods=['GET', 'POST'])
-@admin_required
+@manager_required
 def import_materials():
     if request.method == 'GET':
         return render_template('import_materials.html')
@@ -1947,12 +1938,6 @@ def upload_file():
             flash('Пожалуйста, загрузите файл в формате PDF', 'danger')
             return redirect(url_for('index'))
 
-        # Сохраняем информацию о файле
-        file_path = request.form.get('file_path', '')
-        if file_path:
-            save_last_file(file_path)
-            print(f"💾 Сохранен путь к файлу: {file_path}")
-
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
@@ -1989,6 +1974,14 @@ def upload_file():
                     product['palletization'] = 0
 
                 quantity = product.get('количество', 0)
+                if quantity == 'Не найдено' or quantity is None:
+                    quantity = 0
+                else:
+                    try:
+                        quantity = int(quantity)
+                    except:
+                        quantity = 0
+
                 palletization = product.get('palletization', 0)
                 product['pallets'] = calculate_pallets(quantity, palletization)
                 total_pallets += product['pallets']
@@ -2009,79 +2002,6 @@ def upload_file():
         print(f"❌ Ошибка в upload_file: {e}")
         traceback.print_exc()
         flash(f'Ошибка при загрузке файла: {str(e)}', 'danger')
-        return redirect(url_for('index'))
-
-
-@app.route('/upload_last', methods=['POST'])
-@labels_access_required
-def upload_last():
-    """Загрузка последнего приходного ордера по сохраненному пути"""
-    print("\n" + "=" * 60)
-    print("📤 ПОЛУЧЕН ЗАПРОС НА ЗАГРУЗКУ ПОСЛЕДНЕГО ФАЙЛА")
-    print("=" * 60)
-
-    try:
-        last_file = load_last_file()
-        print(f"📄 Последний файл: {last_file}")
-
-        if not last_file or not os.path.exists(last_file):
-            print("❌ Файл не найден")
-            flash('Последний использованный файл не найден. Сначала выберите файл вручную.', 'warning')
-            return redirect(url_for('index'))
-
-        filename = secure_filename(os.path.basename(last_file))
-        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        shutil.copy2(last_file, temp_path)
-        print(f"💾 Файл скопирован: {temp_path}")
-
-        try:
-            data = extract_data_from_pdf(temp_path)
-            os.remove(temp_path)
-            print(f"🗑️ Временный файл удален: {temp_path}")
-
-            if not data or not data['дата_приемки'] and not data['название_поставщика'] and not data['товары']:
-                print("❌ Данные не извлечены")
-                flash('Не удалось извлечь данные из PDF-файла. Файл поврежден или имеет неверный формат.', 'danger')
-                return redirect(url_for('index'))
-
-            total_pallets = 0
-            for product in data['товары']:
-                sap_code = product.get('номенклатурный_номер')
-                product['sap_code_display'] = sap_code if sap_code else '-'
-
-                if sap_code:
-                    try:
-                        sap_code_int = int(sap_code)
-                        material = materials_db.get_material_by_sap(sap_code_int)
-                        if material:
-                            product['palletization'] = material.get('palletization', 0)
-                        else:
-                            product['palletization'] = 0
-                    except (ValueError, TypeError):
-                        product['palletization'] = 0
-                else:
-                    product['palletization'] = 0
-
-                quantity = product.get('количество', 0)
-                palletization = product.get('palletization', 0)
-                product['pallets'] = calculate_pallets(quantity, palletization)
-                total_pallets += product['pallets']
-
-            db.log_action(session['user'], 'UPLOAD_LAST_PDF', f"Загружен последний PDF: {os.path.basename(last_file)}")
-
-            flash(f'✅ Успешно загружен последний приходный ордер: {os.path.basename(last_file)}', 'success')
-            return render_template('result.html', data=data, total_pallets=total_pallets)
-        except Exception as e:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            print(f"❌ Ошибка при обработке: {e}")
-            traceback.print_exc()
-            flash(f'Ошибка при обработке файла: {str(e)}', 'danger')
-            return redirect(url_for('index'))
-    except Exception as e:
-        print(f"❌ Ошибка в upload_last: {e}")
-        traceback.print_exc()
-        flash(f'Ошибка при загрузке последнего файла: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
 
@@ -2157,7 +2077,6 @@ def generate_labels():
             flash('Не сгенерировано ни одной этикетки (нет выбранных товаров)', 'warning')
             return redirect(url_for('index'))
 
-        # Для Render: не открываем Word, а показываем ссылку на скачивание
         if os.environ.get('RENDER'):
             return render_template('success_render.html',
                                    filepath=filepath,
@@ -2292,6 +2211,8 @@ def settings_page():
 
         material_count = materials_db.get_materials_count()
         font_settings = settings.get('font_settings', {})
+        is_admin = session.get('user_rights') == 'Администратор'
+        is_manager = session.get('user_rights') in ['Администратор', 'Менеджер ОСЛ']
 
         return render_template('settings.html',
                                settings=settings,
@@ -2300,13 +2221,33 @@ def settings_page():
                                path_parts=path_parts,
                                subdirs=subdirs,
                                os_sep=os.sep,
-                               is_admin=(session.get('user_rights') == 'Администратор'),
+                               is_admin=is_admin,
+                               is_manager=is_manager,
                                material_count=material_count,
                                font_settings=font_settings)
     except Exception as e:
         print(f"Ошибка в settings_page: {e}")
         traceback.print_exc()
         flash(f'Ошибка загрузки настроек: {str(e)}', 'danger')
+        return redirect(url_for('index'))
+
+
+@app.route('/functionality_not_available')
+@login_required
+def functionality_not_available():
+    flash('Функционал будет доступен в следующей версии', 'info')
+    return redirect(url_for('index'))
+
+
+@app.route('/upload_form')
+@labels_access_required
+def upload_form():
+    try:
+        return render_template('upload.html')
+    except Exception as e:
+        print(f"Ошибка в upload_form: {e}")
+        traceback.print_exc()
+        flash('Ошибка загрузки страницы', 'danger')
         return redirect(url_for('index'))
 
 
@@ -2317,6 +2258,4 @@ def exit_app():
 
 if __name__ == '__main__':
     load_settings()
-    print("\n🚀 ЗАПУСК ПРИЛОЖЕНИЯ")
-    print("=" * 60)
     app.run(debug=True, host='0.0.0.0', port=5000)

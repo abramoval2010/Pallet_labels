@@ -1,461 +1,574 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>База пользователей</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        }
-        h1, h2 { color: #1a237e; margin-bottom: 20px; }
-        .row {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 30px;
-        }
-        @media (max-width: 768px) {
-            .row { grid-template-columns: 1fr; }
-        }
-        .form-group { margin-bottom: 12px; }
-        .form-group label {
-            display: block;
-            margin-bottom: 3px;
-            font-weight: 500;
-            font-size: 14px;
-            color: #333;
-        }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #9c27b0;
-        }
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: transform 0.2s;
-        }
-        .btn:hover { transform: scale(1.05); }
-        .btn-success {
-            background: linear-gradient(135deg, #4caf50, #66bb6a);
-            color: white;
-            width: 100%;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-        }
-        .btn-warning {
-            background: linear-gradient(135deg, #ff9800, #ffa726);
-            color: white;
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-        }
-        .btn-admin {
-            background: linear-gradient(135deg, #9c27b0, #ab47bc);
-            color: white;
-        }
-        .btn-sm {
-            padding: 5px 12px;
-            font-size: 12px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 14px;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background: #1a237e;
-            color: white;
-        }
-        tr:hover { background: #f5f5f5; }
-        .badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .badge-admin { background: #f44336; color: white; }
-        .badge-operator { background: #2196f3; color: white; }
-        .badge-manager { background: #ff9800; color: white; }
-        .badge-other { background: #9e9e9e; color: white; }
-        .badge-active { background: #4caf50; color: white; }
-        .badge-blocked { background: #ff9800; color: white; }
-        .badge-deleted { background: #f44336; color: white; }
-        .actions { margin: 15px 0; display: flex; gap: 5px; flex-wrap: wrap; }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .modal.active { display: flex; }
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .modal-header h3 { color: #1a237e; }
-        .close { cursor: pointer; font-size: 28px; color: #999; }
-        .close:hover { color: #333; }
-        .alert {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-        }
-        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .back-link {
-            display: inline-block;
-            margin-top: 20px;
-            color: #2196f3;
-            text-decoration: none;
-        }
-        .back-link:hover { text-decoration: underline; }
-        .audit-log {
-            max-height: 300px;
-            overflow-y: auto;
-            font-size: 13px;
-        }
-        .audit-log table { font-size: 13px; }
-        .audit-log th, .audit-log td { padding: 6px 10px; }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 5px;
-        }
-        .checkbox-group input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-        }
-        .status-select {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,
+initial-scale=1.0">
+<title>База пользователей</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+min-height: 100vh;
+background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784
+70%, #a5d6a7 100%);
+padding: 20px;
+}
+.container {
+max-width: 1200px;
+margin: 0 auto;
+background: white;
+border-radius: 20px;
+padding: 40px;
+box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+h1, h2 { color: #1a237e; margin-bottom: 20px; }
+.row {
+display: grid;
+grid-template-columns: 1fr 2fr;
+gap: 30px;
+}
+@media (max-width: 768px) {
+.row { grid-template-columns: 1fr; }
+}
+.form-group { margin-bottom: 12px; }
+.form-group label {
+display: block;
+margin-bottom: 3px;
+font-weight: 500;
+font-size: 14px;
+color: #333;
+}
+.form-group input, .form-group select {
+width: 100%;
+padding: 10px;
+border: 2px solid #e0e0e0;
+border-radius: 8px;
+font-size: 14px;
+}
+.form-group input:focus, .form-group select:focus {
+outline: none;
+border-color: #9c27b0;
+}
+.btn {
+padding: 10px 20px;
+border: none;
+border-radius: 8px;
+font-size: 14px;
+font-weight: 500;
+cursor: pointer;
+text-decoration: none;
+display: inline-block;
+transition: transform 0.2s;
+}
+.btn:hover { transform: scale(1.05); }
+.btn-success {
+background: linear-gradient(135deg, #4caf50, #66bb6a);
+color: white;
+width: 100%;
+}
+.btn-primary {
+background: linear-gradient(135deg, #2196f3, #64b5f6);
+color: white;
+}
+.btn-warning {
+background: linear-gradient(135deg, #ff9800, #ffa726);
+color: white;
+}
+.btn-danger {
+background: linear-gradient(135deg, #f44336, #ef5350);
+color: white;
+}
+.btn-admin {
+background: linear-gradient(135deg, #9c27b0, #ab47bc);
+color: white;
+}
+.btn-sm {
+padding: 5px 12px;
+font-size: 12px;
+}
+table {
+width: 100%;
+border-collapse: collapse;
+margin: 15px 0;
+font-size: 14px;
+}
+th, td {
+padding: 10px;
+text-align: left;
+border-bottom: 1px solid #ddd;
+}
+th {
+background: #1a237e;
+color: white;
+}
+tr:hover { background: #f5f5f5; }
+.badge {
+display: inline-block;
+padding: 3px 10px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: bold;
+}
+.badge-admin { background: #f44336; color: white; }
+.badge-operator { background: #2196f3; color: white; }
+.badge-manager { background: #ff9800; color: white; }
+.badge-other { background: #9e9e9e; color: white; }
+.badge-active { background: #4caf50; color: white; }
+.badge-blocked { background: #ff9800; color: white; }
+.badge-deleted { background: #f44336; color: white; }
+.actions { margin: 15px 0; display: flex; gap: 5px; flex-wrap: wrap; }
+.modal {
+display: none;
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background: rgba(0,0,0,0.5);
+justify-content: center;
+align-items: center;
+z-index: 1000;
+}
+.modal.active { display: flex; }
+.modal-content {
+background: white;
+padding: 30px;
+border-radius: 15px;
+max-width: 500px;
+width: 90%;
+max-height: 90vh;
+overflow-y: auto;
+}
+.modal-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 20px;
+}
+.modal-header h3 { color: #1a237e; }
+.close { cursor: pointer; font-size: 28px; color: #999; }
+.close:hover { color: #333; }
+.alert {
+padding: 12px;
+border-radius: 8px;
+margin-bottom: 15px;
+}
+.alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.back-link {
+display: inline-block;
+margin-top: 20px;
+color: #2196f3;
+text-decoration: none;
+}
+.back-link:hover { text-decoration: underline; }
+.audit-log {
+max-height: 300px;
+overflow-y: auto;
+font-size: 13px;
+}
+.audit-log table { font-size: 13px; }
+.audit-log th, .audit-log td { padding: 6px 10px; }
+.checkbox-group {
+display: flex;
+align-items: center;
+gap: 10px;
+margin-top: 5px;
+}
+.checkbox-group input[type="checkbox"] {
+width: 20px;
+height: 20px;
+}
+.status-select {
+width: 100%;
+padding: 10px;
+border: 2px solid #e0e0e0;
+border-radius: 8px;
+font-size: 14px;
+}
+.readonly-badge {
+display: inline-block;
+padding: 3px 10px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: bold;
+background: #e0e0e0;
+color: #666;
+}
+.admin-badge {
+display: inline-block;
+padding: 2px 12px;
+border-radius: 20px;
+font-size: 11px;
+font-weight: 600;
+background: #9c27b0;
+color: white;
+margin-left: 8px;
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>👥 База пользователей</h1>
-        <p style="color: #666; margin-bottom: 20px;">Управление учетными записями пользователей системы</p>
+<div class="container">
+<h1>👥 База пользователей
+    {% if user_rights == 'Администратор' %}
+        <span class="admin-badge">Полный доступ</span>
+    {% elif user_rights == 'Менеджер ОСЛ' %}
+        <span class="admin-badge" style="background: #ff9800;">Ограниченный доступ</span>
+    {% endif %}
+</h1>
+<p style="color: #666; margin-bottom: 20px;">
+    Управление учетными записями пользователей системы
+    {% if user_rights == 'Менеджер ОСЛ' %}
+        <span style="color: #ff9800; font-size: 14px;">(Доступно: создание/блокировка только для "Оператор СиМ")</span>
+    {% endif %}
+</p>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }}">{{ message }}</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<div class="row">
+<!-- Форма добавления пользователя (только для Администратора или Менеджера ОСЛ) -->
+{% if user_rights in ['Администратор', 'Менеджер ОСЛ'] %}
+<div>
+    <h2>➕ Создать пользователя</h2>
+    <form action="/admin/add_user" method="POST">
+        <div class="form-group">
+            <label>Логин *</label>
+            <input type="text" name="login" required>
+        </div>
+        <div class="form-group">
+            <label>Email *</label>
+            <input type="email" name="email" required>
+        </div>
+        <div class="form-group">
+            <label>Пароль * (мин. 6 символов)</label>
+            <input type="password" name="password" required minlength="6">
+        </div>
+        <div class="form-group">
+            <label>Имя *</label>
+            <input type="text" name="fname" required>
+        </div>
+        <div class="form-group">
+            <label>Фамилия *</label>
+            <input type="text" name="lname" required>
+        </div>
+        <div class="form-group">
+            <label>Предприятие</label>
+            <select name="enterprise">
+                <option value="ООО &quot;Верофарм&quot;">ООО "Верофарм"</option>
+                <option value="АО &quot;Верофарм&quot;">АО "Верофарм"</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Завод</label>
+            <select name="plant">
+                <option value="Вольгинский">Вольгинский</option>
+                <option value="Белгород">Белгород</option>
+                <option value="Воронеж">Воронеж</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Права</label>
+            <select name="rights" id="rightsSelect">
+                {% if user_rights == 'Администратор' %}
+                    <option value="Администратор">Администратор</option>
+                    <option value="Менеджер ОСЛ">Менеджер ОСЛ</option>
+                {% endif %}
+                <option value="Оператор СиМ" selected>Оператор СиМ</option>
+                <option value="Оператор ГП">Оператор ГП</option>
+            </select>
+            {% if user_rights == 'Менеджер ОСЛ' %}
+                <span style="font-size: 12px; color: #ff9800;">(Менеджер ОСЛ может создавать только "Оператор СиМ")</span>
             {% endif %}
-        {% endwith %}
-
-        <div class="row">
-            <!-- Форма добавления пользователя -->
-            <div>
-                <h2>➕ Создать пользователя</h2>
-                <form action="/admin/add_user" method="POST">
-                    <div class="form-group">
-                        <label>Логин *</label>
-                        <input type="text" name="login" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Email *</label>
-                        <input type="email" name="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Пароль * (мин. 6 символов)</label>
-                        <input type="password" name="password" required minlength="6">
-                    </div>
-                    <div class="form-group">
-                        <label>Имя *</label>
-                        <input type="text" name="fname" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Фамилия *</label>
-                        <input type="text" name="lname" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Предприятие</label>
-                        <select name="enterprise">
-                            <option value="ООО &quot;Верофарм&quot;">ООО "Верофарм"</option>
-                            <option value="АО &quot;Верофарм&quot;">АО "Верофарм"</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Завод</label>
-                        <select name="plant">
-                            <option value="Вольгинский">Вольгинский</option>
-                            <option value="Белгород">Белгород</option>
-                            <option value="Воронеж">Воронеж</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Права</label>
-                        <select name="rights">
-                            <option value="Администратор">Администратор</option>
-                            <option value="Менеджер ОСЛ">Менеджер ОСЛ</option>
-                            <option value="Оператор СиМ" selected>Оператор СиМ</option>
-                            <option value="Оператор ГП">Оператор ГП</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Статус</label>
-                        <select name="status" class="status-select">
-                            <option value="active">Активный</option>
-                            <option value="blocked">Заблокированный</option>
-                            <option value="deleted">Удаленный</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-success">➕ Создать</button>
-                </form>
-            </div>
-
-            <!-- Список пользователей -->
-            <div>
-                <h2>📋 Список пользователей</h2>
-                <div style="overflow-x: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Логин</th>
-                                <th>Имя</th>
-                                <th>Фамилия</th>
-                                <th>Права</th>
-                                <th>Завод</th>
-                                <th>Статус</th>
-                                <th>Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user in users %}
-                            <tr>
-                                <td><strong>{{ user.login }}</strong></td>
-                                <td>{{ user.fname }}</td>
-                                <td>{{ user.lname }}</td>
-                                <td>
-                                    {% if user.rights == 'Администратор' %}
-                                        <span class="badge badge-admin">{{ user.rights }}</span>
-                                    {% elif user.rights == 'Оператор СиМ' %}
-                                        <span class="badge badge-operator">{{ user.rights }}</span>
-                                    {% elif user.rights == 'Менеджер ОСЛ' %}
-                                        <span class="badge badge-manager">{{ user.rights }}</span>
-                                    {% else %}
-                                        <span class="badge badge-other">{{ user.rights }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ user.plant }}</td>
-                                <td>
-                                    {% if user.status == 'active' %}
-                                        <span class="badge badge-active">Активный</span>
-                                    {% elif user.status == 'blocked' %}
-                                        <span class="badge badge-blocked">Заблокирован</span>
-                                    {% elif user.status == 'deleted' %}
-                                        <span class="badge badge-deleted">Удален</span>
-                                    {% else %}
-                                        <span class="badge badge-other">{{ user.status }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="actions">
-                                        <button class="btn btn-warning btn-sm" onclick="openEditModal('{{ user.login }}')">✏️</button>
-
-                                        {% if session.user != user.login %}
-                                            {% if user.status == 'active' %}
-                                                <form action="/admin/block_user/{{ user.login }}" method="POST" style="display:inline;">
-                                                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Заблокировать пользователя {{ user.login }}?')">🔒</button>
-                                                </form>
-                                            {% elif user.status == 'blocked' %}
-                                                <form action="/admin/unblock_user/{{ user.login }}" method="POST" style="display:inline;">
-                                                    <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Разблокировать пользователя {{ user.login }}?')">🔓</button>
-                                                </form>
-                                            {% endif %}
-
-                                            {% if user.status != 'deleted' %}
-                                                <form action="/admin/delete_user/{{ user.login }}" method="POST" style="display:inline;">
-                                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Удалить пользователя {{ user.login }}?')">🗑️</button>
-                                                </form>
-                                            {% endif %}
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
         </div>
-
-        <!-- Журнал аудита -->
-        <h2 style="margin-top: 30px;">📋 Журнал аудита</h2>
-        <div class="audit-log">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Время</th>
-                        <th>Пользователь</th>
-                        <th>Действие</th>
-                        <th>Детали</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in audit_log %}
-                    <tr>
-                        <td><small>{{ log.timestamp }}</small></td>
-                        <td><strong>{{ log.user_login }}</strong></td>
-                        <td>{{ log.action }}</td>
-                        <td><small>{{ log.details }}</small></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="form-group">
+            <label>Статус</label>
+            <select name="status" class="status-select">
+                <option value="active">Активный</option>
+                <option value="blocked">Заблокированный</option>
+                <option value="deleted">Удаленный</option>
+            </select>
         </div>
-
-        <a href="/" class="back-link">🏠 На главную</a>
-        <a href="/settings" class="back-link" style="margin-left: 15px;">⚙️ Настройки</a>
+        <button type="submit" class="btn btn-success">➕ Создать</button>
+    </form>
+</div>
+{% else %}
+<div>
+    <h2>ℹ️ Информация</h2>
+    <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; border-left: 4px solid #2196f3;">
+        <p style="margin: 0; color: #0d47a1;">
+            У вас нет прав для создания новых пользователей.
+            Обратитесь к Администратору или Менеджеру ОСЛ.
+        </p>
     </div>
+</div>
+{% endif %}
 
-    <!-- Модальное окно редактирования -->
-    <div class="modal" id="editModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>✏️ Редактирование пользователя</h3>
-                <span class="close" onclick="closeEditModal()">&times;</span>
-            </div>
-            <form id="editForm" method="POST">
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" name="email" id="editEmail">
-                </div>
-                <div class="form-group">
-                    <label>Имя</label>
-                    <input type="text" name="fname" id="editFname">
-                </div>
-                <div class="form-group">
-                    <label>Фамилия</label>
-                    <input type="text" name="lname" id="editLname">
-                </div>
-                <div class="form-group">
-                    <label>Предприятие</label>
-                    <select name="enterprise" id="editEnterprise">
-                        <option value="ООО &quot;Верофарм&quot;">ООО "Верофарм"</option>
-                        <option value="АО &quot;Верофарм&quot;">АО "Верофарм"</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Завод</label>
-                    <select name="plant" id="editPlant">
-                        <option value="Вольгинский">Вольгинский</option>
-                        <option value="Белгород">Белгород</option>
-                        <option value="Воронеж">Воронеж</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Права</label>
-                    <select name="rights" id="editRights">
-                        <option value="Администратор">Администратор</option>
-                        <option value="Менеджер ОСЛ">Менеджер ОСЛ</option>
-                        <option value="Оператор СиМ">Оператор СиМ</option>
-                        <option value="Оператор ГП">Оператор ГП</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Статус</label>
-                    <select name="status" id="editStatus" class="status-select">
-                        <option value="active">Активный</option>
-                        <option value="blocked">Заблокированный</option>
-                        <option value="deleted">Удаленный</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Новый пароль (оставьте пустым)</label>
-                    <input type="password" name="password" placeholder="Новый пароль (мин. 6 символов)">
-                </div>
-                <button type="submit" class="btn btn-success" style="width: 100%;">💾 Сохранить изменения</button>
+<!-- Список пользователей -->
+<div>
+<h2>📋 Список пользователей</h2>
+<div style="overflow-x: auto;">
+<table>
+<thead>
+<tr>
+<th>Логин</th>
+<th>Имя</th>
+<th>Фамилия</th>
+<th>Права</th>
+<th>Завод</th>
+<th>Статус</th>
+<th>Действия</th>
+</tr>
+</thead>
+<tbody>
+{% for user in users %}
+<tr>
+<td><strong>{{ user.login }}</strong></td>
+<td>{{ user.fname }}</td>
+<td>{{ user.lname }}</td>
+<td>
+{% if user.rights == 'Администратор' %}
+<span class="badge badge-admin">{{ user.rights }}</span>
+{% elif user.rights == 'Оператор СиМ' %}
+<span class="badge badge-operator">{{ user.rights }}</span>
+{% elif user.rights == 'Менеджер ОСЛ' %}
+<span class="badge badge-manager">{{ user.rights }}</span>
+{% else %}
+<span class="badge badge-other">{{ user.rights }}</span>
+{% endif %}
+</td>
+<td>{{ user.plant }}</td>
+<td>
+{% if user.status == 'active' %}
+<span class="badge badge-active">Активный</span>
+{% elif user.status == 'blocked' %}
+<span class="badge badge-blocked">Заблокирован</span>
+{% elif user.status == 'deleted' %}
+<span class="badge badge-deleted">Удален</span>
+{% else %}
+<span class="badge badge-other">{{ user.status }}</span>
+{% endif %}
+</td>
+<td>
+<div class="actions">
+{% if user_rights == 'Администратор' %}
+    <!-- Администратор: полный доступ ко всем пользователям -->
+    <button class="btn btn-warning btn-sm" onclick="openEditModal('{{ user.login }}')">✏️</button>
+
+    {% if session.user != user.login %}
+        {% if user.status == 'active' %}
+            <form action="/admin/block_user/{{ user.login }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Заблокировать пользователя {{ user.login }}?')">🔒</button>
             </form>
-        </div>
-    </div>
+        {% elif user.status == 'blocked' %}
+            <form action="/admin/unblock_user/{{ user.login }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Разблокировать пользователя {{ user.login }}?')">🔓</button>
+            </form>
+        {% endif %}
 
-    <script>
-        function openEditModal(login) {
-            const modal = document.getElementById('editModal');
-            modal.classList.add('active');
-            document.getElementById('editForm').action = '/admin/update_user/' + login;
+        {% if user.status != 'deleted' %}
+            <form action="/admin/delete_user/{{ user.login }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Удалить пользователя {{ user.login }}?')">🗑️</button>
+            </form>
+        {% endif %}
+    {% endif %}
 
-            // Получаем данные из таблицы
-            const rows = document.querySelectorAll('tbody tr');
-            for (const row of rows) {
-                const cells = row.querySelectorAll('td');
-                if (cells.length > 0 && cells[0].textContent.trim() === login) {
-                    // Заполняем поля данными из таблицы
-                    // Для простоты оставляем поля для ручного ввода
-                    break;
-                }
-            }
-        }
+{% elif user_rights == 'Менеджер ОСЛ' %}
+    <!-- Менеджер ОСЛ: только для Операторов СиМ -->
+    {% if user.rights == 'Оператор СиМ' %}
+        <button class="btn btn-warning btn-sm" onclick="openEditModal('{{ user.login }}')">✏️</button>
 
-        function closeEditModal() {
-            document.getElementById('editModal').classList.remove('active');
-        }
+        {% if session.user != user.login %}
+            {% if user.status == 'active' %}
+                <form action="/admin/block_user/{{ user.login }}" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Заблокировать пользователя {{ user.login }}?')">🔒</button>
+                </form>
+            {% elif user.status == 'blocked' %}
+                <form action="/admin/unblock_user/{{ user.login }}" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Разблокировать пользователя {{ user.login }}?')">🔓</button>
+                </form>
+            {% endif %}
+        {% endif %}
 
-        // Закрытие по клику вне модального окна
-        document.getElementById('editModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeEditModal();
-            }
-        });
-    </script>
+        <!-- Менеджер ОСЛ НЕ может удалять пользователей -->
+        <span class="readonly-badge" title="Менеджер ОСЛ не может удалять пользователей">🔒</span>
+    {% else %}
+        <!-- Для остальных категорий - только просмотр -->
+        <span class="readonly-badge">Только просмотр</span>
+        {% if user.status != 'active' %}
+            <span style="font-size: 11px; color: #999;">({{ user.status }})</span>
+        {% endif %}
+    {% endif %}
+
+{% else %}
+    <!-- Для обычных пользователей - только просмотр -->
+    <span class="readonly-badge">Только просмотр</span>
+{% endif %}
+</div>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Журнал аудита (доступен только для Администратора и Менеджера ОСЛ) -->
+{% if user_rights in ['Администратор', 'Менеджер ОСЛ'] %}
+<h2 style="margin-top: 30px;">📋 Журнал аудита</h2>
+<div class="audit-log">
+<table>
+<thead>
+<tr>
+<th>Время</th>
+<th>Пользователь</th>
+<th>Действие</th>
+<th>Детали</th>
+</tr>
+</thead>
+<tbody>
+{% for log in audit_log %}
+<tr>
+<td><small>{{ log.timestamp }}</small></td>
+<td><strong>{{ log.user_login }}</strong></td>
+<td>{{ log.action }}</td>
+<td><small>{{ log.details }}</small></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endif %}
+
+<a href="/" class="back-link">🏠 На главную</a>
+<a href="/settings" class="back-link" style="margin-left: 15px;">⚙️ Настройки</a>
+</div>
+
+<!-- Модальное окно редактирования -->
+<div class="modal" id="editModal">
+<div class="modal-content">
+<div class="modal-header">
+<h3>✏️ Редактирование пользователя</h3>
+<span class="close" onclick="closeEditModal()">&times;</span>
+</div>
+<form id="editForm" method="POST">
+<div class="form-group">
+<label>Email</label>
+<input type="email" name="email" id="editEmail">
+</div>
+<div class="form-group">
+<label>Имя</label>
+<input type="text" name="fname" id="editFname">
+</div>
+<div class="form-group">
+<label>Фамилия</label>
+<input type="text" name="lname" id="editLname">
+</div>
+<div class="form-group">
+<label>Предприятие</label>
+<select name="enterprise" id="editEnterprise">
+<option value="ООО &quot;Верофарм&quot;">ООО "Верофарм"</option>
+<option value="АО &quot;Верофарм&quot;">АО "Верофарм"</option>
+</select>
+</div>
+<div class="form-group">
+<label>Завод</label>
+<select name="plant" id="editPlant">
+<option value="Вольгинский">Вольгинский</option>
+<option value="Белгород">Белгород</option>
+<option value="Воронеж">Воронеж</option>
+</select>
+</div>
+<div class="form-group">
+<label>Права</label>
+<select name="rights" id="editRights">
+{% if user_rights == 'Администратор' %}
+<option value="Администратор">Администратор</option>
+<option value="Менеджер ОСЛ">Менеджер ОСЛ</option>
+{% endif %}
+<option value="Оператор СиМ">Оператор СиМ</option>
+<option value="Оператор ГП">Оператор ГП</option>
+</select>
+{% if user_rights == 'Менеджер ОСЛ' %}
+<span style="font-size: 12px; color: #ff9800;">(Менеджер ОСЛ может редактировать только "Оператор СиМ")</span>
+{% endif %}
+</div>
+<div class="form-group">
+<label>Статус</label>
+<select name="status" id="editStatus" class="status-select">
+<option value="active">Активный</option>
+<option value="blocked">Заблокированный</option>
+<option value="deleted">Удаленный</option>
+</select>
+{% if user_rights == 'Менеджер ОСЛ' %}
+<span style="font-size: 12px; color: #ff9800;">(Менеджер ОСЛ не может удалять пользователей)</span>
+{% endif %}
+</div>
+<div class="form-group">
+<label>Новый пароль (оставьте пустым)</label>
+<input type="password" name="password" placeholder="Новый пароль (мин. 6 символов)">
+</div>
+<button type="submit" class="btn btn-success" style="width: 100%;">💾 Сохранить изменения</button>
+</form>
+</div>
+</div>
+
+<script>
+function openEditModal(login) {
+const modal = document.getElementById('editModal');
+modal.classList.add('active');
+document.getElementById('editForm').action = '/admin/update_user/' + login;
+
+// Заполняем поля данными пользователя (делаем запрос к серверу)
+fetch('/admin/get_user_data/' + login)
+.then(response => response.json())
+.then(data => {
+if (data.success) {
+document.getElementById('editEmail').value = data.email || '';
+document.getElementById('editFname').value = data.fname || '';
+document.getElementById('editLname').value = data.lname || '';
+document.getElementById('editEnterprise').value = data.enterprise || 'ООО "Верофарм"';
+document.getElementById('editPlant').value = data.plant || 'Вольгинский';
+document.getElementById('editRights').value = data.rights || 'Оператор СиМ';
+document.getElementById('editStatus').value = data.status || 'active';
+}
+});
+}
+
+function closeEditModal() {
+document.getElementById('editModal').classList.remove('active');
+}
+
+// Закрытие по клику вне модального окна
+document.getElementById('editModal').addEventListener('click', function(e) {
+if (e.target === this) {
+closeEditModal();
+}
+});
+
+// Для Менеджера ОСЛ ограничиваем выбор прав при создании
+{% if user_rights == 'Менеджер ОСЛ' %}
+document.addEventListener('DOMContentLoaded', function() {
+const rightsSelect = document.getElementById('rightsSelect');
+if (rightsSelect) {
+// Оставляем только Оператор СиМ
+for (let option of rightsSelect.options) {
+if (option.value !== 'Оператор СиМ') {
+option.style.display = 'none';
+}
+}
+rightsSelect.value = 'Оператор СиМ';
+}
+});
+{% endif %}
+</script>
 </body>
 </html>

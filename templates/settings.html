@@ -1,560 +1,574 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Настройки</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            padding: 20px;
-        }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        }
-        h1 {
-            color: #1a237e;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 16px;
-        }
-        .settings-menu {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .settings-section {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 25px;
-            border-left: 4px solid #9c27b0;
-            transition: all 0.3s ease;
-        }
-        .settings-section:hover {
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-        }
-        .settings-section h2 {
-            color: #1a237e;
-            font-size: 18px;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .settings-section .desc {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        .settings-section .icon {
-            font-size: 24px;
-        }
-        .current-path {
-            background: #e8f5e9;
-            padding: 12px 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            border-left: 4px solid #4caf50;
-            word-break: break-all;
-            font-size: 14px;
-        }
-        .current-path strong {
-            color: #2e7d32;
-        }
-        .current-sop {
-            background: #e3f2fd;
-            padding: 12px 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            border-left: 4px solid #2196f3;
-            word-break: break-all;
-            font-size: 14px;
-        }
-        .current-sop strong {
-            color: #0d47a1;
-        }
-        .btn {
-            padding: 10px 25px;
-            border: none;
-            border-radius: 50px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s ease;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #4caf50, #66bb6a);
-            color: white;
-        }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #43a047, #4caf50);
-        }
-        .btn-secondary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-        }
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, #1e88e5, #42a5f5);
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-        }
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #d32f2f, #e53935);
-        }
-        .btn-settings {
-            background: linear-gradient(135deg, #ff9800, #ffa726);
-            color: white;
-        }
-        .btn-settings:hover {
-            background: linear-gradient(135deg, #f57c00, #fb8c00);
-        }
-        .btn-admin {
-            background: linear-gradient(135deg, #9c27b0, #ab47bc);
-            color: white;
-        }
-        .btn-admin:hover {
-            background: linear-gradient(135deg, #7b1fa2, #8e24aa);
-        }
-        .btn-materials {
-            background: linear-gradient(135deg, #00897b, #26a69a);
-            color: white;
-        }
-        .btn-materials:hover {
-            background: linear-gradient(135deg, #00695c, #00897b);
-        }
-        .btn-font {
-            background: linear-gradient(135deg, #5c6bc0, #7986cb);
-            color: white;
-        }
-        .btn-font:hover {
-            background: linear-gradient(135deg, #3949ab, #5c6bc0);
-        }
-        .alert {
-            padding: 12px 20px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            font-weight: 500;
-        }
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .alert-danger {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .alert-warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-        .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        .form-row {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin: 10px 0;
-        }
-        .form-row input, .form-row select {
-            flex: 1;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 15px;
-            min-width: 200px;
-            transition: border-color 0.3s;
-        }
-        .form-row input:focus, .form-row select:focus {
-            outline: none;
-            border-color: #9c27b0;
-        }
-        .form-row .btn {
-            flex: 0 0 auto;
-        }
-        .drive-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 10px 0;
-        }
-        .drive-list .btn {
-            font-size: 13px;
-            padding: 8px 18px;
-        }
-        .path-nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin: 10px 0;
-        }
-        .path-nav .btn {
-            font-size: 12px;
-            padding: 5px 15px;
-        }
-        .admin-actions {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-        .actions {
-            margin-top: 25px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        .admin-badge {
-            display: inline-block;
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            background: #9c27b0;
-            color: white;
-            margin-left: 8px;
-        }
-        .material-stats {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin: 10px 0;
-        }
-        .stat-item {
-            background: #e8eaf6;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-        .stat-item strong {
-            color: #1a237e;
-        }
-        .font-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        .font-item {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .font-item label {
-            font-size: 13px;
-            font-weight: 500;
-            color: #333;
-        }
-        .font-item input {
-            padding: 8px 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            width: 100%;
-        }
-        .font-item input:focus {
-            outline: none;
-            border-color: #5c6bc0;
-        }
-        .font-item .hint {
-            font-size: 12px;
-            color: #999;
-        }
-        .font-section {
-            background: #e8eaf6;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-        }
-        .font-section h3 {
-            color: #1a237e;
-            font-size: 16px;
-            margin-bottom: 10px;
-        }
-        @media (max-width: 768px) {
-            .container { padding: 20px; }
-            .settings-section { padding: 20px; }
-            .form-row { flex-direction: column; }
-            .form-row input { min-width: auto; }
-            .actions { flex-direction: column; }
-            .actions .btn { width: 100%; text-align: center; }
-            .admin-actions { flex-direction: column; }
-            .admin-actions .btn { width: 100%; text-align: center; }
-            .font-grid { grid-template-columns: 1fr; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,
+initial-scale=1.0">
+<title>Настройки</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+min-height: 100vh;
+background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784
+70%, #a5d6a7 100%);
+padding: 20px;
+}
+.container {
+max-width: 1000px;
+margin: 0 auto;
+background: white;
+border-radius: 20px;
+padding: 40px;
+box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+h1 {
+color: #1a237e;
+margin-bottom: 10px;
+display: flex;
+align-items: center;
+gap: 10px;
+}
+.subtitle {
+color: #666;
+margin-bottom: 30px;
+font-size: 16px;
+}
+.settings-menu {
+display: flex;
+flex-direction: column;
+gap: 20px;
+}
+.settings-section {
+background: #f8f9fa;
+border-radius: 15px;
+padding: 25px;
+border-left: 4px solid #9c27b0;
+transition: all 0.3s ease;
+}
+.settings-section:hover {
+box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+}
+.settings-section h2 {
+color: #1a237e;
+font-size: 18px;
+margin-bottom: 5px;
+display: flex;
+align-items: center;
+gap: 10px;
+}
+.settings-section .desc {
+color: #666;
+font-size: 14px;
+margin-bottom: 15px;
+}
+.settings-section .icon {
+font-size: 24px;
+}
+.current-path {
+background: #e8f5e9;
+padding: 12px 15px;
+border-radius: 10px;
+margin: 10px 0;
+border-left: 4px solid #4caf50;
+word-break: break-all;
+font-size: 14px;
+}
+.current-path strong {
+color: #2e7d32;
+}
+.current-sop {
+background: #e3f2fd;
+padding: 12px 15px;
+border-radius: 10px;
+margin: 10px 0;
+border-left: 4px solid #2196f3;
+word-break: break-all;
+font-size: 14px;
+}
+.current-sop strong {
+color: #0d47a1;
+}
+.btn {
+padding: 10px 25px;
+border: none;
+border-radius: 50px;
+font-size: 14px;
+font-weight: 500;
+cursor: pointer;
+text-decoration: none;
+display: inline-block;
+transition: all 0.3s ease;
+}
+.btn:hover {
+transform: translateY(-2px);
+box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+.btn-primary {
+background: linear-gradient(135deg, #4caf50, #66bb6a);
+color: white;
+}
+.btn-primary:hover {
+background: linear-gradient(135deg, #43a047, #4caf50);
+}
+.btn-secondary {
+background: linear-gradient(135deg, #2196f3, #64b5f6);
+color: white;
+}
+.btn-secondary:hover {
+background: linear-gradient(135deg, #1e88e5, #42a5f5);
+}
+.btn-danger {
+background: linear-gradient(135deg, #f44336, #ef5350);
+color: white;
+}
+.btn-danger:hover {
+background: linear-gradient(135deg, #d32f2f, #e53935);
+}
+.btn-settings {
+background: linear-gradient(135deg, #ff9800, #ffa726);
+color: white;
+}
+.btn-settings:hover {
+background: linear-gradient(135deg, #f57c00, #fb8c00);
+}
+.btn-admin {
+background: linear-gradient(135deg, #9c27b0, #ab47bc);
+color: white;
+}
+.btn-admin:hover {
+background: linear-gradient(135deg, #7b1fa2, #8e24aa);
+}
+.btn-materials {
+background: linear-gradient(135deg, #00897b, #26a69a);
+color: white;
+}
+.btn-materials:hover {
+background: linear-gradient(135deg, #00695c, #00897b);
+}
+.btn-font {
+background: linear-gradient(135deg, #5c6bc0, #7986cb);
+color: white;
+}
+.btn-font:hover {
+background: linear-gradient(135deg, #3949ab, #5c6bc0);
+}
+.alert {
+padding: 12px 20px;
+border-radius: 10px;
+margin-bottom: 15px;
+font-weight: 500;
+}
+.alert-success {
+background: #d4edda;
+color: #155724;
+border: 1px solid #c3e6cb;
+}
+.alert-danger {
+background: #f8d7da;
+color: #721c24;
+border: 1px solid #f5c6cb;
+}
+.alert-warning {
+background: #fff3cd;
+color: #856404;
+border: 1px solid #ffeeba;
+}
+.alert-info {
+background: #d1ecf1;
+color: #0c5460;
+border: 1px solid #bee5eb;
+}
+.form-row {
+display: flex;
+gap: 10px;
+flex-wrap: wrap;
+margin: 10px 0;
+}
+.form-row input, .form-row select {
+flex: 1;
+padding: 12px 15px;
+border: 2px solid #e0e0e0;
+border-radius: 10px;
+font-size: 15px;
+min-width: 200px;
+transition: border-color 0.3s;
+}
+.form-row input:focus, .form-row select:focus {
+outline: none;
+border-color: #9c27b0;
+}
+.form-row .btn {
+flex: 0 0 auto;
+}
+.drive-list {
+display: flex;
+flex-wrap: wrap;
+gap: 10px;
+margin: 10px 0;
+}
+.drive-list .btn {
+font-size: 13px;
+padding: 8px 18px;
+}
+.path-nav {
+display: flex;
+flex-wrap: wrap;
+gap: 8px;
+margin: 10px 0;
+}
+.path-nav .btn {
+font-size: 12px;
+padding: 5px 15px;
+}
+.admin-actions {
+display: flex;
+gap: 15px;
+flex-wrap: wrap;
+margin-top: 10px;
+}
+.actions {
+margin-top: 25px;
+padding-top: 20px;
+border-top: 1px solid #e0e0e0;
+display: flex;
+gap: 15px;
+flex-wrap: wrap;
+}
+.admin-badge {
+display: inline-block;
+padding: 2px 12px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: 600;
+background: #9c27b0;
+color: white;
+margin-left: 8px;
+}
+.manager-badge {
+display: inline-block;
+padding: 2px 12px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: 600;
+background: #ff9800;
+color: white;
+margin-left: 8px;
+}
+.material-stats {
+display: flex;
+gap: 20px;
+flex-wrap: wrap;
+margin: 10px 0;
+}
+.stat-item {
+background: #e8eaf6;
+padding: 8px 20px;
+border-radius: 20px;
+font-size: 14px;
+}
+.stat-item strong {
+color: #1a237e;
+}
+.font-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 15px;
+}
+.font-item {
+display: flex;
+flex-direction: column;
+gap: 5px;
+}
+.font-item label {
+font-size: 13px;
+font-weight: 500;
+color: #333;
+}
+.font-item input {
+padding: 8px 12px;
+border: 2px solid #e0e0e0;
+border-radius: 8px;
+font-size: 14px;
+width: 100%;
+}
+.font-item input:focus {
+outline: none;
+border-color: #5c6bc0;
+}
+.font-item .hint {
+font-size: 12px;
+color: #999;
+}
+.font-section {
+background: #e8eaf6;
+padding: 15px;
+border-radius: 10px;
+margin: 10px 0;
+}
+.font-section h3 {
+color: #1a237e;
+font-size: 16px;
+margin-bottom: 10px;
+}
+@media (max-width: 768px) {
+.container { padding: 20px; }
+.settings-section { padding: 20px; }
+.form-row { flex-direction: column; }
+.form-row input { min-width: auto; }
+.actions { flex-direction: column; }
+.actions .btn { width: 100%; text-align: center; }
+.admin-actions { flex-direction: column; }
+.admin-actions .btn { width: 100%; text-align: center; }
+.font-grid { grid-template-columns: 1fr; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>
-            ⚙️ Настройки системы
-            {% if is_admin %}
-                <span class="admin-badge">Администратор</span>
-            {% endif %}
-        </h1>
-        <p class="subtitle">Управление параметрами программы</p>
+<div class="container">
+<h1>
+⚙️ Настройки системы
+{% if is_admin %}
+<span class="admin-badge">Администратор</span>
+{% elif is_manager %}
+<span class="manager-badge">Менеджер ОСЛ</span>
+{% endif %}
+</h1>
+<p class="subtitle">Управление параметрами программы</p>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }}">{{ message }}</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
 
-        <div class="settings-menu">
+<div class="settings-menu">
 
-            <!-- 1. Путь к папке с сохраненными этикетками -->
-            <div class="settings-section">
-                <h2>
-                    <span class="icon">📁</span>
-                    Путь к папке с сохраненными палетными этикетками
-                </h2>
-                <div class="desc">Выберите папку, где будут сохраняться сгенерированные палетные этикетки</div>
+<!-- 1. Путь к папке с сохраненными этикетками -->
+<div class="settings-section">
+<h2>
+<span class="icon">📁</span>
+Путь к папке с сохраненными палетными этикетками
+</h2>
+<div class="desc">Выберите папку, где будут сохраняться сгенерированные палетные этикетки</div>
 
-                <div class="current-path">
-                    <strong>Текущая папка:</strong> {{ settings.save_path }}
-                </div>
+<div class="current-path">
+<strong>Текущая папка:</strong> {{ settings.save_path }}
+</div>
 
-                <form method="POST">
-                    <div class="form-row">
-                        <input type="text" name="selected_path" placeholder="Введите путь к папке" value="{{ current_path }}">
-                        <button type="submit" class="btn btn-primary">💾 Сохранить путь</button>
-                    </div>
-                </form>
+<form method="POST">
+<div class="form-row">
+<input type="text" name="selected_path" placeholder="Введите путь к папке" value="{{ current_path }}">
+<button type="submit" class="btn btn-primary">💾 Сохранить путь</button>
+</div>
+</form>
 
-                <h3 style="font-size: 14px; color: #666; margin-top: 15px;">💾 Доступные диски</h3>
-                <div class="drive-list">
-                    {% for drive in drives %}
-                        <a href="/settings?path={{ drive }}" class="btn btn-secondary">{{ drive }}</a>
-                    {% endfor %}
-                </div>
+<h3 style="font-size: 14px; color: #666; margin-top: 15px;">💾 Доступные диски</h3>
+<div class="drive-list">
+{% for drive in drives %}
+<a href="/settings?path={{ drive }}" class="btn btn-secondary">{{ drive }}</a>
+{% endfor %}
+</div>
 
-                {% if subdirs %}
-                    <h3 style="font-size: 14px; color: #666; margin-top: 10px;">📂 Папки в текущей директории</h3>
-                    <div class="drive-list">
-                        {% for subdir in subdirs %}
-                            <a href="/settings?path={{ current_path }}{{ os_sep }}{{ subdir }}" class="btn btn-secondary">
-                                📁 {{ subdir }}
-                            </a>
-                        {% endfor %}
-                    </div>
-                {% endif %}
+{% if subdirs %}
+<h3 style="font-size: 14px; color: #666; margin-top: 10px;">📂 Папки в текущей директории</h3>
+<div class="drive-list">
+{% for subdir in subdirs %}
+<a href="/settings?path={{ current_path }}{{ os_sep }}{{ subdir }}" class="btn btn-secondary">
+📁 {{ subdir }}
+</a>
+{% endfor %}
+</div>
+{% endif %}
 
-                <div style="margin-top: 10px; padding: 12px; background: #f5f5f5; border-radius: 8px;">
-                    <p style="color: #999; font-size: 13px;">
-                        <strong>Текущий путь:</strong> {{ current_path }}
-                    </p>
-                    {% if path_parts %}
-                        <div class="path-nav">
-                            {% for part in path_parts %}
-                                <a href="/settings?path={{ part.path }}" class="btn btn-secondary">
-                                    {{ part.name }}
-                                </a>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+<div style="margin-top: 10px; padding: 12px; background: #f5f5f5; border-radius: 8px;">
+<p style="color: #999; font-size: 13px;">
+<strong>Текущий путь:</strong> {{ current_path }}
+</p>
+{% if path_parts %}
+<div class="path-nav">
+{% for part in path_parts %}
+<a href="/settings?path={{ part.path }}" class="btn btn-secondary">
+{{ part.name }}
+</a>
+{% endfor %}
+</div>
+{% endif %}
+</div>
+</div>
 
-            <!-- 2. Номер СОП (только для администратора) -->
-            {% if is_admin %}
-            <div class="settings-section" style="border-left-color: #ff9800;">
-                <h2>
-                    <span class="icon">📋</span>
-                    Номер СОП при формировании палетной этикетки
-                </h2>
-                <div class="desc">Редактирование последней строки, которая выводится на палетной этикетке</div>
+<!-- 2. Номер СОП (только для администратора) -->
+{% if is_admin %}
+<div class="settings-section" style="border-left-color: #ff9800;">
+<h2>
+<span class="icon">📋</span>
+Номер СОП при формировании палетной этикетки
+</h2>
+<div class="desc">Редактирование последней строки, которая выводится на палетной этикетке</div>
 
-                <div class="current-sop">
-                    <strong>Текущий номер СОП:</strong> {{ settings.sop_code }}
-                </div>
+<div class="current-sop">
+<strong>Текущий номер СОП:</strong> {{ settings.sop_code }}
+</div>
 
-                <form method="POST">
-                    <div class="form-row">
-                        <input type="text" name="sop_code" placeholder="Введите номер СОП" value="{{ settings.sop_code }}">
-                        <button type="submit" class="btn btn-settings">💾 Сохранить СОП</button>
-                    </div>
-                </form>
-                <div style="margin-top: 8px; font-size: 13px; color: #999;">
-                    <span>ℹ️ Пример: RUPD.VLG.05.04.C01</span>
-                </div>
-            </div>
-            {% endif %}
+<form method="POST">
+<div class="form-row">
+<input type="text" name="sop_code" placeholder="Введите номер СОП" value="{{ settings.sop_code }}">
+<button type="submit" class="btn btn-settings">💾 Сохранить СОП</button>
+</div>
+</form>
+<div style="margin-top: 8px; font-size: 13px; color: #999;">
+<span>ℹ️ Пример: RUPD.VLG.05.04.C01</span>
+</div>
+</div>
+{% endif %}
 
-            <!-- 3. Размеры шрифтов (доступны всем пользователям) -->
-            <div class="settings-section" style="border-left-color: #5c6bc0;">
-                <h2>
-                    <span class="icon">🔤</span>
-                    Размеры шрифтов и межстрочный интервал
-                </h2>
-                <div class="desc">Настройка размеров шрифтов и межстрочного интервала для этикеток</div>
+<!-- 3. Размеры шрифтов (доступны всем пользователям) -->
+<div class="settings-section" style="border-left-color: #5c6bc0;">
+<h2>
+<span class="icon">🔤</span>
+Размеры шрифтов и межстрочный интервал
+</h2>
+<div class="desc">Настройка размеров шрифтов и межстрочного интервала для этикеток</div>
 
-                <form method="POST">
-                    <div class="font-section">
-                        <h3>📌 Основные настройки</h3>
-                        <div class="font-grid">
-                            <div class="font-item">
-                                <label>ООО «Верофарм» (header)</label>
-                                <input type="number" name="header_size" value="{{ font_settings.get('header_size', 12) }}" min="8" max="24">
-                                <span class="hint">pt (8-24)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Название товара (короткое &lt;{{ font_settings.get('short_name_threshold', 25) }})</label>
-                                <input type="number" name="product_size_short" value="{{ font_settings.get('product_size_short', 80) }}" min="30" max="120">
-                                <span class="hint">pt (30-120)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Название товара (среднее {{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }})</label>
-                                <input type="number" name="product_size_medium" value="{{ font_settings.get('product_size_medium', 72) }}" min="30" max="120">
-                                <span class="hint">pt (30-120)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Название товара (длинное ≥{{ font_settings.get('medium_name_threshold', 40) }})</label>
-                                <input type="number" name="product_size_long" value="{{ font_settings.get('product_size_long', 64) }}" min="30" max="120">
-                                <span class="hint">pt (30-120)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Серия поставщика (короткая &lt;{{ font_settings.get('short_name_threshold', 25) }})</label>
-                                <input type="number" name="supplier_size_short" value="{{ font_settings.get('supplier_size_short', 42) }}" min="16" max="60">
-                                <span class="hint">pt (16-60)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Серия поставщика (средняя {{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }})</label>
-                                <input type="number" name="supplier_size_medium" value="{{ font_settings.get('supplier_size_medium', 42) }}" min="16" max="60">
-                                <span class="hint">pt (16-60)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Серия поставщика (длинная ≥{{ font_settings.get('medium_name_threshold', 40) }})</label>
-                                <input type="number" name="supplier_size_long" value="{{ font_settings.get('supplier_size_long', 36) }}" min="16" max="60">
-                                <span class="hint">pt (16-60)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Аналитический лист</label>
-                                <input type="number" name="analytic_size" value="{{ font_settings.get('analytic_size', 117) }}" min="40" max="180">
-                                <span class="hint">pt (40-180)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Код</label>
-                                <input type="number" name="code_size" value="{{ font_settings.get('code_size', 14) }}" min="8" max="24">
-                                <span class="hint">pt (8-24)</span>
-                            </div>
-                        </div>
-                    </div>
+<form method="POST">
+<div class="font-section">
+<h3>📌 Основные настройки</h3>
+<div class="font-grid">
+<div class="font-item">
+<label>ООО «Верофарм» (header)</label>
+<input type="number" name="header_size" value="{{ font_settings.get('header_size', 12) }}" min="8" max="24">
+<span class="hint">pt (8-24)</span>
+</div>
+<div class="font-item">
+<label>Название товара (короткое &lt;{{ font_settings.get('short_name_threshold', 25) }})</label>
+<input type="number" name="product_size_short" value="{{ font_settings.get('product_size_short', 80) }}" min="30" max="120">
+<span class="hint">pt (30-120)</span>
+</div>
+<div class="font-item">
+<label>Название товара (среднее {{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }})</label>
+<input type="number" name="product_size_medium" value="{{ font_settings.get('product_size_medium', 72) }}" min="30" max="120">
+<span class="hint">pt (30-120)</span>
+</div>
+<div class="font-item">
+<label>Название товара (длинное ≥{{ font_settings.get('medium_name_threshold', 40) }})</label>
+<input type="number" name="product_size_long" value="{{ font_settings.get('product_size_long', 64) }}" min="30" max="120">
+<span class="hint">pt (30-120)</span>
+</div>
+<div class="font-item">
+<label>Серия поставщика (короткая &lt;{{ font_settings.get('short_name_threshold', 25) }})</label>
+<input type="number" name="supplier_size_short" value="{{ font_settings.get('supplier_size_short', 42) }}" min="16" max="60">
+<span class="hint">pt (16-60)</span>
+</div>
+<div class="font-item">
+<label>Серия поставщика (средняя {{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }})</label>
+<input type="number" name="supplier_size_medium" value="{{ font_settings.get('supplier_size_medium', 42) }}" min="16" max="60">
+<span class="hint">pt (16-60)</span>
+</div>
+<div class="font-item">
+<label>Серия поставщика (длинная ≥{{ font_settings.get('medium_name_threshold', 40) }})</label>
+<input type="number" name="supplier_size_long" value="{{ font_settings.get('supplier_size_long', 36) }}" min="16" max="60">
+<span class="hint">pt (16-60)</span>
+</div>
+<div class="font-item">
+<label>Аналитический лист</label>
+<input type="number" name="analytic_size" value="{{ font_settings.get('analytic_size', 117) }}" min="40" max="180">
+<span class="hint">pt (40-180)</span>
+</div>
+<div class="font-item">
+<label>Код</label>
+<input type="number" name="code_size" value="{{ font_settings.get('code_size', 14) }}" min="8" max="24">
+<span class="hint">pt (8-24)</span>
+</div>
+</div>
+</div>
 
-                    <div class="font-section" style="margin-top: 15px;">
-                        <h3>📐 Межстрочный интервал в зависимости от длины названия</h3>
-                        <div class="font-grid">
-                            <div class="font-item">
-                                <label>Короткое название (&lt;{{ font_settings.get('short_name_threshold', 25) }} символов)</label>
-                                <input type="number" name="line_spacing_short" value="{{ font_settings.get('line_spacing_short', 1.5) }}" step="0.1" min="0.5" max="3.0">
-                                <span class="hint">(0.5-3.0)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Среднее название ({{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }} символов)</label>
-                                <input type="number" name="line_spacing_medium" value="{{ font_settings.get('line_spacing_medium', 1.0) }}" step="0.1" min="0.5" max="3.0">
-                                <span class="hint">(0.5-3.0)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Длинное название (≥{{ font_settings.get('medium_name_threshold', 40) }} символов)</label>
-                                <input type="number" name="line_spacing_long" value="{{ font_settings.get('line_spacing_long', 0.8) }}" step="0.1" min="0.5" max="3.0">
-                                <span class="hint">(0.5-3.0)</span>
-                            </div>
-                        </div>
-                    </div>
+<div class="font-section" style="margin-top: 15px;">
+<h3>📐 Межстрочный интервал в зависимости от длины названия</h3>
+<div class="font-grid">
+<div class="font-item">
+<label>Короткое название (&lt;{{ font_settings.get('short_name_threshold', 25) }} символов)</label>
+<input type="number" name="line_spacing_short" value="{{ font_settings.get('line_spacing_short', 1.5) }}" step="0.1" min="0.5" max="3.0">
+<span class="hint">(0.5-3.0)</span>
+</div>
+<div class="font-item">
+<label>Среднее название ({{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }} символов)</label>
+<input type="number" name="line_spacing_medium" value="{{ font_settings.get('line_spacing_medium', 1.0) }}" step="0.1" min="0.5" max="3.0">
+<span class="hint">(0.5-3.0)</span>
+</div>
+<div class="font-item">
+<label>Длинное название (≥{{ font_settings.get('medium_name_threshold', 40) }} символов)</label>
+<input type="number" name="line_spacing_long" value="{{ font_settings.get('line_spacing_long', 0.8) }}" step="0.1" min="0.5" max="3.0">
+<span class="hint">(0.5-3.0)</span>
+</div>
+</div>
+</div>
 
-                    <div class="font-section" style="margin-top: 15px; background: #fff3cd;">
-                        <h3>⚙️ Границы длины названия</h3>
-                        <div class="font-grid">
-                            <div class="font-item">
-                                <label>Максимальная длина короткого названия</label>
-                                <input type="number" name="short_name_threshold" value="{{ font_settings.get('short_name_threshold', 25) }}" min="10" max="35">
-                                <span class="hint">символов (10-35)</span>
-                            </div>
-                            <div class="font-item">
-                                <label>Минимальная длина длинного названия</label>
-                                <input type="number" name="medium_name_threshold" value="{{ font_settings.get('medium_name_threshold', 40) }}" min="30" max="55">
-                                <span class="hint">символов (30-55)</span>
-                            </div>
-                        </div>
-                    </div>
+<div class="font-section" style="margin-top: 15px; background: #fff3cd;">
+<h3>⚙️ Границы длины названия</h3>
+<div class="font-grid">
+<div class="font-item">
+<label>Максимальная длина короткого названия</label>
+<input type="number" name="short_name_threshold" value="{{ font_settings.get('short_name_threshold', 25) }}" min="10" max="35">
+<span class="hint">символов (10-35)</span>
+</div>
+<div class="font-item">
+<label>Минимальная длина длинного названия</label>
+<input type="number" name="medium_name_threshold" value="{{ font_settings.get('medium_name_threshold', 40) }}" min="30" max="55">
+<span class="hint">символов (30-55)</span>
+</div>
+</div>
+</div>
 
-                    <div style="margin-top: 15px;">
-                        <button type="submit" class="btn btn-font">💾 Сохранить настройки шрифтов</button>
-                    </div>
-                </form>
-            </div>
+<div style="margin-top: 15px;">
+<button type="submit" class="btn btn-font">💾 Сохранить настройки шрифтов</button>
+</div>
+</form>
+</div>
 
-            <!-- 4. Редактирование мастер-данных материалов (только для администратора) -->
-            {% if is_admin %}
-            <div class="settings-section" style="border-left-color: #00897b;">
-                <h2>
-                    <span class="icon">📦</span>
-                    Редактирование мастер-данных материалов
-                </h2>
-                <div class="desc">Управление базой материалов: просмотр, редактирование и импорт данных о палетизации</div>
+<!-- 4. Редактирование мастер-данных материалов (доступно для Администратора и Менеджера ОСЛ) -->
+{% if is_manager %}
+<div class="settings-section" style="border-left-color: #00897b;">
+<h2>
+<span class="icon">📦</span>
+Редактирование мастер-данных сырья и материалов
+</h2>
+<div class="desc">Управление базой материалов: просмотр, редактирование и импорт данных о палетизации</div>
 
-                <div class="material-stats">
-                    <span class="stat-item">📊 Всего материалов: <strong>{{ material_count }}</strong></span>
-                </div>
+<div class="material-stats">
+<span class="stat-item">📊 Всего материалов: <strong>{{ material_count }}</strong></span>
+</div>
 
-                <div class="admin-actions">
-                    <a href="/materials" class="btn btn-materials">📋 Редактировать материалы</a>
-                    <a href="/materials/import" class="btn btn-settings">📤 Загрузить данные о палетизации</a>
-                </div>
-            </div>
-            {% endif %}
+<div class="admin-actions">
+<a href="/materials" class="btn btn-materials">📋 Редактировать материалы</a>
+<a href="/materials/import" class="btn btn-settings">📤 Загрузить данные о палетизации</a>
+</div>
+</div>
+{% endif %}
 
-            <!-- 5. База пользователей (только для администратора) -->
-            {% if is_admin %}
-            <div class="settings-section" style="border-left-color: #9c27b0;">
-                <h2>
-                    <span class="icon">👥</span>
-                    База пользователей
-                </h2>
-                <div class="desc">Управление пользователями системы: создание, редактирование, блокировка и удаление учетных записей</div>
+<!-- 5. База пользователей (доступна для Администратора и Менеджера ОСЛ) -->
+{% if is_manager %}
+<div class="settings-section" style="border-left-color: #9c27b0;">
+<h2>
+<span class="icon">👥</span>
+База пользователей
+</h2>
+<div class="desc">Управление пользователями системы: создание, редактирование, блокировка и удаление учетных записей</div>
 
-                <div class="admin-actions">
-                    <a href="/admin" class="btn btn-admin">👥 Перейти к управлению пользователями</a>
-                </div>
-            </div>
-            {% endif %}
+<div class="admin-actions">
+<a href="/admin" class="btn btn-admin">👥 Перейти к управлению пользователями</a>
+</div>
+</div>
+{% endif %}
 
-        </div>
+</div>
 
-        <div class="actions">
-            <a href="/" class="btn btn-settings">🏠 На главную</a>
-            <a href="/change_password" class="btn btn-secondary">🔑 Сменить пароль</a>
-            <a href="/logout" class="btn btn-danger">🚪 Выйти</a>
-        </div>
-    </div>
+<div class="actions">
+<a href="/" class="btn btn-settings">🏠 На главную</a>
+<a href="/change_password" class="btn btn-secondary">🔑 Сменить пароль</a>
+<a href="/logout" class="btn btn-danger">🚪 Выйти</a>
+</div>
+</div>
 </body>
 </html>

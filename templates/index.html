@@ -3,56 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Система формирования палетных этикеток</title>
+    <title>АРМ ОСЛ</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 20px;
         }
-
         .container {
+            max-width: 800px;
+            margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
-            padding: 50px;
-            max-width: 800px;
-            width: 100%;
+            padding: 40px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
         }
-
         .header {
             text-align: center;
             margin-bottom: 30px;
         }
-
         .header h1 {
             color: #1a237e;
-            font-size: 2.2em;
-            margin-bottom: 5px;
+            font-size: 2em;
             font-weight: 600;
         }
-
         .header .subtitle {
             color: #4a6fa5;
             font-size: 1.1em;
-            font-weight: 300;
         }
-
         .greeting {
             text-align: center;
-            font-size: 1.3em;
+            font-size: 1.1em;
             color: #1a237e;
             margin-bottom: 25px;
             padding: 15px;
@@ -60,186 +43,64 @@
             border-radius: 12px;
             border-left: 4px solid #4caf50;
         }
-
         .greeting .user-name {
             font-weight: 600;
             color: #2e7d32;
         }
-
-        .menu {
-            display: flex;
-            flex-direction: column;
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
+            margin-bottom: 20px;
         }
-
+        @media (max-width: 600px) {
+            .menu-grid {
+                grid-template-columns: 1fr;
+            }
+        }
         .menu-item {
-            background: linear-gradient(135deg, #e8f5e9, #e1f5fe);
+            background: #f8f9fa;
             border-radius: 15px;
-            padding: 20px 25px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
             transition: all 0.3s ease;
             border: 2px solid transparent;
+            text-decoration: none;
+            color: #333;
+            display: block;
         }
-
         .menu-item:hover {
             transform: translateY(-3px);
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             border-color: #4caf50;
+            background: #e8f5e9;
         }
-
         .menu-item .icon {
-            font-size: 2em;
-            margin-right: 15px;
-        }
-
-        .menu-item .title {
-            font-size: 1.3em;
-            color: #1a237e;
-            font-weight: 500;
-        }
-
-        .menu-item .description {
-            color: #546e7a;
-            margin-top: 5px;
-            font-size: 0.95em;
-        }
-
-        .upload-area {
-            border: 2px dashed #4caf50;
-            border-radius: 15px;
-            padding: 40px;
-            text-align: center;
-            background: rgba(76, 175, 80, 0.05);
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .upload-area:hover {
-            background: rgba(76, 175, 80, 0.1);
-            border-color: #388e3c;
-        }
-
-        .upload-area .upload-icon {
-            font-size: 4em;
-            color: #4caf50;
-            margin-bottom: 15px;
-        }
-
-        .upload-area h3 {
-            color: #1a237e;
+            font-size: 2.5em;
             margin-bottom: 10px;
+            display: block;
         }
-
-        .upload-area p {
-            color: #78909c;
-        }
-
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-            margin-top: 20px;
-        }
-
-        .file-input-wrapper input[type="file"] {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-
-        .btn {
-            padding: 12px 35px;
-            border: none;
-            border-radius: 50px;
+        .menu-item .title {
             font-size: 1.1em;
             font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-            text-decoration: none;
-            display: inline-block;
+            color: #1a237e;
         }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #4caf50, #66bb6a);
-            color: white;
+        .menu-item .description {
+            font-size: 0.85em;
+            color: #78909c;
+            margin-top: 5px;
         }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(76, 175, 80, 0.4);
-            background: linear-gradient(135deg, #43a047, #4caf50);
-        }
-
-        .btn-primary:disabled {
+        .menu-item.disabled {
             opacity: 0.6;
-            cursor: not-allowed;
+            cursor: default;
+        }
+        .menu-item.disabled:hover {
             transform: none;
+            box-shadow: none;
+            border-color: transparent;
+            background: #f8f9fa;
         }
-
-        .btn-secondary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
-        }
-
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, #1e88e5, #42a5f5);
-            box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
-        }
-
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #d32f2f, #e53935);
-            box-shadow: 0 6px 25px rgba(244, 67, 54, 0.4);
-        }
-
-        .btn-settings {
-            background: linear-gradient(135deg, #ff9800, #ffa726);
-            color: white;
-            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
-        }
-
-        .btn-settings:hover {
-            background: linear-gradient(135deg, #f57c00, #fb8c00);
-            box-shadow: 0 6px 25px rgba(255, 152, 0, 0.4);
-        }
-
-        .btn-admin {
-            background: linear-gradient(135deg, #9c27b0, #ab47bc);
-            color: white;
-            box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
-        }
-
-        .btn-admin:hover {
-            background: linear-gradient(135deg, #7b1fa2, #8e24aa);
-            box-shadow: 0 6px 25px rgba(156, 39, 176, 0.4);
-        }
-
-        .btn-last {
-            background: linear-gradient(135deg, #00bcd4, #26c6da);
-            color: white;
-            box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
-        }
-
-        .btn-last:hover {
-            background: linear-gradient(135deg, #0097a7, #00acc1);
-            box-shadow: 0 6px 25px rgba(0, 188, 212, 0.4);
-        }
-
-        .file-name {
-            margin-top: 15px;
-            color: #4a6fa5;
-            font-size: 0.95em;
-        }
-
         .menu-footer {
             margin-top: 20px;
             padding-top: 20px;
@@ -249,206 +110,121 @@
             gap: 15px;
             flex-wrap: wrap;
         }
-
+        .btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+        .btn-settings {
+            background: linear-gradient(135deg, #ff9800, #ffa726);
+            color: white;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #2196f3, #64b5f6);
+            color: white;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: white;
+        }
         .flash-messages {
             margin-bottom: 15px;
         }
-
         .flash-message {
             padding: 12px 20px;
             border-radius: 10px;
             margin-bottom: 8px;
             font-weight: 500;
         }
-
-        .flash-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .flash-danger {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .flash-warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-
-        .flash-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 15px;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 30px 20px;
-            }
-
-            .header h1 {
-                font-size: 1.8em;
-            }
-
-            .menu-item {
-                padding: 15px;
-            }
-
-            .menu-footer {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .menu-footer .btn {
-                width: 100%;
-                text-align: center;
-            }
-
-            .button-group {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .button-group .btn {
-                width: 100%;
-                text-align: center;
-            }
-        }
+        .flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .flash-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🏭 Система формирования палетных этикеток</h1>
-            <div class="subtitle">Автоматическое извлечение данных из приходных ордеров</div>
-        </div>
+<div class="container">
+    <div class="header">
+        <h1>🏭 Автоматизированное рабочее место ОСЛ</h1>
+        <div class="subtitle">Управление складскими операциями</div>
+    </div>
 
-        <!-- Приветствие -->
-        <div class="greeting">
-            👋 Добрый день, <span class="user-name">{{ session.user_fname }} {{ session.user_lname }}</span>!
-            <div style="font-size: 0.7em; color: #546e7a; margin-top: 5px;">
-                {{ session.user_rights }} | {{ session.user_plant }}
-            </div>
-        </div>
-
-        <!-- Flash сообщения -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
-        <div class="menu">
-            <div class="menu-item">
-                <div style="display: flex; align-items: center;">
-                    <span class="icon">📦</span>
-                    <div>
-                        <div class="title">Сформировать палетные этикетки</div>
-                        <div class="description">Загрузите приходный ордер в формате PDF для автоматического извлечения данных</div>
-                    </div>
-                </div>
-            </div>
-
-            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">📄</div>
-                    <h3>Загрузите PDF-файл</h3>
-                    <p>Перетащите файл сюда или нажмите для выбора</p>
-
-                    <div class="file-input-wrapper">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
-                            Выбрать файл
-                        </button>
-                        <input type="file" name="file" id="fileInput" accept=".pdf" required>
-                    </div>
-
-                    <div class="file-name" id="fileName">Файл не выбран</div>
-                </div>
-
-                <div class="button-group">
-                    <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
-                        🔄 Извлечь данные
-                    </button>
-                    <form action="/upload_last" method="post" style="display: inline;">
-                        <button type="submit" class="btn btn-last" id="lastBtn">
-                            📂 Загрузить последний приходный ордер
-                        </button>
-                    </form>
-                </div>
-            </form>
-
-            <div class="menu-footer">
-                <a href="/settings" class="btn btn-settings">⚙️ Настройки</a>
-                {% if session.user_rights == 'Администратор' %}
-                    <a href="/admin" class="btn btn-admin">👥 База пользователей</a>
-                {% endif %}
-                <a href="/change_password" class="btn btn-secondary">🔑 Сменить пароль</a>
-                <a href="/logout" class="btn btn-danger">🚪 Выйти</a>
-            </div>
+    <div class="greeting">
+        👋 Добрый день, <span class="user-name">{{ session.user_fname }} {{ session.user_lname }}</span>!
+        <div style="font-size: 0.7em; color: #546e7a; margin-top: 5px;">
+            {{ session.user_rights }} | {{ session.user_plant }}
         </div>
     </div>
 
-    <script>
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const fileName = e.target.files[0]?.name || 'Файл не выбран';
-            document.getElementById('fileName').textContent = fileName;
-            document.getElementById('submitBtn').disabled = !e.target.files[0];
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
 
-            if (e.target.files[0]) {
-                document.getElementById('submitBtn').textContent = '📊 Извлечь данные';
-                document.getElementById('uploadArea').style.borderColor = '#388e3c';
-                document.getElementById('uploadArea').style.background = 'rgba(76, 175, 80, 0.1)';
-            }
-        });
+    <div class="menu-grid">
+        <!-- 1. Сформировать палетные этикетки (СиМ) -->
+        {% set has_labels_access = session.user_rights in ['Администратор', 'Оператор СиМ', 'Менеджер ОСЛ'] and session.user_plant == 'Вольгинский' %}
+        <a href="{{ url_for('upload_form') if has_labels_access else url_for('functionality_not_available') }}"
+           class="menu-item {% if not has_labels_access %}disabled{% endif %}">
+            <span class="icon">📦</span>
+            <div class="title">Сформировать палетные этикетки (СиМ)</div>
+            <div class="description">Загрузка приходного ордера в PDF</div>
+        </a>
 
-        const uploadArea = document.getElementById('uploadArea');
+        <!-- 2. Сформировать стеллажную карту (СиМ) -->
+        <a href="{{ url_for('functionality_not_available') }}" class="menu-item">
+            <span class="icon">🏷️</span>
+            <div class="title">Сформировать стеллажную карту (СиМ)</div>
+            <div class="description">Формирование стеллажных карт</div>
+        </a>
 
-        uploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#2196f3';
-            this.style.background = 'rgba(33, 150, 243, 0.1)';
-        });
+        <!-- 3. Сформировать транспортную заявку в РТЭ -->
+        <a href="{{ url_for('functionality_not_available') }}" class="menu-item">
+            <span class="icon">🚛</span>
+            <div class="title">Сформировать транспортную заявку в РТЭ</div>
+            <div class="description">Создание заявок на перевозку</div>
+        </a>
 
-        uploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#4caf50';
-            this.style.background = 'rgba(76, 175, 80, 0.05)';
-        });
+        <!-- 4. Сформировать ТТН (наем и собств) -->
+        <a href="{{ url_for('functionality_not_available') }}" class="menu-item">
+            <span class="icon">📄</span>
+            <div class="title">Сформировать ТТН (наем и собств)</div>
+            <div class="description">Товарно-транспортные накладные</div>
+        </a>
 
-        uploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#4caf50';
-            this.style.background = 'rgba(76, 175, 80, 0.05)';
+        <!-- 5. Настройки -->
+        <a href="{{ url_for('settings_page') }}" class="menu-item">
+            <span class="icon">⚙️</span>
+            <div class="title">Настройки</div>
+            <div class="description">Параметры системы и управление</div>
+        </a>
 
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const file = files[0];
-                if (file.type === 'application/pdf') {
-                    document.getElementById('fileInput').files = files;
-                    document.getElementById('fileName').textContent = file.name;
-                    document.getElementById('submitBtn').disabled = false;
-                    document.getElementById('submitBtn').textContent = '📊 Извлечь данные';
-                } else {
-                    alert('Пожалуйста, загрузите файл в формате PDF');
-                }
-            }
-        });
-    </script>
+        <!-- 6. Смена пароля -->
+        <a href="{{ url_for('change_password') }}" class="menu-item">
+            <span class="icon">🔑</span>
+            <div class="title">Смена пароля</div>
+            <div class="description">Изменение пароля пользователя</div>
+        </a>
+    </div>
+
+    <div class="menu-footer">
+        <a href="/logout" class="btn btn-danger">🚪 Выйти</a>
+    </div>
+</div>
 </body>
 </html>
