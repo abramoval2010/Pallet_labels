@@ -4,4 +4,4 @@ python-docx==0.8.11
 Werkzeug==2.3.6
 gunicorn==22.0.0
 setuptools==68.2.2
-PyMuPDF==1.23.26
+PyMuPDF==1.22.5
