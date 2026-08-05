@@ -274,284 +274,171 @@ def extract_data_from_pdf(pdf_path):
     # Находим строку с "14" (маркер начала данных)
     marker_index = -1
     for i, line in enumerate(table_lines):
-        # Ищем строку, содержащую "14" (номер колонки)
-        if re.search(r'\b14\b', line) and '1 2 3 4 5 6 7 8 9 10 11 12 13 14' in line:
+        if re.search(r'\b14\b', line):
             marker_index = i
             print(f" ✅ Найден маркер '14' в строке {i + 1} (внутри таблицы): {line}")
             break
 
     if marker_index == -1:
-        print(" ⚠️ Маркер '14' не найден, используем поиск по строкам")
-        # Пробуем найти просто строку с 14
-        for i, line in enumerate(table_lines):
-            if re.search(r'\b14\b', line):
-                marker_index = i
-                print(f" ✅ Найден маркер '14' (альтернативный) в строке {i + 1}: {line}")
-                break
+        print(" ⚠️ Маркер '14' не найден, пытаемся парсить без него")
+        marker_index = 0
 
-    if marker_index == -1:
-        print(" ⚠️ Маркер '14' не найден, парсинг невозможен")
-        return result
-
-    # Парсим товары
-    products = []
-    current_pos = marker_index + 1  # Начинаем со строки после "14"
-
-    while current_pos < len(table_lines):
-        line = table_lines[current_pos]
-
-        # Проверяем, не достигли ли конца таблицы
-        if 'Итого' in line or 'X' in line or 'x' in line:
-            print(f"  🛑 Достигнут конец таблицы на строке {current_pos + 1}")
-            break
-
-        # Проверяем, не является ли строка служебной
-        if any(keyword in line.lower() for keyword in ['принял', 'сдал', 'должность', 'подпись']):
-            print(f"  🛑 Служебная строка на позиции {current_pos + 1}, останавливаем парсинг")
-            break
-
-        # Проверяем, не является ли строка служебным номером
-        if re.match(r'^\d+$', line) and len(line) <= 3:
-            current_pos += 1
-            continue
-
-        # Ищем номенклатурный номер (8 цифр)
+    # Находим все позиции SAP-кодов
+    sap_positions = []
+    for idx, line in enumerate(table_lines):
         nomencl_match = re.search(r'\b(\d{8})\b', line)
         if nomencl_match:
             nomencl_number = nomencl_match.group(1)
-
-            # Проверяем, что это не ОКПО и не другие служебные номера
             if (not nomencl_number.startswith(('8', '7')) and
                     nomencl_number not in ['48797491', '21000101', '0315003']):
+                sap_positions.append(idx)
 
-                print(f"\n  🔍 Найден номенклатурный номер: {nomencl_number} в строке {current_pos + 1}")
+    print(f"  Найдено SAP-кодов: {len(sap_positions)}")
 
-                # Собираем название товара (строки от marker_index + 1 до current_pos - 1)
-                product_name_parts = []
+    # Парсим товары
+    products = []
 
-                # Идем от current_pos - 1 вниз до marker_index + 1
-                for k in range(current_pos - 1, marker_index, -1):
-                    name_line = table_lines[k]
-                    # Проверяем, что строка содержит буквы и не является служебной
-                    # и не содержит цифр (чтобы не захватить номенклатурный номер)
-                    if (re.search(r'[А-ЯЁA-Z]', name_line) and
-                            not re.match(r'^\d+$', name_line) and
-                            not any(
-                                keyword in name_line.lower() for keyword in ['итого', 'x', 'принял', 'сдал', 'номер'])):
-                        # Добавляем в начало списка, чтобы сохранить порядок
-                        product_name_parts.insert(0, name_line)
-                    else:
-                        # Если встретили строку с цифрами или служебную - останавливаемся
-                        break
+    # Для каждого SAP-кода собираем данные
+    for pos_idx, sap_idx in enumerate(sap_positions):
+        nomencl_number = re.search(r'\b(\d{8})\b', table_lines[sap_idx]).group(1)
+        print(f"\n  🔍 Обработка SAP-кода: {nomencl_number} в строке {sap_idx + 1}")
 
-                product_name = ' '.join(product_name_parts).strip() if product_name_parts else 'Не указано'
-                print(f"  📦 Название товара: {product_name[:80]}...")
+        # --- СОБИРАЕМ НАЗВАНИЕ ТОВАРА ---
+        # Для первого товара: от маркера "14" до первого SAP-кода
+        # Для остальных: от (предыдущий SAP + 10) до текущего SAP
+        if pos_idx == 0:
+            start_search = marker_index + 1
+        else:
+            start_search = sap_positions[pos_idx - 1] + 10
 
-                # Находим количество (через 4 строки после номенклатурного номера)
-                quantity_row_index = current_pos + 4
-                quantity = None
-                if quantity_row_index < len(table_lines):
-                    quantity_line = table_lines[quantity_row_index]
-                    # Ищем число с пробелами между разрядами (например "648 000")
-                    quantity_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)\s*ШТ', quantity_line)
-                    if quantity_match:
-                        qty_str = quantity_match.group(1).replace(' ', '')
+        end_search = sap_idx
+
+        product_name_parts = []
+        for j in range(start_search, end_search):
+            if j < len(table_lines):
+                product_name_parts.append(table_lines[j])
+
+        product_name = ' '.join(product_name_parts).strip() if product_name_parts else 'Не указано'
+        print(f"  📦 Название товара: {product_name[:80]}...")
+
+        # --- ИЗВЛЕКАЕМ КОЛИЧЕСТВО (через 4 строки после SAP-кода) ---
+        quantity_row = sap_idx + 4
+        quantity = None
+        if quantity_row < len(table_lines):
+            quantity_line = table_lines[quantity_row]
+            # Ищем число с пробелами между разрядами (например "648 000")
+            qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)\s*ШТ', quantity_line)
+            if qty_match:
+                qty_str = qty_match.group(1).replace(' ', '')
+                try:
+                    quantity = int(qty_str)
+                    print(f"  📊 Количество (строка {quantity_row + 1}): {quantity}")
+                except:
+                    pass
+            else:
+                # Пробуем найти просто число в строке
+                alt_qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)', quantity_line)
+                if alt_qty_match:
+                    qty_str = alt_qty_match.group(1).replace(' ', '')
+                    try:
+                        quantity = int(qty_str)
+                        print(f"  📊 Количество (строка {quantity_row + 1}, альтернативное): {quantity}")
+                    except:
+                        pass
+
+        # Если не нашли количество, пробуем в строках +3, +4, +5
+        if quantity is None:
+            for offset in [3, 4, 5]:
+                check_row = sap_idx + offset
+                if check_row < len(table_lines):
+                    check_line = table_lines[check_row]
+                    qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)\s*ШТ', check_line)
+                    if qty_match:
+                        qty_str = qty_match.group(1).replace(' ', '')
                         try:
                             quantity = int(qty_str)
-                            print(f"  📊 Количество (строка {quantity_row_index + 1}): {quantity}")
+                            print(f"  📊 Количество (строка {check_row + 1}, поиск по диапазону): {quantity}")
+                            break
                         except:
                             pass
-                    else:
-                        # Пробуем найти просто число в строке
-                        alt_quantity_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)', quantity_line)
-                        if alt_quantity_match:
-                            qty_str = alt_quantity_match.group(1).replace(' ', '')
-                            try:
-                                quantity = int(qty_str)
-                                print(f"  📊 Количество (строка {quantity_row_index + 1}, альтернативное): {quantity}")
-                            except:
-                                pass
 
-                # Если не нашли количество, пробуем поискать в других строках
-                if quantity is None:
-                    for offset in [3, 4, 5, 6]:
-                        check_row = current_pos + offset
-                        if check_row < len(table_lines):
-                            check_line = table_lines[check_row]
-                            qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)\s*ШТ', check_line)
-                            if qty_match:
-                                qty_str = qty_match.group(1).replace(' ', '')
-                                try:
-                                    quantity = int(qty_str)
-                                    print(f"  📊 Количество (строка {check_row + 1}, поиск по диапазону): {quantity}")
-                                    break
-                                except:
-                                    pass
+        # --- ИЗВЛЕКАЕМ АНАЛИТИЧЕСКИЙ ЛИСТ (через 7 строк после SAP-кода) ---
+        analytic_row = sap_idx + 7
+        analytic_list = None
+        if analytic_row < len(table_lines):
+            analytic_line = table_lines[analytic_row]
+            # Ищем 10-значное число
+            analytic_match = re.search(r'\b(\d{10})\b', analytic_line)
+            if analytic_match:
+                potential = analytic_match.group(1)
+                if not potential.startswith('49'):
+                    analytic_list = potential
+                    print(f"  📋 Аналитический лист (строка {analytic_row + 1}): {analytic_list}")
+            else:
+                # Пробуем найти 10 цифр в строке (без границ слова)
+                alt_match = re.search(r'(\d{10})', analytic_line)
+                if alt_match:
+                    potential = alt_match.group(1)
+                    if not potential.startswith('49'):
+                        analytic_list = potential
+                        print(f"  📋 Аналитический лист (строка {analytic_row + 1}, альтернативный): {analytic_list}")
 
-                # Находим аналитический лист (через 7 строк после номенклатурного номера)
-                analytic_row_index = current_pos + 7
-                analytic_list = None
-                if analytic_row_index < len(table_lines):
-                    analytic_line = table_lines[analytic_row_index]
-                    analytic_match = re.search(r'\b(\d{10})\b', analytic_line)
-                    if analytic_match:
-                        potential_analytic = analytic_match.group(1)
-                        # Проверяем, что это не номер заказа (начинается с 49)
-                        if not potential_analytic.startswith('49'):
-                            analytic_list = potential_analytic
-                            print(f"  📋 Аналитический лист (строка {analytic_row_index + 1}): {analytic_list}")
-                        else:
-                            print(f"  ⚠️ Найден номер заказа вместо АЛ: {potential_analytic}")
-                    else:
-                        # Пробуем найти 10-значное число в строке
-                        alt_match = re.search(r'\b(\d{10})\b', analytic_line)
-                        if alt_match:
-                            potential_analytic = alt_match.group(1)
-                            if not potential_analytic.startswith('49'):
-                                analytic_list = potential_analytic
-                                print(
-                                    f"  📋 Аналитический лист (строка {analytic_row_index + 1}, альтернативный): {analytic_list}")
+        # Если не нашли, пробуем в строках +6, +7, +8
+        if analytic_list is None:
+            for offset in [6, 7, 8]:
+                check_row = sap_idx + offset
+                if check_row < len(table_lines):
+                    check_line = table_lines[check_row]
+                    check_match = re.search(r'\b(\d{10})\b', check_line)
+                    if check_match:
+                        potential = check_match.group(1)
+                        if not potential.startswith('49'):
+                            analytic_list = potential
+                            print(
+                                f"  📋 Аналитический лист (строка {check_row + 1}, поиск по диапазону): {analytic_list}")
+                            break
 
-                # Если не нашли аналитический лист, пробуем поискать в других строках
-                if analytic_list is None:
-                    # Пробуем в строках +7, +8, +9
-                    for offset in [7, 8, 9, 10]:
-                        check_row = current_pos + offset
-                        if check_row < len(table_lines):
-                            check_line = table_lines[check_row]
-                            check_match = re.search(r'\b(1\d{9})\b', check_line)
-                            if check_match:
-                                potential_analytic = check_match.group(1)
-                                if not potential_analytic.startswith('49'):
-                                    analytic_list = potential_analytic
-                                    print(
-                                        f"  📋 Аналитический лист (строка {check_row + 1}, поиск по диапазону): {analytic_list}")
-                                    break
+        # --- ИЗВЛЕКАЕМ ПАРТИЮ ПОСТАВЩИКА (строго через 8 строк после SAP-кода) ---
+        supplier_row = sap_idx + 8
+        supplier_batch = None
+        if supplier_row < len(table_lines):
+            supplier_line = table_lines[supplier_row]
+            # Берем всю строку целиком как партию поставщика
+            if supplier_line.strip():
+                supplier_batch = supplier_line.strip()
+                print(f"  🏷️ Партия поставщика (строка {supplier_row + 1}): {supplier_batch}")
 
-                # Находим партию поставщика (через 8 строк после номенклатурного номера)
-                supplier_row_index = current_pos + 8
-                supplier_batch = None
-                if supplier_row_index < len(table_lines):
-                    supplier_line = table_lines[supplier_row_index]
-                    # Ищем партию - берем все, что не является датой и не является числом
-                    # Убираем из строки все, что похоже на дату
-                    clean_line = re.sub(r'\d{2}\.\d{2}\.\d{4}', '', supplier_line).strip()
-                    if clean_line:
-                        # Берем всю оставшуюся строку как партию
-                        supplier_batch = clean_line
-                        print(f"  🏷️ Партия поставщика (строка {supplier_row_index + 1}): {supplier_batch}")
-                    else:
-                        # Если строка пустая после удаления даты, пробуем найти что-то похожее на партию
-                        # Ищем последовательность букв, цифр, тире, слешей, точек
-                        batch_match = re.search(r'([A-Za-zА-Яа-я0-9\-/\.]{4,})', supplier_line)
-                        if batch_match:
-                            potential_batch = batch_match.group(1)
-                            # Проверяем, что это не дата
-                            if not re.match(r'^\d{2}\.\d{2}\.\d{4}$', potential_batch):
-                                supplier_batch = potential_batch
-                                print(
-                                    f"  🏷️ Партия поставщика (строка {supplier_row_index + 1}, альтернативная): {supplier_batch}")
+        # --- ИЗВЛЕКАЕМ СРОК ГОДНОСТИ ---
+        expiration_date = None
+        for offset in [7, 8, 9, 10]:
+            check_row = sap_idx + offset
+            if check_row < len(table_lines):
+                check_line = table_lines[check_row]
+                exp_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', check_line)
+                if exp_match:
+                    exp_date = exp_match.group(1)
+                    if exp_date != result.get('дата_приемки'):
+                        expiration_date = exp_date
+                        print(f"  📅 Срок годности (строка {check_row + 1}): {expiration_date}")
+                        break
 
-                # Находим срок годности
-                expiration_date = None
-                # Ищем в строке с аналитическим листом или партией
-                for check_row in [analytic_row_index, supplier_row_index, current_pos + 6, current_pos + 9,
-                                  current_pos + 10]:
-                    if check_row < len(table_lines):
-                        check_line = table_lines[check_row]
-                        exp_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', check_line)
-                        if exp_match:
-                            exp_date = exp_match.group(1)
-                            # Проверяем, что это не дата приемки
-                            if exp_date != result.get('дата_приемки'):
-                                expiration_date = exp_date
-                                print(f"  📅 Срок годности (строка {check_row + 1}): {expiration_date}")
-                                break
-
-                # Добавляем товар
-                if analytic_list:
-                    product_data = {
-                        'наименование': product_name,
-                        'номенклатурный_номер': nomencl_number,
-                        'аналитический_лист': analytic_list,
-                        'партия_поставщика': supplier_batch,
-                        'срок_годности': expiration_date,
-                        'количество': quantity
-                    }
-                    products.append(product_data)
-                    print(f"  ✅ Товар добавлен: {product_name[:50]}... (АЛ: {analytic_list})")
-                else:
-                    print(f"  ⚠️ Товар пропущен (нет аналитического листа): {product_name[:50]}...")
-
-                # Переходим к следующему товару (через 10 строк после номенклатурного номера)
-                current_pos = current_pos + 10
-                continue
-
-        current_pos += 1
+        # --- ДОБАВЛЯЕМ ТОВАР ---
+        if analytic_list:
+            product_data = {
+                'наименование': product_name,
+                'номенклатурный_номер': nomencl_number,
+                'аналитический_лист': analytic_list,
+                'партия_поставщика': supplier_batch,
+                'срок_годности': expiration_date,
+                'количество': quantity
+            }
+            products.append(product_data)
+            print(f"  ✅ Товар добавлен: {product_name[:50]}... (АЛ: {analytic_list})")
+        else:
+            print(f"  ⚠️ Товар пропущен (нет аналитического листа): {product_name[:50]}...")
 
     result['товары'] = products
     print(f"\n📊 Всего найдено товаров: {len(products)}")
-
-    # Если товары не найдены, пробуем альтернативный метод - поиск по таблице
-    if len(products) == 0:
-        print("\n🔄 Пробуем альтернативный метод парсинга...")
-        # Ищем строки с датами (срок годности) и собираем данные из них
-        for i, line in enumerate(table_lines):
-            # Ищем дату в формате ДД.ММ.ГГГГ (и не дату приемки)
-            date_match = re.search(r'\b(\d{2}\.\d{2}\.20\d{2})\b', line)
-            if date_match:
-                exp_date = date_match.group(1)
-                if exp_date != result.get('дата_приемки'):
-                    # Проверяем, есть ли в строке 8-значный номер
-                    nomencl_match = re.search(r'\b(\d{8})\b', line)
-                    if nomencl_match:
-                        nomencl_number = nomencl_match.group(1)
-                        if not nomencl_number.startswith(('8', '7')):
-                            # Извлекаем аналитический лист
-                            analytic_match = re.search(r'\b(1\d{9})\b', line)
-                            if analytic_match:
-                                analytic_list = analytic_match.group(1)
-                                if not analytic_list.startswith('49'):
-                                    # Ищем количество
-                                    quantity_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)\s*ШТ', line)
-                                    quantity = None
-                                    if quantity_match:
-                                        qty_str = quantity_match.group(1).replace(' ', '')
-                                        try:
-                                            quantity = int(qty_str)
-                                        except:
-                                            pass
-
-                                    # Собираем название (предыдущие строки)
-                                    product_name_parts = []
-                                    j = i - 1
-                                    while j >= 0:
-                                        prev_line = table_lines[j]
-                                        if (re.search(r'[А-ЯЁA-Z]', prev_line) and
-                                                not re.match(r'^\d', prev_line) and
-                                                not any(keyword in prev_line.lower() for keyword in
-                                                        ['итого', 'x', 'принял', 'сдал'])):
-                                            product_name_parts.insert(0, prev_line)
-                                            j -= 1
-                                        else:
-                                            break
-
-                                    product_name = ' '.join(
-                                        product_name_parts).strip() if product_name_parts else 'Не указано'
-
-                                    product_data = {
-                                        'наименование': product_name,
-                                        'номенклатурный_номер': nomencl_number,
-                                        'аналитический_лист': analytic_list,
-                                        'партия_поставщика': None,
-                                        'срок_годности': exp_date,
-                                        'количество': quantity
-                                    }
-                                    products.append(product_data)
-                                    print(f"  ✅ Товар добавлен (альтернативный метод): {product_name[:50]}...")
-
-        result['товары'] = products
-        print(f"\n📊 Всего найдено товаров (после альтернативного метода): {len(products)}")
 
     print(f"\n{'=' * 60}")
     print(f"📊 РЕЗУЛЬТАТ ПАРСИНГА:")
@@ -2121,16 +2008,12 @@ def upload_file():
                         material = materials_db.get_material_by_sap(sap_code_int)
                         if material:
                             product['palletization'] = material.get('palletization', 0)
-                            product['material_found'] = True
                         else:
                             product['palletization'] = 0
-                            product['material_found'] = False
                     except (ValueError, TypeError):
                         product['palletization'] = 0
-                        product['material_found'] = False
                 else:
                     product['palletization'] = 0
-                    product['material_found'] = False
 
                 quantity = product.get('количество', 0)
                 palletization = product.get('palletization', 0)
@@ -2199,16 +2082,12 @@ def upload_last():
                         material = materials_db.get_material_by_sap(sap_code_int)
                         if material:
                             product['palletization'] = material.get('palletization', 0)
-                            product['material_found'] = True
                         else:
                             product['palletization'] = 0
-                            product['material_found'] = False
                     except (ValueError, TypeError):
                         product['palletization'] = 0
-                        product['material_found'] = False
                 else:
                     product['palletization'] = 0
-                    product['material_found'] = False
 
                 quantity = product.get('количество', 0)
                 palletization = product.get('palletization', 0)
