@@ -1,282 +1,286 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Импорт материалов</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            width: 100%;
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        }
-        h1 {
-            color: #1a237e;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 25px;
-        }
-        .upload-area {
-            border: 2px dashed #00897b;
-            border-radius: 15px;
-            padding: 40px;
-            text-align: center;
-            background: rgba(0, 137, 123, 0.05);
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        .upload-area:hover {
-            background: rgba(0, 137, 123, 0.1);
-            border-color: #004d40;
-        }
-        .upload-area .icon {
-            font-size: 4em;
-            color: #00897b;
-            margin-bottom: 15px;
-        }
-        .upload-area h3 {
-            color: #1a237e;
-            margin-bottom: 10px;
-        }
-        .upload-area p {
-            color: #78909c;
-        }
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-            margin-top: 20px;
-        }
-        .file-input-wrapper input[type="file"] {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        .btn {
-            padding: 12px 35px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #00897b, #26a69a);
-            color: white;
-            box-shadow: 0 4px 15px rgba(0, 137, 123, 0.3);
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(0, 137, 123, 0.4);
-            background: linear-gradient(135deg, #00695c, #00897b);
-        }
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-secondary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
-        }
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, #1e88e5, #42a5f5);
-            box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
-        }
-        .btn-settings {
-            background: linear-gradient(135deg, #ff9800, #ffa726);
-            color: white;
-            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
-        }
-        .btn-settings:hover {
-            background: linear-gradient(135deg, #f57c00, #fb8c00);
-            box-shadow: 0 6px 25px rgba(255, 152, 0, 0.4);
-        }
-        .file-name {
-            margin-top: 15px;
-            color: #4a6fa5;
-            font-size: 0.95em;
-        }
-        .alert {
-            padding: 12px 20px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            font-weight: 500;
-        }
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .alert-danger {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .alert-warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-        .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        .requirements {
-            background: #f5f5f5;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-        }
-        .requirements h4 {
-            color: #1a237e;
-            margin-bottom: 10px;
-        }
-        .requirements ul {
-            padding-left: 20px;
-            color: #666;
-            line-height: 1.8;
-        }
-        .actions {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-top: 20px;
-        }
-        @media (max-width: 768px) {
-            .container { padding: 20px; }
-            .upload-area { padding: 25px; }
-            .actions { flex-direction: column; }
-            .actions .btn { width: 100%; text-align: center; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Импорт материалов</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+.container {
+    max-width: 700px;
+    width: 100%;
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+h1 {
+    color: #1a237e;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.subtitle {
+    color: #666;
+    margin-bottom: 25px;
+}
+.upload-area {
+    border: 2px dashed #00897b;
+    border-radius: 15px;
+    padding: 40px;
+    text-align: center;
+    background: rgba(0, 137, 123, 0.05);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.upload-area:hover {
+    background: rgba(0, 137, 123, 0.1);
+    border-color: #004d40;
+}
+.upload-area .icon {
+    font-size: 4em;
+    color: #00897b;
+    margin-bottom: 15px;
+}
+.upload-area h3 {
+    color: #1a237e;
+    margin-bottom: 10px;
+}
+.upload-area p {
+    color: #78909c;
+}
+.file-input-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-top: 20px;
+}
+.file-input-wrapper input[type="file"] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+.btn {
+    padding: 12px 35px;
+    border: none;
+    border-radius: 50px;
+    font-size: 1.1em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-primary {
+    background: linear-gradient(135deg, #00897b, #26a69a);
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 137, 123, 0.3);
+}
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(0, 137, 123, 0.4);
+    background: linear-gradient(135deg, #00695c, #00897b);
+}
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+.btn-secondary {
+    background: linear-gradient(135deg, #2196f3, #64b5f6);
+    color: white;
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+}
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #1e88e5, #42a5f5);
+    box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
+}
+.btn-settings {
+    background: linear-gradient(135deg, #ff9800, #ffa726);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+}
+.btn-settings:hover {
+    background: linear-gradient(135deg, #f57c00, #fb8c00);
+    box-shadow: 0 6px 25px rgba(255, 152, 0, 0.4);
+}
+.file-name {
+    margin-top: 15px;
+    color: #4a6fa5;
+    font-size: 0.95em;
+}
+.alert {
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.alert-danger {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+.alert-warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+.alert-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+.requirements {
+    background: #f5f5f5;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+.requirements h4 {
+    color: #1a237e;
+    margin-bottom: 10px;
+}
+.requirements ul {
+    padding-left: 20px;
+    color: #666;
+    line-height: 1.8;
+}
+.requirements ul li.optional {
+    color: #00897b;
+}
+.actions {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+@media (max-width: 768px) {
+    .container { padding: 20px; }
+    .upload-area { padding: 25px; }
+    .actions { flex-direction: column; }
+    .actions .btn { width: 100%; text-align: center; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>📤 Загрузка данных о палетизации</h1>
-        <p class="subtitle">Импорт мастер-данных материалов из Excel-файла</p>
+<div class="container">
+    <h1>📤 Загрузка данных о палетизации</h1>
+    <p class="subtitle">Импорт мастер-данных материалов из Excel-файла</p>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-        <div class="requirements">
-            <h4>📋 Требования к файлу:</h4>
-            <ul>
-                <li><strong>Колонка A</strong> — SAP код материала (8 цифр)</li>
-                <li><strong>Колонка B</strong> — Название материала (строка)</li>
-                <li><strong>Колонка C</strong> — Палетизация (число ≥ 0)</li>
-                <li>Первая строка может содержать заголовки</li>
-                <li>Файл должен быть в формате <strong>.xlsx</strong> или <strong>.xls</strong></li>
-            </ul>
-        </div>
-
-        <form action="/materials/import" method="post" enctype="multipart/form-data" id="uploadForm">
-            <div class="upload-area" id="uploadArea">
-                <div class="icon">📄</div>
-                <h3>Выберите Excel-файл</h3>
-                <p>Перетащите файл сюда или нажмите для выбора</p>
-
-                <div class="file-input-wrapper">
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
-                        Выбрать файл
-                    </button>
-                    <input type="file" name="file" id="fileInput" accept=".xlsx,.xls" required>
-                </div>
-
-                <div class="file-name" id="fileName">Файл не выбран</div>
-            </div>
-
-            <div style="text-align: center; margin-top: 25px;">
-                <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
-                    📊 Загрузить данные
-                </button>
-            </div>
-        </form>
-
-        <div class="actions">
-            <a href="/materials" class="btn btn-settings">📋 К материалам</a>
-            <a href="/settings" class="btn btn-secondary">⚙️ Настройки</a>
-            <a href="/" class="btn btn-primary">🏠 На главную</a>
-        </div>
+    <div class="requirements">
+        <h4>📋 Требования к файлу:</h4>
+        <ul>
+            <li><strong>Колонка A</strong> — SAP код материала (8 цифр)</li>
+            <li><strong>Колонка B</strong> — Название материала (строка)</li>
+            <li><strong>Колонка C</strong> — Палетизация (число ≥ 0)</li>
+            <li class="optional"><strong>Колонка D (опционально)</strong> — Вложение в короб (число ≥ 0, необязательно)</li>
+            <li>Первая строка может содержать заголовки</li>
+            <li>Файл должен быть в формате <strong>.xlsx</strong> или <strong>.xls</strong></li>
+        </ul>
     </div>
 
-    <script>
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const fileName = e.target.files[0]?.name || 'Файл не выбран';
-            document.getElementById('fileName').textContent = fileName;
-            document.getElementById('submitBtn').disabled = !e.target.files[0];
+    <form action="/materials/import" method="post" enctype="multipart/form-data" id="uploadForm">
+        <div class="upload-area" id="uploadArea">
+            <div class="icon">📄</div>
+            <h3>Выберите Excel-файл</h3>
+            <p>Перетащите файл сюда или нажмите для выбора</p>
 
-            if (e.target.files[0]) {
-                document.getElementById('submitBtn').textContent = '📊 Загрузить данные';
-                document.getElementById('uploadArea').style.borderColor = '#004d40';
-                document.getElementById('uploadArea').style.background = 'rgba(0, 137, 123, 0.1)';
-            }
-        });
+            <div class="file-input-wrapper">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+                    Выбрать файл
+                </button>
+                <input type="file" name="file" id="fileInput" accept=".xlsx,.xls" required>
+            </div>
 
-        const uploadArea = document.getElementById('uploadArea');
+            <div class="file-name" id="fileName">Файл не выбран</div>
+        </div>
 
-        uploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#2196f3';
-            this.style.background = 'rgba(33, 150, 243, 0.1)';
-        });
+        <div style="text-align: center; margin-top: 25px;">
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                📊 Загрузить данные
+            </button>
+        </div>
+    </form>
 
-        uploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#00897b';
-            this.style.background = 'rgba(0, 137, 123, 0.05)';
-        });
+    <div class="actions">
+        <a href="/materials" class="btn btn-settings">📋 К материалам</a>
+        <a href="/settings" class="btn btn-secondary">⚙️ Настройки</a>
+        <a href="/" class="btn btn-primary">🏠 На главную</a>
+    </div>
+</div>
 
-        uploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#00897b';
-            this.style.background = 'rgba(0, 137, 123, 0.05)';
+<script>
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const fileName = e.target.files[0]?.name || 'Файл не выбран';
+    document.getElementById('fileName').textContent = fileName;
+    document.getElementById('submitBtn').disabled = !e.target.files[0];
 
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const file = files[0];
-                const ext = file.name.split('.').pop().toLowerCase();
-                if (ext === 'xlsx' || ext === 'xls') {
-                    document.getElementById('fileInput').files = files;
-                    document.getElementById('fileName').textContent = file.name;
-                    document.getElementById('submitBtn').disabled = false;
-                    document.getElementById('submitBtn').textContent = '📊 Загрузить данные';
-                } else {
-                    alert('Пожалуйста, загрузите файл в формате Excel (.xlsx или .xls)');
-                }
-            }
-        });
-    </script>
+    if (e.target.files[0]) {
+        document.getElementById('submitBtn').textContent = '📊 Загрузить данные';
+        document.getElementById('uploadArea').style.borderColor = '#004d40';
+        document.getElementById('uploadArea').style.background = 'rgba(0, 137, 123, 0.1)';
+    }
+});
+
+const uploadArea = document.getElementById('uploadArea');
+
+uploadArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#2196f3';
+    this.style.background = 'rgba(33, 150, 243, 0.1)';
+});
+
+uploadArea.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#00897b';
+    this.style.background = 'rgba(0, 137, 123, 0.05)';
+});
+
+uploadArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#00897b';
+    this.style.background = 'rgba(0, 137, 123, 0.05)';
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        const file = files[0];
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'xlsx' || ext === 'xls') {
+            document.getElementById('fileInput').files = files;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').textContent = '📊 Загрузить данные';
+        } else {
+            alert('Пожалуйста, загрузите файл в формате Excel (.xlsx или .xls)');
+        }
+    }
+});
+</script>
 </body>
 </html>

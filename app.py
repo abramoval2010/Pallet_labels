@@ -444,27 +444,60 @@ class MaterialsDatabase:
             return cursor.fetchone()[0]
 
     def validate_and_import_from_excel(self, filepath):
-        """Проверяет и импортирует данные из Excel файла (без pandas)"""
+        """Проверяет и импортирует данные из Excel файла (без pandas).
+           Поддерживает 3 колонки (SAP, Название, Палетизация) или 4 колонки (SAP, Название, Палетизация, Вложение в короб)"""
+        print(f"📂 Импорт Excel файла: {filepath}")
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
+            print(f"  Активный лист: {ws.title}")
+            print(f"  Максимальное количество колонок: {ws.max_column}")
 
+            # Определяем, есть ли заголовок
             is_header = False
             first_row = [cell.value for cell in ws[1]]
-            if first_row and any(isinstance(cell, str) and not str(cell).isdigit() for cell in first_row[:2]):
-                is_header = True
-                start_row = 2
+            # Проверяем, что первая строка содержит текст, а не числа (заголовок)
+            if first_row:
+                header_count = 0
+                for cell in first_row[:4]:  # Проверяем первые 4 колонки
+                    if cell is not None and isinstance(cell, str) and not str(cell).isdigit():
+                        header_count += 1
+                # Если хотя бы 2 из первых 4 ячеек - строки, считаем, что это заголовок
+                if header_count >= 2:
+                    is_header = True
+                    start_row = 2
+                    print(f"  Обнаружен заголовок, данные начинаются со строки {start_row}")
+                else:
+                    start_row = 1
+                    print(f"  Заголовка нет, данные начинаются со строки {start_row}")
             else:
                 start_row = 1
+                print(f"  Заголовка нет, данные начинаются со строки {start_row}")
 
             errors = []
             materials_to_add = []
             materials_to_update = []
+            skipped_empty_box = 0
+
+            # Проверяем, есть ли 4-я колонка (D)
+            has_box_quantity = ws.max_column >= 4
+            if has_box_quantity:
+                print("  ✅ Обнаружена колонка D (Вложение в короб)")
+            else:
+                print("  ℹ️ Колонка D не обнаружена, вложение в короб не будет обновляться")
 
             for row_idx in range(start_row, ws.max_row + 1):
-                row = [ws.cell(row=row_idx, column=col).value for col in range(1, 4)]
+                # Читаем 3 обязательные колонки
+                sap_value = ws.cell(row=row_idx, column=1).value
+                material_name = ws.cell(row=row_idx, column=2).value
+                palletization_value = ws.cell(row=row_idx, column=3).value
 
-                sap_value = row[0]
+                # Читаем 4-ю колонку (опционально)
+                box_quantity_value = None
+                if has_box_quantity:
+                    box_quantity_value = ws.cell(row=row_idx, column=4).value
+
+                # Проверяем SAP код
                 if sap_value is None:
                     errors.append(f"Строка {row_idx}: SAP код не может быть пустым")
                     continue
@@ -479,14 +512,16 @@ class MaterialsDatabase:
                     errors.append(f"Строка {row_idx}: SAP код должен быть числом (текущее значение: {sap_value})")
                     continue
 
-                material_name = str(row[1]) if row[1] else ''
+                # Проверяем название материала
+                material_name = str(material_name) if material_name else ''
                 if not material_name.strip():
                     errors.append(f"Строка {row_idx}: Название материала не может быть пустым")
                     continue
+                material_name = material_name.strip()
 
-                palletization_value = row[2] if row[2] else 0
+                # Проверяем палетизацию
                 try:
-                    palletization = int(palletization_value)
+                    palletization = int(palletization_value) if palletization_value is not None else 0
                     if palletization < 0:
                         errors.append(
                             f"Строка {row_idx}: Палетизация не может быть отрицательной (текущее значение: {palletization})")
@@ -496,58 +531,104 @@ class MaterialsDatabase:
                         f"Строка {row_idx}: Палетизация должна быть числом (текущее значение: {palletization_value})")
                     continue
 
-                if ws.max_column > 3:
-                    for col_idx in range(4, ws.max_column + 1):
+                # Проверяем вложение в короб (если есть)
+                box_quantity = None
+                if has_box_quantity and box_quantity_value is not None:
+                    try:
+                        # Пытаемся преобразовать в число (int или float)
+                        if isinstance(box_quantity_value, (int, float)):
+                            box_quantity = int(box_quantity_value)
+                        else:
+                            # Пробуем преобразовать строку в число
+                            box_quantity_str = str(box_quantity_value).strip().replace(',', '.')
+                            if box_quantity_str:
+                                box_quantity = int(float(box_quantity_str))
+
+                        if box_quantity is not None:
+                            if box_quantity < 0:
+                                errors.append(
+                                    f"Строка {row_idx}: Вложение в короб не может быть отрицательным (текущее значение: {box_quantity})")
+                                box_quantity = None
+                    except (ValueError, TypeError):
+                        errors.append(
+                            f"Строка {row_idx}: Вложение в короб должно быть числом (текущее значение: {box_quantity_value})")
+                        box_quantity = None
+                elif has_box_quantity and box_quantity_value is None:
+                    # Если ячейка пустая - пропускаем обновление этого поля
+                    skipped_empty_box += 1
+                    box_quantity = None
+
+                # Проверяем наличие дополнительных колонок
+                if ws.max_column > 4:
+                    for col_idx in range(5, ws.max_column + 1):
                         if ws.cell(row=row_idx, column=col_idx).value is not None:
                             errors.append(f"Строка {row_idx}: Обнаружены данные в дополнительной колонке {col_idx}")
                             break
 
-                material_data = {
-                    'sap_code': sap_code,
-                    'material_name': material_name.strip(),
-                    'palletization': palletization
-                }
-
+                # Проверяем существование материала
                 existing = self.get_material_by_sap(sap_code)
                 if existing:
-                    materials_to_update.append(material_data)
+                    # Обновляем существующий материал
+                    new_data = {
+                        'material_name': material_name,
+                        'palletization': palletization
+                    }
+                    # Добавляем box_quantity только если оно было передано
+                    if box_quantity is not None:
+                        new_data['box_quantity'] = box_quantity
+                    materials_to_update.append({
+                        'sap_code': sap_code,
+                        'data': new_data
+                    })
                 else:
-                    existing_name = self.get_material_by_name(material_name.strip())
+                    # Проверяем уникальность названия
+                    existing_name = self.get_material_by_name(material_name)
                     if existing_name:
                         errors.append(
-                            f"Строка {row_idx}: Материал с названием '{material_name.strip()}' уже существует в базе (SAP: {existing_name['sap_code']})")
-                    else:
-                        materials_to_add.append(material_data)
+                            f"Строка {row_idx}: Материал с названием '{material_name}' уже существует в базе (SAP: {existing_name['sap_code']})")
+                        continue
+
+                    # Добавляем новый материал
+                    material_data = {
+                        'sap_code': sap_code,
+                        'material_name': material_name,
+                        'palletization': palletization,
+                        'box_quantity': box_quantity if box_quantity is not None else 0
+                    }
+                    materials_to_add.append(material_data)
 
             if errors:
-                return False, "Ошибки в файле:\n" + "\n".join(errors)
+                return False, "Ошибки в файле:\n" + "\n".join(errors[:20]) + (
+                    f"\n... и еще {len(errors) - 20} ошибок" if len(errors) > 20 else "")
 
+            # Выполняем обновления
             updated_count = 0
             for material in materials_to_update:
-                existing = self.get_material_by_sap(material['sap_code'])
-                if existing:
-                    new_data = {
-                        'material_name': material['material_name'],
-                        'palletization': material['palletization'],
-                        'box_quantity': existing.get('box_quantity', 0)
-                    }
-                    success, message = self.update_material(material['sap_code'], new_data)
-                    if success:
-                        updated_count += 1
+                success, message = self.update_material(material['sap_code'], material['data'])
+                if success:
+                    updated_count += 1
+                else:
+                    errors.append(f"SAP {material['sap_code']}: {message}")
 
+            # Выполняем добавления
             added_count = 0
             for material in materials_to_add:
-                material_data = {
-                    'sap_code': material['sap_code'],
-                    'material_name': material['material_name'],
-                    'palletization': material['palletization'],
-                    'box_quantity': 0
-                }
-                success, message = self.add_material(material_data)
+                success, message = self.add_material(material)
                 if success:
                     added_count += 1
+                else:
+                    errors.append(f"SAP {material['sap_code']}: {message}")
 
-            return True, f"Успешно обработано: добавлено {added_count} материалов, обновлено {updated_count} материалов"
+            result_message = f"Успешно обработано: добавлено {added_count} материалов, обновлено {updated_count} материалов"
+            if skipped_empty_box > 0:
+                result_message += f", пропущено обновление вложения в короб для {skipped_empty_box} материалов (пустые ячейки)"
+            if errors:
+                result_message += f"\nОшибки: " + "\n".join(errors[:5]) + (
+                    f"\n... и еще {len(errors) - 5} ошибок" if len(errors) > 5 else "")
+                return False, result_message
+
+            print(f"✅ Импорт завершен: добавлено {added_count}, обновлено {updated_count}")
+            return True, result_message
 
         except Exception as e:
             print(f"❌ Ошибка при импорте: {e}")
@@ -1851,57 +1932,6 @@ def export_materials():
         print(f"Ошибка в export_materials: {e}")
         traceback.print_exc()
         flash(f'Ошибка при экспорте: {str(e)}', 'danger')
-        return redirect(url_for('materials_page'))
-
-
-@app.route('/materials/search', methods=['POST'])
-@manager_required
-def search_materials():
-    try:
-        query = request.form.get('query', '').strip()
-        search_type = request.form.get('search_type', 'both')
-        sort_by = request.form.get('sort_by', 'sap_code')
-        sort_order = request.form.get('sort_order', 'asc')
-
-        materials = materials_db.get_all_materials()
-
-        # Фильтрация
-        if query:
-            filtered = []
-            query_lower = query.lower()
-            for material in materials:
-                if search_type == 'sap':
-                    if query in str(material['sap_code']):
-                        filtered.append(material)
-                elif search_type == 'name':
-                    if query_lower in material['material_name'].lower():
-                        filtered.append(material)
-                else:
-                    if query in str(material['sap_code']) or query_lower in material['material_name'].lower():
-                        filtered.append(material)
-            materials = filtered
-
-        # Сортировка
-        reverse = sort_order == 'desc'
-        if sort_by == 'sap_code':
-            materials.sort(key=lambda x: x['sap_code'], reverse=reverse)
-        elif sort_by == 'material_name':
-            materials.sort(key=lambda x: x['material_name'].lower(), reverse=reverse)
-        elif sort_by == 'palletization':
-            materials.sort(key=lambda x: x['palletization'], reverse=reverse)
-        elif sort_by == 'box_quantity':
-            materials.sort(key=lambda x: x['box_quantity'], reverse=reverse)
-
-        return render_template('materials.html',
-                               materials=materials,
-                               query=query,
-                               search_type=search_type,
-                               sort_by=sort_by,
-                               sort_order=sort_order)
-    except Exception as e:
-        print(f"Ошибка в search_materials: {e}")
-        traceback.print_exc()
-        flash(f'Ошибка при поиске: {str(e)}', 'danger')
         return redirect(url_for('materials_page'))
 
 
