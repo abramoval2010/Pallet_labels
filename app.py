@@ -15,10 +15,11 @@ from contextlib import contextmanager
 import io
 import traceback
 
-from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash, jsonify, make_response
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
@@ -73,16 +74,13 @@ def extract_text_from_pdf(pdf_path):
     Универсальная функция извлечения текста из PDF.
     Работает с PyMuPDF.
     """
-    print(f"\n📄 ИЗВЛЕЧЕНИЕ ТЕКСТА ИЗ PDF: {pdf_path}")
     try:
         doc = fitz.open(pdf_path)
         text = ""
         for page_num, page in enumerate(doc):
             page_text = page.get_text()
             text += page_text
-            print(f"  Страница {page_num + 1}: {len(page_text)} символов")
         doc.close()
-        print(f"✅ Итого извлечено {len(text)} символов")
         return text
     except Exception as e:
         print(f"❌ Ошибка открытия PDF: {e}")
@@ -92,31 +90,13 @@ def extract_text_from_pdf(pdf_path):
 
 def extract_data_from_pdf(pdf_path):
     """Извлекает данные из PDF-файла приходного ордера"""
-    print(f"\n{'=' * 60}")
-    print(f"🔍 ПАРСИНГ PDF: {pdf_path}")
-    print(f"{'=' * 60}")
-
     # Извлекаем текст из PDF
     text = extract_text_from_pdf(pdf_path)
     if text is None:
-        print("❌ Текст не извлечен")
         return None
-
-    # Выводим первые 1000 символов для отладки
-    print(f"\n📄 ПЕРВЫЕ 1000 СИМВОЛОВ ТЕКСТА:")
-    print(f"{'-' * 60}")
-    print(text[:1000])
-    print(f"{'-' * 60}\n")
 
     # Разбиваем на строки и очищаем
     lines = [line.strip() for line in text.split('\n') if line.strip()]
-
-    print(f"📊 Всего строк: {len(lines)}")
-    print(f"\n📋 ПЕРВЫЕ 150 СТРОК (для анализа):")
-    print(f"{'-' * 60}")
-    for i, line in enumerate(lines[:150]):
-        print(f" {i + 1:3d}: {line}")
-    print(f"{'-' * 60}\n")
 
     result = {
         'дата_приемки': None,
@@ -126,32 +106,23 @@ def extract_data_from_pdf(pdf_path):
     }
 
     # 1) Номер приходного ордера
-    print("🔍 Поиск номера приходного ордера...")
     for line in lines:
         if 'ПРИХОДНЫЙ ОРДЕР №' in line or 'ПРИХОДНЫЙ ОРДЕР N' in line:
             order_match = re.search(r'№?\s*(\d+)', line)
             if order_match:
                 result['номер_ордера'] = order_match.group(1)
-                print(f" ✅ Найден номер: {result['номер_ордера']}")
                 break
-    if not result['номер_ордера']:
-        print(" ⚠️ Номер ордера не найден")
 
     # 2) Дата приемки
-    print("\n🔍 Поиск даты приемки...")
     for line in lines:
         date_match = re.search(r'\b(\d{2}\.\d{2}\.\d{4})\b', line)
         if date_match:
             date = date_match.group(1)
             if not date.startswith('2028') and 'годности' not in line.lower():
                 result['дата_приемки'] = date
-                print(f" ✅ Найдена дата: {date}")
                 break
-    if not result['дата_приемки']:
-        print(" ⚠️ Дата приемки не найдена")
 
     # 3) Название поставщика
-    print("\n🔍 Поиск названия поставщика...")
     for line in lines:
         supplier_match = re.search(r'(ООО|ЗАО|ОАО|АО|ИП)\s*["«]?([^"«»]+)["»]?', line)
         if supplier_match:
@@ -161,20 +132,14 @@ def extract_data_from_pdf(pdf_path):
                     line)
                 if full_match:
                     result['название_поставщика'] = full_match.group(1)
-                    print(f" ✅ Найден поставщик: {result['название_поставщика']}")
                     break
-    if not result['название_поставщика']:
-        print(" ⚠️ Название поставщика не найдено")
 
     # 4) ПАРСИНГ ТОВАРОВ
-    print("\n🔍 Поиск таблицы с товарами...")
-
     # Находим начало таблицы
     start_index = -1
     for i, line in enumerate(lines):
         if 'Материальные ценности' in line:
             start_index = i
-            print(f" ✅ Найдено начало таблицы: строка {i + 1}")
             break
 
     # Находим конец таблицы
@@ -183,11 +148,9 @@ def extract_data_from_pdf(pdf_path):
         if line == 'Итого' or 'Итого' in line:
             if i + 1 < len(lines) and (lines[i + 1] == 'X' or lines[i + 1] == 'x'):
                 end_index = i + 1
-                print(f" ✅ Найден конец таблицы: строки {i + 1} (Итого) и {i + 2} (X)")
                 break
             elif 'X' in line or 'x' in line:
                 end_index = i
-                print(f" ✅ Найден конец таблицы: строка {i + 1} (Итого X)")
                 break
 
     if end_index == -1:
@@ -195,72 +158,31 @@ def extract_data_from_pdf(pdf_path):
             if line == 'X' or line == 'x' or line.startswith('X'):
                 if i > 0 and ('Итого' in lines[i - 1] or 'Итого' in lines[i]):
                     end_index = i
-                    print(f" ✅ Найден конец таблицы (альтернативный): строка {i + 1}")
                     break
 
-    if start_index == -1:
-        print(" ⚠️ Начало таблицы не найдено")
+    if start_index == -1 or end_index == -1:
         return result
-
-    if end_index == -1:
-        print(" ⚠️ Конец таблицы не найден, ищем альтернативный конец...")
-        for i, line in enumerate(lines):
-            if 'Принял' in line or 'Сдал' in line:
-                end_index = i - 1
-                print(f" ✅ Найден альтернативный конец таблицы (перед 'Принял'): строка {end_index + 1}")
-                break
-
-    if end_index == -1:
-        print(" ⚠️ Конец таблицы не найден")
-        return result
-
-    print(f"\n📊 Таблица найдена: строки {start_index + 1} - {end_index + 1}")
 
     # Собираем строки таблицы
     table_lines = lines[start_index:end_index + 1]
-
-    # Выводим содержимое таблицы для отладки
-    print(f"\n📋 СОДЕРЖИМОЕ ТАБЛИЦЫ (строки {start_index + 1} - {end_index + 1}):")
-    print(f"{'-' * 60}")
-    for idx, line in enumerate(table_lines):
-        print(f"  {idx + 1:3d}: {line}")
-    print(f"{'-' * 60}\n")
 
     # Находим маркер "14"
     marker_index = -1
     for i, line in enumerate(table_lines):
         if line == '14' or re.search(r'\b14\b', line):
             marker_index = i
-            print(f" ✅ Найден маркер '14' в строке {i + 1}")
             break
 
     if marker_index == -1:
         for i, line in enumerate(table_lines):
             if re.search(r'\b1\s+2\s+3\s+4\s+5\s+6\s+7\s+8\s+9\s+10\s+11\s+12\s+13\s+14\b', line):
                 marker_index = i
-                print(f" ✅ Найден маркер '1..14' в строке {i + 1} (альтернативный)")
                 break
 
     if marker_index == -1:
-        print(" ⚠️ Маркер не найден, парсинг невозможен")
         return result
 
     # ПАРСИНГ ТОВАРОВ С ЖЕСТКИМИ ПРАВИЛАМИ
-    # Правила:
-    # - Название: строки от marker_index + 1 до номенклатурного номера
-    # - Номенклатурный номер (SAP): 8 цифр
-    # - Количество: SAP + 4 строки (число с пробелом как разделитель разрядов)
-    # - Аналитический лист: SAP + 7 строк (10 цифр, начинается с 1)
-    # - Партия поставщика: SAP + 8 строк (любой формат)
-    # - Срок годности: SAP + 9 строк (дата в формате ДД.ММ.ГГГГ)
-
-    print("\n🔍 ПАРСИНГ ТОВАРОВ (жесткие правила):")
-    print("   - Название: до номенклатурного номера")
-    print("   - Количество: SAP + 4 строки")
-    print("   - Аналитический лист: SAP + 7 строк")
-    print("   - Партия поставщика: SAP + 8 строк")
-    print("   - Срок годности: SAP + 9 строк")
-
     products = []
     i = 0
 
@@ -283,14 +205,12 @@ def extract_data_from_pdf(pdf_path):
             if (not nomencl_number.startswith(('8', '7')) and
                     nomencl_number not in ['48797491', '21000101', '0315003']):
 
-                print(f"\n  🔍 Найден SAP-код: {nomencl_number} в строке {i + 1}")
                 sap_row = i
 
-                # --- 1. НАЗВАНИЕ (строки от marker_index + 1 до SAP) ---
+                # --- 1. НАЗВАНИЕ ---
                 name_parts = []
                 for j in range(sap_row - 1, marker_index, -1):
                     prev_line = table_lines[j]
-                    # Проверяем, что строка содержит буквы и не является служебной
                     if (re.search(r'[А-ЯЁA-Z]', prev_line) and
                             not re.match(r'^\d+$', prev_line) and
                             not any(keyword in prev_line.lower() for keyword in ['итого', 'x', 'принял', 'сдал'])):
@@ -298,70 +218,48 @@ def extract_data_from_pdf(pdf_path):
                     else:
                         break
                 product_name = ' '.join(name_parts).strip() if name_parts else 'Не указано'
-                print(f"  📦 Название: {product_name[:80]}...")
 
-                # --- 2. КОЛИЧЕСТВО (SAP + 4 строки) - ЖЕСТКО ---
+                # --- 2. КОЛИЧЕСТВО (SAP + 4 строки) ---
                 quantity = None
                 qty_row = sap_row + 4
                 if qty_row < len(table_lines):
                     qty_line = table_lines[qty_row]
-                    # Ищем число с пробелами между разрядами (например "6 500")
                     qty_match = re.search(r'(\d{1,3}(?:\s?\d{3})*)', qty_line)
                     if qty_match:
                         qty_str = qty_match.group(1).replace(' ', '')
                         try:
                             quantity = int(qty_str)
-                            print(f"  📊 Количество (строка {qty_row + 1}): {quantity}")
                         except:
-                            print(f"  ⚠️ Ошибка преобразования количества: {qty_str}")
+                            pass
 
-                if quantity is None:
-                    print(f"  ⚠️ Количество не найдено в строке {qty_row + 1}")
-
-                # --- 3. АНАЛИТИЧЕСКИЙ ЛИСТ (SAP + 7 строк) - ЖЕСТКО ---
+                # --- 3. АНАЛИТИЧЕСКИЙ ЛИСТ (SAP + 7 строк) ---
                 analytic_list = None
                 analytic_row = sap_row + 7
                 if analytic_row < len(table_lines):
                     analytic_line = table_lines[analytic_row]
-                    # Ищем 10 цифр, начинающихся с 1
                     analytic_match = re.search(r'\b(1\d{9})\b', analytic_line)
                     if analytic_match:
                         analytic_list = analytic_match.group(1)
-                        print(f"  📋 Аналитический лист (строка {analytic_row + 1}): {analytic_list}")
                     else:
-                        # Пробуем найти любое 10-значное число
                         alt_match = re.search(r'\b(\d{10})\b', analytic_line)
                         if alt_match:
                             potential = alt_match.group(1)
-                            if not potential.startswith('49'):  # не номер заказа
+                            if not potential.startswith('49'):
                                 analytic_list = potential
-                                print(
-                                    f"  📋 Аналитический лист (строка {analytic_row + 1}, альтернативный): {analytic_list}")
 
-                if analytic_list is None:
-                    print(f"  ⚠️ Аналитический лист не найден в строке {analytic_row + 1}")
-
-                # --- 4. ПАРТИЯ ПОСТАВЩИКА (SAP + 8 строк) - ЖЕСТКО, ЛЮБОЙ ФОРМАТ ---
+                # --- 4. ПАРТИЯ ПОСТАВЩИКА (SAP + 8 строк) ---
                 supplier_batch = None
                 batch_row = sap_row + 8
                 if batch_row < len(table_lines):
                     batch_line = table_lines[batch_row]
-                    # Берем всю строку как партию (удаляем только дату, если есть)
                     clean_batch = re.sub(r'\d{2}\.\d{2}\.\d{4}', '', batch_line).strip()
                     if clean_batch:
                         supplier_batch = clean_batch
-                        print(f"  🏷️ Партия поставщика (строка {batch_row + 1}): {supplier_batch}")
                     else:
-                        # Если строка пустая после удаления даты, берем все, что не похоже на дату
                         if not re.match(r'^\d{2}\.\d{2}\.\d{4}$', batch_line):
                             supplier_batch = batch_line
-                            print(
-                                f"  🏷️ Партия поставщика (строка {batch_row + 1}, без удаления даты): {supplier_batch}")
 
-                if supplier_batch is None:
-                    print(f"  ⚠️ Партия поставщика не найдена в строке {batch_row + 1}")
-
-                # --- 5. СРОК ГОДНОСТИ (SAP + 9 строк) - ЖЕСТКО ---
+                # --- 5. СРОК ГОДНОСТИ (SAP + 9 строк) ---
                 expiration_date = None
                 exp_row = sap_row + 9
                 if exp_row < len(table_lines):
@@ -371,12 +269,8 @@ def extract_data_from_pdf(pdf_path):
                         exp_date = exp_match.group(1)
                         if exp_date != result.get('дата_приемки'):
                             expiration_date = exp_date
-                            print(f"  📅 Срок годности (строка {exp_row + 1}): {expiration_date}")
 
-                if expiration_date is None:
-                    print(f"  ⚠️ Срок годности не найден в строке {exp_row + 1}")
-
-                # Добавляем товар (даже если нет аналитического листа)
+                # Добавляем товар
                 product_data = {
                     'наименование': product_name,
                     'номенклатурный_номер': nomencl_number,
@@ -386,30 +280,10 @@ def extract_data_from_pdf(pdf_path):
                     'количество': quantity if quantity else 'Не найдено'
                 }
                 products.append(product_data)
-                print(f"  ✅ Товар добавлен: {product_name[:50]}...")
-                print(f"     Количество: {quantity if quantity else 'Не найдено'}")
-                print(f"     АЛ: {analytic_list if analytic_list else 'Не найден'}")
-                print(f"     Партия: {supplier_batch if supplier_batch else 'Не найдена'}")
-                print(f"     Срок годности: {expiration_date if expiration_date else 'Не найден'}")
 
         i += 1
 
     result['товары'] = products
-    print(f"\n📊 Всего найдено товаров: {len(products)}")
-
-    print(f"\n{'=' * 60}")
-    print(f"📊 РЕЗУЛЬТАТ ПАРСИНГА:")
-    print(f" - Номер ордера: {result['номер_ордера'] or 'Не найден'}")
-    print(f" - Дата приемки: {result['дата_приемки'] or 'Не найдена'}")
-    print(f" - Поставщик: {result['название_поставщика'] or 'Не найден'}")
-    print(f" - Товаров: {len(result['товары'])}")
-    if len(result['товары']) > 0:
-        print(f" - Первый товар: {result['товары'][0]['наименование'][:50]}...")
-        print(f" - Первый АЛ: {result['товары'][0]['аналитический_лист']}")
-        print(f" - Первое количество: {result['товары'][0]['количество']}")
-        print(f" - Первая партия: {result['товары'][0]['партия_поставщика']}")
-    print(f"{'=' * 60}\n")
-
     return result
 
 
@@ -679,6 +553,52 @@ class MaterialsDatabase:
             print(f"❌ Ошибка при импорте: {e}")
             traceback.print_exc()
             return False, f"Ошибка при обработке файла: {str(e)}"
+
+    def export_to_excel(self):
+        """Экспортирует данные материалов в Excel файл"""
+        try:
+            materials = self.get_all_materials()
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Реестр сырья и материалов"
+
+            # Заголовки
+            headers = ['Номер SAP', 'Наименование', 'Палетизация', 'Вложение в короб']
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="1a237e", end_color="1a237e", fill_type="solid")
+            header_alignment = Alignment(horizontal="center", vertical="center")
+
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+
+            # Данные
+            for row_idx, material in enumerate(materials, 2):
+                ws.cell(row=row_idx, column=1, value=material['sap_code'])
+                ws.cell(row=row_idx, column=2, value=material['material_name'])
+                ws.cell(row=row_idx, column=3, value=material['palletization'])
+                ws.cell(row=row_idx, column=4, value=material['box_quantity'])
+
+            # Настройка ширины колонок
+            ws.column_dimensions['A'].width = 15
+            ws.column_dimensions['B'].width = 40
+            ws.column_dimensions['C'].width = 15
+            ws.column_dimensions['D'].width = 20
+
+            # Сохраняем файл
+            filename = f"Реестр_сырья_и_материалов_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            wb.save(filepath)
+
+            return filepath
+
+        except Exception as e:
+            print(f"❌ Ошибка экспорта: {e}")
+            traceback.print_exc()
+            return None
 
 
 # ============================================================
@@ -1793,42 +1713,47 @@ def materials_page():
 @manager_required
 def update_materials():
     try:
-        materials_data = request.form.get('materials_data')
-        if not materials_data:
+        # Получаем данные из формы
+        sap_codes = request.form.getlist('sap_code[]')
+        material_names = request.form.getlist('material_name[]')
+        palletizations = request.form.getlist('palletization[]')
+        box_quantities = request.form.getlist('box_quantity[]')
+
+        if not sap_codes:
             flash('Нет данных для сохранения', 'danger')
             return redirect(url_for('materials_page'))
 
-        materials = json.loads(materials_data)
         errors = []
         success_count = 0
 
-        for material in materials:
-            sap_code = material.get('sap_code')
-            material_name = material.get('material_name', '').strip()
-            palletization = material.get('palletization', 0)
-            box_quantity = material.get('box_quantity', 0)
+        for i in range(len(sap_codes)):
+            sap_code = sap_codes[i]
+            material_name = material_names[i].strip() if i < len(material_names) else ''
+            try:
+                palletization = int(palletizations[i]) if i < len(palletizations) and palletizations[i] else 0
+            except:
+                palletization = 0
+            try:
+                box_quantity = int(box_quantities[i]) if i < len(box_quantities) and box_quantities[i] else 0
+            except:
+                box_quantity = 0
 
+            if not material_name:
+                errors.append(f"SAP {sap_code}: Название материала не может быть пустым")
+                continue
+
+            # Проверяем уникальность названия
             existing = materials_db.get_material_by_name(material_name)
-            if existing and existing['sap_code'] != sap_code:
+            if existing and str(existing['sap_code']) != str(sap_code):
                 errors.append(f"Материал с названием '{material_name}' уже существует (SAP: {existing['sap_code']})")
                 continue
 
-            try:
-                palletization = int(palletization)
-                if palletization < 0:
-                    errors.append(f"SAP {sap_code}: Палетизация не может быть отрицательной")
-                    continue
-            except (ValueError, TypeError):
-                errors.append(f"SAP {sap_code}: Палетизация должна быть числом")
+            if palletization < 0:
+                errors.append(f"SAP {sap_code}: Палетизация не может быть отрицательной")
                 continue
 
-            try:
-                box_quantity = int(box_quantity)
-                if box_quantity < 0:
-                    errors.append(f"SAP {sap_code}: Вложение в короб не может быть отрицательным")
-                    continue
-            except (ValueError, TypeError):
-                errors.append(f"SAP {sap_code}: Вложение в короб должно быть числом")
+            if box_quantity < 0:
+                errors.append(f"SAP {sap_code}: Вложение в короб не может быть отрицательным")
                 continue
 
             new_data = {
@@ -1836,7 +1761,7 @@ def update_materials():
                 'palletization': palletization,
                 'box_quantity': box_quantity
             }
-            success, message = materials_db.update_material(sap_code, new_data)
+            success, message = materials_db.update_material(int(sap_code), new_data)
             if success:
                 success_count += 1
             else:
@@ -1912,48 +1837,103 @@ def import_materials():
         return redirect(url_for('import_materials'))
 
 
+@app.route('/materials/export')
+@manager_required
+def export_materials():
+    try:
+        filepath = materials_db.export_to_excel()
+        if filepath and os.path.exists(filepath):
+            return send_file(filepath, as_attachment=True, download_name=os.path.basename(filepath))
+        else:
+            flash('Ошибка при экспорте данных', 'danger')
+            return redirect(url_for('materials_page'))
+    except Exception as e:
+        print(f"Ошибка в export_materials: {e}")
+        traceback.print_exc()
+        flash(f'Ошибка при экспорте: {str(e)}', 'danger')
+        return redirect(url_for('materials_page'))
+
+
+@app.route('/materials/search', methods=['POST'])
+@manager_required
+def search_materials():
+    try:
+        query = request.form.get('query', '').strip()
+        search_type = request.form.get('search_type', 'both')
+        sort_by = request.form.get('sort_by', 'sap_code')
+        sort_order = request.form.get('sort_order', 'asc')
+
+        materials = materials_db.get_all_materials()
+
+        # Фильтрация
+        if query:
+            filtered = []
+            query_lower = query.lower()
+            for material in materials:
+                if search_type == 'sap':
+                    if query in str(material['sap_code']):
+                        filtered.append(material)
+                elif search_type == 'name':
+                    if query_lower in material['material_name'].lower():
+                        filtered.append(material)
+                else:
+                    if query in str(material['sap_code']) or query_lower in material['material_name'].lower():
+                        filtered.append(material)
+            materials = filtered
+
+        # Сортировка
+        reverse = sort_order == 'desc'
+        if sort_by == 'sap_code':
+            materials.sort(key=lambda x: x['sap_code'], reverse=reverse)
+        elif sort_by == 'material_name':
+            materials.sort(key=lambda x: x['material_name'].lower(), reverse=reverse)
+        elif sort_by == 'palletization':
+            materials.sort(key=lambda x: x['palletization'], reverse=reverse)
+        elif sort_by == 'box_quantity':
+            materials.sort(key=lambda x: x['box_quantity'], reverse=reverse)
+
+        return render_template('materials.html',
+                               materials=materials,
+                               query=query,
+                               search_type=search_type,
+                               sort_by=sort_by,
+                               sort_order=sort_order)
+    except Exception as e:
+        print(f"Ошибка в search_materials: {e}")
+        traceback.print_exc()
+        flash(f'Ошибка при поиске: {str(e)}', 'danger')
+        return redirect(url_for('materials_page'))
+
+
 @app.route('/upload', methods=['POST'])
 @labels_access_required
 def upload_file():
-    print("\n" + "=" * 60)
-    print("📤 ПОЛУЧЕН ЗАПРОС НА ЗАГРУЗКУ PDF")
-    print("=" * 60)
-
     try:
         if 'file' not in request.files:
-            print("❌ Файл не выбран")
             flash('Файл не выбран', 'warning')
             return redirect(url_for('index'))
 
         file = request.files['file']
-        print(f"📄 Имя файла: {file.filename}")
 
         if file.filename == '':
-            print("❌ Имя файла пустое")
             flash('Файл не выбран', 'warning')
             return redirect(url_for('index'))
 
         if not file.filename.lower().endswith('.pdf'):
-            print(f"❌ Неверный формат: {file.filename}")
             flash('Пожалуйста, загрузите файл в формате PDF', 'danger')
             return redirect(url_for('index'))
 
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
-        print(f"💾 Файл сохранен: {filepath}")
 
         try:
             data = extract_data_from_pdf(filepath)
             os.remove(filepath)
-            print(f"🗑️ Временный файл удален: {filepath}")
 
             if not data or not data['дата_приемки'] and not data['название_поставщика'] and not data['товары']:
-                print("❌ Данные не извлечены")
                 flash('Не удалось извлечь данные из PDF-файла. Проверьте формат файла.', 'danger')
                 return redirect(url_for('index'))
-
-            print(f"✅ Данные успешно извлечены: {len(data['товары'])} товаров")
 
             total_pallets = 0
             for product in data['товары']:
@@ -1987,8 +1967,6 @@ def upload_file():
                 total_pallets += product['pallets']
 
             db.log_action(session['user'], 'UPLOAD_PDF', f"Загружен PDF: {filename}")
-            print(f"📊 Всего паллет: {total_pallets}")
-            print("=" * 60 + "\n")
 
             return render_template('result.html', data=data, total_pallets=total_pallets)
         except Exception as e:
