@@ -134,9 +134,16 @@ th {
     top: 0;
     z-index: 10;
     cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
 }
 th:hover {
     background: #283593;
+}
+th .sort-icon {
+    display: inline-block;
+    margin-left: 5px;
+    font-size: 12px;
 }
 tr:hover {
     background: #f5f5f5;
@@ -214,11 +221,16 @@ tr:hover {
 }
 .search-bar input {
     flex: 1;
-    min-width: 200px;
+    min-width: 250px;
     padding: 10px 15px;
     border: 2px solid #e0e0e0;
     border-radius: 10px;
     font-size: 14px;
+    transition: border-color 0.3s;
+}
+.search-bar input:focus {
+    outline: none;
+    border-color: #00897b;
 }
 .search-bar input:focus {
     outline: none;
@@ -235,61 +247,13 @@ tr:hover {
     outline: none;
     border-color: #00897b;
 }
-.sort-controls {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-bottom: 15px;
-    padding: 10px 15px;
-    background: #f5f5f5;
-    border-radius: 10px;
-}
-.sort-controls label {
+.search-stats {
     font-size: 14px;
-    font-weight: 500;
-    color: #333;
+    color: #666;
+    margin-left: 10px;
 }
-.sort-controls select {
-    padding: 8px 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 14px;
-    background: white;
-}
-.sort-controls select:focus {
-    outline: none;
-    border-color: #00897b;
-}
-.btn-sort {
-    padding: 8px 15px;
-    background: linear-gradient(135deg, #00897b, #26a69a);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-.btn-sort:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 137, 123, 0.3);
-}
-.btn-clear {
-    padding: 8px 15px;
-    background: #f44336;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-.btn-clear:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+.search-stats strong {
+    color: #1a237e;
 }
 @media (max-width: 768px) {
     .container { padding: 20px; }
@@ -300,8 +264,8 @@ tr:hover {
     .actions { flex-direction: column; }
     .actions .btn { width: 100%; text-align: center; }
     .search-bar { flex-direction: column; }
-    .search-bar input { width: 100%; }
-    .sort-controls { flex-direction: column; align-items: stretch; }
+    .search-bar input { width: 100%; min-width: unset; }
+    .search-bar select { width: 100%; }
 }
 </style>
 </head>
@@ -327,43 +291,20 @@ tr:hover {
     {% endwith %}
 
     <div class="stats">
-        <span class="stat-item">📊 Всего материалов: <strong>{{ materials|length }}</strong></span>
+        <span class="stat-item">📊 Всего материалов: <strong id="totalCount">{{ materials|length }}</strong></span>
+        <span class="stat-item" id="filteredStats" style="display: none;">📌 Отображено: <strong id="filteredCount">{{ materials|length }}</strong></span>
     </div>
 
-    <!-- Поиск -->
-    <form action="/materials/search" method="POST" class="search-bar">
-        <input type="text" name="query" placeholder="Поиск по SAP или названию..." value="{{ query or '' }}">
-        <select name="search_type">
-            <option value="both" {% if search_type == 'both' %}selected{% endif %}>Поиск везде</option>
-            <option value="sap" {% if search_type == 'sap' %}selected{% endif %}>По SAP</option>
-            <option value="name" {% if search_type == 'name' %}selected{% endif %}>По названию</option>
+    <!-- Поиск с быстрой фильтрацией -->
+    <div class="search-bar">
+        <input type="text" id="searchQuery" placeholder="Поиск по SAP или названию (быстрая фильтрация)..." oninput="filterTable()">
+        <select id="searchType" onchange="filterTable()">
+            <option value="both">Поиск везде</option>
+            <option value="sap">По SAP</option>
+            <option value="name">По названию</option>
         </select>
-        <button type="submit" class="btn btn-materials">🔍 Найти</button>
-    </form>
-
-    <!-- Сортировка -->
-    <div class="sort-controls">
-        <label>Сортировка:</label>
-        <form action="/materials/search" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-            <input type="hidden" name="query" value="{{ query or '' }}">
-            <input type="hidden" name="search_type" value="{{ search_type or 'both' }}">
-            <select name="sort_by">
-                <option value="sap_code" {% if sort_by == 'sap_code' %}selected{% endif %}>SAP код</option>
-                <option value="material_name" {% if sort_by == 'material_name' %}selected{% endif %}>Наименование</option>
-                <option value="palletization" {% if sort_by == 'palletization' %}selected{% endif %}>Палетизация</option>
-                <option value="box_quantity" {% if sort_by == 'box_quantity' %}selected{% endif %}>Вложение в короб</option>
-            </select>
-            <select name="sort_order">
-                <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>По возрастанию ↑</option>
-                <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>По убыванию ↓</option>
-            </select>
-            <button type="submit" class="btn-sort">Сортировать</button>
-        </form>
-        {% if query or sort_by or sort_order %}
-            <form action="/materials" method="GET" style="display: inline;">
-                <button type="submit" class="btn-clear">Сбросить фильтры</button>
-            </form>
-        {% endif %}
+        <button class="btn btn-materials" onclick="clearSearch()">✖ Сбросить</button>
+        <span class="search-stats" id="searchStats"></span>
     </div>
 
     <!-- Таблица материалов -->
@@ -372,16 +313,28 @@ tr:hover {
             <table>
                 <thead>
                     <tr>
-                        <th style="min-width: 120px;">SAP код материала</th>
-                        <th style="min-width: 250px;">Наименование</th>
-                        <th style="min-width: 150px;">Палетизация</th>
-                        <th style="min-width: 150px;">Вложение в короб</th>
+                        <th onclick="sortTable('sap_code')" style="min-width: 120px;">
+                            SAP код материала
+                            <span class="sort-icon" id="sort-sap_code">↕</span>
+                        </th>
+                        <th onclick="sortTable('material_name')" style="min-width: 250px;">
+                            Наименование
+                            <span class="sort-icon" id="sort-material_name">↕</span>
+                        </th>
+                        <th onclick="sortTable('palletization')" style="min-width: 150px;">
+                            Палетизация
+                            <span class="sort-icon" id="sort-palletization">↕</span>
+                        </th>
+                        <th onclick="sortTable('box_quantity')" style="min-width: 150px;">
+                            Вложение в короб
+                            <span class="sort-icon" id="sort-box_quantity">↕</span>
+                        </th>
                         <th style="min-width: 80px;">Действие</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tableBody">
                     {% for material in materials %}
-                    <tr>
+                    <tr data-sap="{{ material.sap_code }}" data-name="{{ material.material_name }}" data-palletization="{{ material.palletization }}" data-box-quantity="{{ material.box_quantity }}">
                         <td>
                             <strong>{{ material.sap_code }}</strong>
                             <input type="hidden" name="sap_code[]" value="{{ material.sap_code }}">
@@ -434,6 +387,148 @@ tr:hover {
 </div>
 
 <script>
+// Храним исходные данные для фильтрации и сортировки
+let originalData = [];
+let currentSortColumn = null;
+let currentSortOrder = 'asc'; // 'asc' или 'desc'
+
+// Инициализация: сохраняем все строки
+function initData() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    originalData = [];
+    rows.forEach(row => {
+        originalData.push({
+            element: row,
+            sap: row.dataset.sap,
+            name: row.dataset.name,
+            palletization: parseInt(row.dataset.palletization) || 0,
+            boxQuantity: parseInt(row.dataset.box_quantity) || 0
+        });
+    });
+}
+
+// Фильтрация таблицы
+function filterTable() {
+    const query = document.getElementById('searchQuery').value.toLowerCase().trim();
+    const searchType = document.getElementById('searchType').value;
+    const rows = document.querySelectorAll('#tableBody tr');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const sap = row.dataset.sap || '';
+        const name = row.dataset.name || '';
+        let match = false;
+
+        if (!query) {
+            match = true;
+        } else {
+            if (searchType === 'sap') {
+                match = sap.toLowerCase().includes(query);
+            } else if (searchType === 'name') {
+                match = name.toLowerCase().includes(query);
+            } else { // both
+                match = sap.toLowerCase().includes(query) || name.toLowerCase().includes(query);
+            }
+        }
+
+        if (match) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    // Обновляем статистику
+    const totalCount = document.getElementById('totalCount').textContent;
+    const filteredStats = document.getElementById('filteredStats');
+    const filteredCount = document.getElementById('filteredCount');
+    const searchStats = document.getElementById('searchStats');
+
+    if (query) {
+        filteredStats.style.display = 'inline';
+        filteredCount.textContent = visibleCount;
+        searchStats.textContent = `Найдено: ${visibleCount} из ${totalCount}`;
+    } else {
+        filteredStats.style.display = 'none';
+        searchStats.textContent = '';
+    }
+}
+
+// Сортировка таблицы
+function sortTable(column) {
+    const rows = document.querySelectorAll('#tableBody tr');
+    const rowArray = Array.from(rows);
+
+    // Определяем направление сортировки
+    if (currentSortColumn === column) {
+        currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortColumn = column;
+        currentSortOrder = 'asc';
+    }
+
+    // Обновляем иконки сортировки
+    updateSortIcons(column, currentSortOrder);
+
+    // Сортируем
+    rowArray.sort((a, b) => {
+        let valA, valB;
+        switch(column) {
+            case 'sap_code':
+                valA = parseInt(a.dataset.sap) || 0;
+                valB = parseInt(b.dataset.sap) || 0;
+                break;
+            case 'material_name':
+                valA = (a.dataset.name || '').toLowerCase();
+                valB = (b.dataset.name || '').toLowerCase();
+                break;
+            case 'palletization':
+                valA = parseInt(a.dataset.palletization) || 0;
+                valB = parseInt(b.dataset.palletization) || 0;
+                break;
+            case 'box_quantity':
+                valA = parseInt(a.dataset.box_quantity) || 0;
+                valB = parseInt(b.dataset.box_quantity) || 0;
+                break;
+            default:
+                return 0;
+        }
+
+        if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    // Перестраиваем таблицу
+    const tbody = document.getElementById('tableBody');
+    rowArray.forEach(row => tbody.appendChild(row));
+
+    // Применяем фильтрацию после сортировки
+    filterTable();
+}
+
+// Обновление иконок сортировки
+function updateSortIcons(activeColumn, order) {
+    const columns = ['sap_code', 'material_name', 'palletization', 'box_quantity'];
+    columns.forEach(col => {
+        const icon = document.getElementById(`sort-${col}`);
+        if (col === activeColumn) {
+            icon.textContent = order === 'asc' ? '↑' : '↓';
+        } else {
+            icon.textContent = '↕';
+        }
+    });
+}
+
+// Очистка поиска
+function clearSearch() {
+    document.getElementById('searchQuery').value = '';
+    document.getElementById('searchType').value = 'both';
+    filterTable();
+}
+
+// Валидация формы
 function validateForm() {
     let isValid = true;
     const inputs = document.querySelectorAll('.editable-input');
@@ -443,6 +538,10 @@ function validateForm() {
     const nameInputs = document.querySelectorAll('input[name^="material_name[]"]');
 
     nameInputs.forEach(input => {
+        // Пропускаем скрытые строки
+        if (input.closest('tr').style.display === 'none') {
+            return;
+        }
         const value = input.value.trim();
         if (value) {
             if (names[value]) {
@@ -463,6 +562,10 @@ function validateForm() {
 
     const numberInputs = document.querySelectorAll('input[type="number"]');
     numberInputs.forEach(input => {
+        // Пропускаем скрытые строки
+        if (input.closest('tr').style.display === 'none') {
+            return;
+        }
         const value = parseInt(input.value);
         if (isNaN(value) || value < 0) {
             input.classList.add('input-error');
@@ -482,9 +585,31 @@ function validateForm() {
     return confirm('Сохранить изменения?');
 }
 
+// Автоматическое обновление индикаторов при вводе
 document.querySelectorAll('.editable-input').forEach(input => {
     input.addEventListener('input', function() {
         this.classList.remove('input-error', 'input-success');
+    });
+});
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    initData();
+    // Применяем фильтр, если есть параметры из URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const query = urlParams.get('query');
+    if (query) {
+        document.getElementById('searchQuery').value = query;
+        filterTable();
+    }
+});
+
+// Сохраняем состояние сортировки при отправке формы
+document.getElementById('materialsForm').addEventListener('submit', function() {
+    // Сохраняем текущий порядок строк в скрытых полях
+    const rows = document.querySelectorAll('#tableBody tr');
+    rows.forEach((row, index) => {
+        // Добавляем скрытое поле с порядком, если нужно
     });
 });
 </script>
