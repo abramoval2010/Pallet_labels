@@ -6,7 +6,7 @@ import sqlite3
 import hashlib
 import secrets
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
 import tempfile
@@ -32,18 +32,166 @@ import fitz
 
 PDF_LIB = 'fitz'
 
-# Импорт конфигурации
+
+# ============================================================
+# ОПРЕДЕЛЕНИЕ РЕЖИМА РАБОТЫ
+# ============================================================
+
+def is_desktop_mode():
+    """
+    Определяет, запущено ли приложение в десктопном режиме.
+    """
+    if 'desktop.py' in sys.argv[0]:
+        return True
+    if 'rmo_osl' in sys.argv[0].lower() or '.exe' in sys.argv[0].lower():
+        return True
+    if os.environ.get('DESKTOP_MODE') == 'true':
+        return True
+    if os.environ.get('RENDER'):
+        return False
+    return False
+
+
+DESKTOP_MODE = is_desktop_mode()
+
+if DESKTOP_MODE:
+    print(" Desktop mode")
+else:
+    print(" Web mode (Render)")
+
+
+# ============================================================
+# ОПРЕДЕЛЕНИЕ ПУТЕЙ (В ЗАВИСИМОСТИ ОТ РЕЖИМА)
+# ============================================================
+
+def get_app_data_dir():
+    """Возвращает путь к папке данных приложения в зависимости от ОС"""
+    if DESKTOP_MODE:
+        app_name = "RMO_OSL"
+        if sys.platform == 'win32':
+            base_dir = os.environ.get('APPDATA', os.path.expanduser('~\\AppData\\Roaming'))
+            app_dir = os.path.join(base_dir, app_name)
+        elif sys.platform == 'darwin':
+            app_dir = os.path.expanduser(f'~/Library/Application Support/{app_name}')
+        else:
+            app_dir = os.path.expanduser(f'~/.local/share/{app_name}')
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
+    os.makedirs(app_dir, exist_ok=True)
+    return app_dir
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+USER_DATA_DIR = get_app_data_dir()
+
+# Пути к файлам (в зависимости от режима)
+if DESKTOP_MODE:
+    SETTINGS_FILE = os.path.join(USER_DATA_DIR, 'settings.json')
+    DATABASE_FILE = os.path.join(USER_DATA_DIR, 'users.db')
+    MATERIALS_DATABASE_FILE = os.path.join(USER_DATA_DIR, 'materials.db')
+    MASTER_KEY_FILE = os.path.join(USER_DATA_DIR, 'master.key')
+    GENERATED_LABELS_DIR = os.path.join(USER_DATA_DIR, 'generated_labels')
+    UPLOADS_DIR = os.path.join(USER_DATA_DIR, 'uploads')
+    SESSION_DIR = os.path.join(USER_DATA_DIR, 'flask_session')
+else:
+    SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
+    DATABASE_FILE = os.path.join(BASE_DIR, 'users.db')
+    MATERIALS_DATABASE_FILE = os.path.join(BASE_DIR, 'materials.db')
+    MASTER_KEY_FILE = os.path.join(BASE_DIR, 'master.key')
+    GENERATED_LABELS_DIR = os.path.join(BASE_DIR, 'generated_labels')
+    UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')
+    SESSION_DIR = os.path.join(BASE_DIR, 'flask_session')
+
+# Создаем необходимые папки
+os.makedirs(GENERATED_LABELS_DIR, exist_ok=True)
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+os.makedirs(SESSION_DIR, exist_ok=True)
+
+print(f"Data folder: {USER_DATA_DIR}")
+print(f"Settings: {SETTINGS_FILE}")
+print(f"Database: {DATABASE_FILE}")
+print(f"Session folder: {SESSION_DIR}")
+
+
+# ============================================================
+# МИГРАЦИЯ ДАННЫХ (ТОЛЬКО ДЛЯ ДЕСКТОПНОГО РЕЖИМА)
+# ============================================================
+
+def migrate_data_from_old_location():
+    """Переносит данные из старой папки в папку пользователя (только десктоп)"""
+    if not DESKTOP_MODE:
+        return
+
+    old_data_dir = BASE_DIR
+    migrated_flag = os.path.join(USER_DATA_DIR, '.migrated')
+
+    if os.path.exists(migrated_flag):
+        return
+
+    print("Checking for old data to migrate...")
+
+    files_to_migrate = [
+        ('settings.json', SETTINGS_FILE),
+        ('users.db', DATABASE_FILE),
+        ('materials.db', MATERIALS_DATABASE_FILE),
+        ('master.key', MASTER_KEY_FILE),
+    ]
+
+    migrated_count = 0
+
+    for old_name, new_path in files_to_migrate:
+        old_path = os.path.join(old_data_dir, old_name)
+        if os.path.exists(old_path) and not os.path.exists(new_path):
+            try:
+                shutil.copy2(old_path, new_path)
+                print(f"  Migrated: {old_name}")
+                migrated_count += 1
+            except Exception as e:
+                print(f"  Error migrating {old_name}: {e}")
+
+    # Проверяем папку generated_labels
+    old_labels = os.path.join(old_data_dir, 'generated_labels')
+    if os.path.exists(old_labels) and not os.path.exists(GENERATED_LABELS_DIR):
+        try:
+            shutil.copytree(old_labels, GENERATED_LABELS_DIR)
+            print(f"  Migrated folder: generated_labels")
+            migrated_count += 1
+        except Exception as e:
+            print(f"  Error migrating generated_labels: {e}")
+
+    if migrated_count > 0:
+        print(f"Migration completed: {migrated_count} files/folders migrated")
+    else:
+        print("No old data found for migration")
+
+    try:
+        with open(migrated_flag, 'w') as f:
+            f.write(f"Migration completed at {datetime.now().isoformat()}\n")
+            f.write(f"Source: {old_data_dir}\n")
+            f.write(f"Destination: {USER_DATA_DIR}\n")
+    except:
+        pass
+
+
+# Запускаем миграцию
+migrate_data_from_old_location()
+
+# ============================================================
+# ИМПОРТ КОНФИГУРАЦИИ
+# ============================================================
+
 try:
     from config import Config
 
-    print("✅ Конфигурация загружена из config.py")
+    print("Config loaded from config.py")
 except ImportError:
-    print("⚠️ config.py не найден, используем настройки по умолчанию")
+    print("config.py not found, using default settings")
 
 
     class Config:
         SECRET_KEY = secrets.token_hex(32)
-        UPLOAD_FOLDER = 'uploads'
+        UPLOAD_FOLDER = UPLOADS_DIR
         MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
 app = Flask(__name__)
@@ -51,18 +199,46 @@ app.secret_key = Config.SECRET_KEY
 app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
 
-# Создаем папку для загрузок
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# ============================================================
+# НАСТРОЙКА СЕССИЙ ДЛЯ ДЕСКТОПНОГО РЕЖИМА
+# ============================================================
 
-# Для Render: сохраняем файлы в папке приложения
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Используем filesystem для хранения сессий
+# Это гарантирует, что сессии не теряются при перезапуске
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=31)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = SESSION_DIR
+app.config['SESSION_FILE_THRESHOLD'] = 500
+app.config['SESSION_FILE_MODE'] = 0o600
 
-# Переназначаем пути к файлам в папку приложения
-SETTINGS_FILE = os.path.join(BASE_DIR, 'settings.json')
-DATABASE_FILE = os.path.join(BASE_DIR, 'users.db')
-MATERIALS_DATABASE_FILE = os.path.join(BASE_DIR, 'materials.db')
-LAST_FOLDER_FILE = os.path.join(BASE_DIR, 'last_folder.json')
-LAST_FILE_FILE = os.path.join(BASE_DIR, 'last_file.json')
+# В десктопном режиме используем постоянные сессии через файлы
+if DESKTOP_MODE:
+    # Используем Flask-Session для постоянного хранения сессий
+    try:
+        from flask_session import Session
+
+        Session(app)
+        print("Flask-Session initialized for desktop mode")
+    except ImportError:
+        print("Flask-Session not installed, using fallback session handling")
+        # Если flask-session не установлен, используем встроенные сессии с настройками
+        app.config['SESSION_COOKIE_DOMAIN'] = '127.0.0.1'
+        app.config['SESSION_COOKIE_PATH'] = '/'
+        app.config['SESSION_COOKIE_HTTPONLY'] = True
+        app.config['SESSION_COOKIE_SECURE'] = False
+        app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+        # Устанавливаем путь для сохранения сессий в папку пользователя
+        import uuid
+
+        session_dir = os.path.join(SESSION_DIR, 'sessions')
+        os.makedirs(session_dir, exist_ok=True)
+        app.config['SESSION_FILE_DIR'] = session_dir
+
+# Если в десктопном режиме - отключаем debug
+if DESKTOP_MODE:
+    app.debug = False
 
 
 # ============================================================
@@ -83,7 +259,7 @@ def extract_text_from_pdf(pdf_path):
         doc.close()
         return text
     except Exception as e:
-        print(f"❌ Ошибка открытия PDF: {e}")
+        print(f"Error opening PDF: {e}")
         traceback.print_exc()
         return None
 
@@ -294,9 +470,12 @@ def extract_data_from_pdf(pdf_path):
 class MaterialsDatabase:
     """Класс для работы с базой мастер-данных материалов"""
 
-    def __init__(self, db_file=MATERIALS_DATABASE_FILE):
+    def __init__(self, db_file=None):
+        if db_file is None:
+            db_file = MATERIALS_DATABASE_FILE
         self.db_file = db_file
         self.init_database()
+        print(f"Materials DB: {self.db_file}")
 
     @contextmanager
     def get_connection(self):
@@ -444,102 +623,87 @@ class MaterialsDatabase:
             return cursor.fetchone()[0]
 
     def validate_and_import_from_excel(self, filepath):
-        """Проверяет и импортирует данные из Excel файла (без pandas).
-           Поддерживает 3 колонки (SAP, Название, Палетизация) или 4 колонки (SAP, Название, Палетизация, Вложение в короб)"""
-        print(f"📂 Импорт Excel файла: {filepath}")
+        """Проверяет и импортирует данные из Excel файла (без pandas)"""
+        print(f"Importing Excel file: {filepath}")
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
-            print(f"  Активный лист: {ws.title}")
-            print(f"  Максимальное количество колонок: {ws.max_column}")
+            print(f"  Active sheet: {ws.title}")
+            print(f"  Max columns: {ws.max_column}")
 
             # Определяем, есть ли заголовок
             is_header = False
             first_row = [cell.value for cell in ws[1]]
-            # Проверяем, что первая строка содержит текст, а не числа (заголовок)
             if first_row:
                 header_count = 0
-                for cell in first_row[:4]:  # Проверяем первые 4 колонки
+                for cell in first_row[:4]:
                     if cell is not None and isinstance(cell, str) and not str(cell).isdigit():
                         header_count += 1
-                # Если хотя бы 2 из первых 4 ячеек - строки, считаем, что это заголовок
                 if header_count >= 2:
                     is_header = True
                     start_row = 2
-                    print(f"  Обнаружен заголовок, данные начинаются со строки {start_row}")
+                    print(f"  Header detected, data starts at row {start_row}")
                 else:
                     start_row = 1
-                    print(f"  Заголовка нет, данные начинаются со строки {start_row}")
+                    print(f"  No header, data starts at row {start_row}")
             else:
                 start_row = 1
-                print(f"  Заголовка нет, данные начинаются со строки {start_row}")
+                print(f"  No header, data starts at row {start_row}")
 
             errors = []
             materials_to_add = []
             materials_to_update = []
             skipped_empty_box = 0
 
-            # Проверяем, есть ли 4-я колонка (D)
             has_box_quantity = ws.max_column >= 4
             if has_box_quantity:
-                print("  ✅ Обнаружена колонка D (Вложение в короб)")
+                print("  Column D detected (Box quantity)")
             else:
-                print("  ℹ️ Колонка D не обнаружена, вложение в короб не будет обновляться")
+                print("  Column D not detected, box quantity will not be updated")
 
             for row_idx in range(start_row, ws.max_row + 1):
-                # Читаем 3 обязательные колонки
                 sap_value = ws.cell(row=row_idx, column=1).value
                 material_name = ws.cell(row=row_idx, column=2).value
                 palletization_value = ws.cell(row=row_idx, column=3).value
 
-                # Читаем 4-ю колонку (опционально)
                 box_quantity_value = None
                 if has_box_quantity:
                     box_quantity_value = ws.cell(row=row_idx, column=4).value
 
-                # Проверяем SAP код
                 if sap_value is None:
-                    errors.append(f"Строка {row_idx}: SAP код не может быть пустым")
+                    errors.append(f"Row {row_idx}: SAP code cannot be empty")
                     continue
 
                 try:
                     sap_code = int(sap_value)
                     if len(str(sap_code)) != 8:
-                        errors.append(
-                            f"Строка {row_idx}: SAP код должен содержать 8 цифр (текущее значение: {sap_code})")
+                        errors.append(f"Row {row_idx}: SAP code must be 8 digits (current: {sap_code})")
                         continue
                 except (ValueError, TypeError):
-                    errors.append(f"Строка {row_idx}: SAP код должен быть числом (текущее значение: {sap_value})")
+                    errors.append(f"Row {row_idx}: SAP code must be a number (current: {sap_value})")
                     continue
 
-                # Проверяем название материала
                 material_name = str(material_name) if material_name else ''
                 if not material_name.strip():
-                    errors.append(f"Строка {row_idx}: Название материала не может быть пустым")
+                    errors.append(f"Row {row_idx}: Material name cannot be empty")
                     continue
                 material_name = material_name.strip()
 
-                # Проверяем палетизацию
                 try:
                     palletization = int(palletization_value) if palletization_value is not None else 0
                     if palletization < 0:
-                        errors.append(
-                            f"Строка {row_idx}: Палетизация не может быть отрицательной (текущее значение: {palletization})")
+                        errors.append(f"Row {row_idx}: Palletization cannot be negative (current: {palletization})")
                         continue
                 except (ValueError, TypeError):
-                    errors.append(
-                        f"Строка {row_idx}: Палетизация должна быть числом (текущее значение: {palletization_value})")
+                    errors.append(f"Row {row_idx}: Palletization must be a number (current: {palletization_value})")
                     continue
 
-                # Проверяем вложение в короб (если есть)
                 box_quantity = None
                 if has_box_quantity and box_quantity_value is not None:
                     try:
-                        # Пытаемся преобразовать в число (int или float)
                         if isinstance(box_quantity_value, (int, float)):
                             box_quantity = int(box_quantity_value)
                         else:
-                            # Пробуем преобразовать строку в число
                             box_quantity_str = str(box_quantity_value).strip().replace(',', '.')
                             if box_quantity_str:
                                 box_quantity = int(float(box_quantity_str))
@@ -547,33 +711,27 @@ class MaterialsDatabase:
                         if box_quantity is not None:
                             if box_quantity < 0:
                                 errors.append(
-                                    f"Строка {row_idx}: Вложение в короб не может быть отрицательным (текущее значение: {box_quantity})")
+                                    f"Row {row_idx}: Box quantity cannot be negative (current: {box_quantity})")
                                 box_quantity = None
                     except (ValueError, TypeError):
-                        errors.append(
-                            f"Строка {row_idx}: Вложение в короб должно быть числом (текущее значение: {box_quantity_value})")
+                        errors.append(f"Row {row_idx}: Box quantity must be a number (current: {box_quantity_value})")
                         box_quantity = None
                 elif has_box_quantity and box_quantity_value is None:
-                    # Если ячейка пустая - пропускаем обновление этого поля
                     skipped_empty_box += 1
                     box_quantity = None
 
-                # Проверяем наличие дополнительных колонок
                 if ws.max_column > 4:
                     for col_idx in range(5, ws.max_column + 1):
                         if ws.cell(row=row_idx, column=col_idx).value is not None:
-                            errors.append(f"Строка {row_idx}: Обнаружены данные в дополнительной колонке {col_idx}")
+                            errors.append(f"Row {row_idx}: Data found in extra column {col_idx}")
                             break
 
-                # Проверяем существование материала
                 existing = self.get_material_by_sap(sap_code)
                 if existing:
-                    # Обновляем существующий материал
                     new_data = {
                         'material_name': material_name,
                         'palletization': palletization
                     }
-                    # Добавляем box_quantity только если оно было передано
                     if box_quantity is not None:
                         new_data['box_quantity'] = box_quantity
                     materials_to_update.append({
@@ -581,14 +739,12 @@ class MaterialsDatabase:
                         'data': new_data
                     })
                 else:
-                    # Проверяем уникальность названия
                     existing_name = self.get_material_by_name(material_name)
                     if existing_name:
                         errors.append(
-                            f"Строка {row_idx}: Материал с названием '{material_name}' уже существует в базе (SAP: {existing_name['sap_code']})")
+                            f"Row {row_idx}: Material with name '{material_name}' already exists (SAP: {existing_name['sap_code']})")
                         continue
 
-                    # Добавляем новый материал
                     material_data = {
                         'sap_code': sap_code,
                         'material_name': material_name,
@@ -598,10 +754,9 @@ class MaterialsDatabase:
                     materials_to_add.append(material_data)
 
             if errors:
-                return False, "Ошибки в файле:\n" + "\n".join(errors[:20]) + (
-                    f"\n... и еще {len(errors) - 20} ошибок" if len(errors) > 20 else "")
+                return False, "Errors in file:\n" + "\n".join(errors[:20]) + (
+                    f"\n... and {len(errors) - 20} more errors" if len(errors) > 20 else "")
 
-            # Выполняем обновления
             updated_count = 0
             for material in materials_to_update:
                 success, message = self.update_material(material['sap_code'], material['data'])
@@ -610,7 +765,6 @@ class MaterialsDatabase:
                 else:
                     errors.append(f"SAP {material['sap_code']}: {message}")
 
-            # Выполняем добавления
             added_count = 0
             for material in materials_to_add:
                 success, message = self.add_material(material)
@@ -619,21 +773,21 @@ class MaterialsDatabase:
                 else:
                     errors.append(f"SAP {material['sap_code']}: {message}")
 
-            result_message = f"Успешно обработано: добавлено {added_count} материалов, обновлено {updated_count} материалов"
+            result_message = f"Processed: {added_count} added, {updated_count} updated"
             if skipped_empty_box > 0:
-                result_message += f", пропущено обновление вложения в короб для {skipped_empty_box} материалов (пустые ячейки)"
+                result_message += f", {skipped_empty_box} box quantity updates skipped (empty cells)"
             if errors:
-                result_message += f"\nОшибки: " + "\n".join(errors[:5]) + (
-                    f"\n... и еще {len(errors) - 5} ошибок" if len(errors) > 5 else "")
+                result_message += f"\nErrors: " + "\n".join(errors[:5]) + (
+                    f"\n... and {len(errors) - 5} more errors" if len(errors) > 5 else "")
                 return False, result_message
 
-            print(f"✅ Импорт завершен: добавлено {added_count}, обновлено {updated_count}")
+            print(f"Import completed: {added_count} added, {updated_count} updated")
             return True, result_message
 
         except Exception as e:
-            print(f"❌ Ошибка при импорте: {e}")
+            print(f"Error importing: {e}")
             traceback.print_exc()
-            return False, f"Ошибка при обработке файла: {str(e)}"
+            return False, f"Error processing file: {str(e)}"
 
     def export_to_excel(self):
         """Экспортирует данные материалов в Excel файл"""
@@ -644,7 +798,6 @@ class MaterialsDatabase:
             ws = wb.active
             ws.title = "Реестр сырья и материалов"
 
-            # Заголовки
             headers = ['Номер SAP', 'Наименование', 'Палетизация', 'Вложение в короб']
             header_font = Font(bold=True, color="FFFFFF")
             header_fill = PatternFill(start_color="1a237e", end_color="1a237e", fill_type="solid")
@@ -656,28 +809,25 @@ class MaterialsDatabase:
                 cell.fill = header_fill
                 cell.alignment = header_alignment
 
-            # Данные
             for row_idx, material in enumerate(materials, 2):
                 ws.cell(row=row_idx, column=1, value=material['sap_code'])
                 ws.cell(row=row_idx, column=2, value=material['material_name'])
                 ws.cell(row=row_idx, column=3, value=material['palletization'])
                 ws.cell(row=row_idx, column=4, value=material['box_quantity'])
 
-            # Настройка ширины колонок
             ws.column_dimensions['A'].width = 15
             ws.column_dimensions['B'].width = 40
             ws.column_dimensions['C'].width = 15
             ws.column_dimensions['D'].width = 20
 
-            # Сохраняем файл
             filename = f"Реестр_сырья_и_материалов_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            filepath = os.path.join(UPLOADS_DIR, filename)
             wb.save(filepath)
 
             return filepath
 
         except Exception as e:
-            print(f"❌ Ошибка экспорта: {e}")
+            print(f"Error exporting: {e}")
             traceback.print_exc()
             return None
 
@@ -689,19 +839,23 @@ class MaterialsDatabase:
 class UserDatabase:
     """Класс для работы с зашифрованной базой данных пользователей"""
 
-    def __init__(self, db_file=DATABASE_FILE):
+    def __init__(self, db_file=None):
+        if db_file is None:
+            db_file = DATABASE_FILE
         self.db_file = db_file
         self.master_key = self._get_master_key()
         self.init_database()
+        print(f"Users DB: {self.db_file}")
 
     def _get_master_key(self):
         """Получает или создает мастер-ключ для шифрования"""
-        key_file = os.path.join(BASE_DIR, 'master.key')
+        key_file = MASTER_KEY_FILE
         if os.path.exists(key_file):
             with open(key_file, 'rb') as f:
                 return f.read()
         else:
             key = secrets.token_bytes(32)
+            os.makedirs(os.path.dirname(key_file), exist_ok=True)
             with open(key_file, 'wb') as f:
                 f.write(key)
             return key
@@ -1051,7 +1205,7 @@ materials_db = MaterialsDatabase(MATERIALS_DATABASE_FILE)
 def load_settings():
     """Загружает настройки из файла"""
     default_settings = {
-        'save_path': os.path.join(BASE_DIR, 'generated_labels'),
+        'save_path': GENERATED_LABELS_DIR,
         'sop_code': 'RUPD.VLG.05.04.C01',
         'font_settings': {
             'header_size': 12,
@@ -1087,7 +1241,7 @@ def load_settings():
                         settings['font_settings'][key] = default_settings['font_settings'][key]
             return settings
         else:
-            os.makedirs(default_settings['save_path'], exist_ok=True)
+            os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
             save_settings(default_settings)
             return default_settings
     except Exception as e:
@@ -1098,6 +1252,7 @@ def load_settings():
 def save_settings(settings):
     """Сохраняет настройки в файл"""
     try:
+        os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
         with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
             json.dump(settings, f, ensure_ascii=False, indent=4)
         return True
@@ -1243,7 +1398,7 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
     """Создает файл с палетными этикетками только для выбранных товаров"""
     if save_path is None:
         settings = load_settings()
-        save_path = settings.get('save_path', os.path.join(BASE_DIR, 'generated_labels'))
+        save_path = settings.get('save_path', GENERATED_LABELS_DIR)
 
     if sop_code is None:
         settings = load_settings()
@@ -1255,7 +1410,7 @@ def create_pallet_labels_file(all_products, order_number, supplier_name, order_d
     try:
         os.makedirs(save_path, exist_ok=True)
     except Exception as e:
-        save_path = os.path.join(BASE_DIR, 'generated_labels')
+        save_path = GENERATED_LABELS_DIR
         os.makedirs(save_path, exist_ok=True)
 
     doc = Document()
@@ -1794,7 +1949,6 @@ def materials_page():
 @manager_required
 def update_materials():
     try:
-        # Получаем данные из формы
         sap_codes = request.form.getlist('sap_code[]')
         material_names = request.form.getlist('material_name[]')
         palletizations = request.form.getlist('palletization[]')
@@ -1823,7 +1977,6 @@ def update_materials():
                 errors.append(f"SAP {sap_code}: Название материала не может быть пустым")
                 continue
 
-            # Проверяем уникальность названия
             existing = materials_db.get_material_by_name(material_name)
             if existing and str(existing['sap_code']) != str(sap_code):
                 errors.append(f"Материал с названием '{material_name}' уже существует (SAP: {existing['sap_code']})")
@@ -1897,7 +2050,7 @@ def import_materials():
             return redirect(url_for('import_materials'))
 
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        filepath = os.path.join(UPLOADS_DIR, filename)
         file.save(filepath)
 
         try:
@@ -1935,6 +2088,55 @@ def export_materials():
         return redirect(url_for('materials_page'))
 
 
+@app.route('/materials/search', methods=['POST'])
+@manager_required
+def search_materials():
+    try:
+        query = request.form.get('query', '').strip()
+        search_type = request.form.get('search_type', 'both')
+        sort_by = request.form.get('sort_by', 'sap_code')
+        sort_order = request.form.get('sort_order', 'asc')
+
+        materials = materials_db.get_all_materials()
+
+        if query:
+            filtered = []
+            query_lower = query.lower()
+            for material in materials:
+                if search_type == 'sap':
+                    if query in str(material['sap_code']):
+                        filtered.append(material)
+                elif search_type == 'name':
+                    if query_lower in material['material_name'].lower():
+                        filtered.append(material)
+                else:
+                    if query in str(material['sap_code']) or query_lower in material['material_name'].lower():
+                        filtered.append(material)
+            materials = filtered
+
+        reverse = sort_order == 'desc'
+        if sort_by == 'sap_code':
+            materials.sort(key=lambda x: x['sap_code'], reverse=reverse)
+        elif sort_by == 'material_name':
+            materials.sort(key=lambda x: x['material_name'].lower(), reverse=reverse)
+        elif sort_by == 'palletization':
+            materials.sort(key=lambda x: x['palletization'], reverse=reverse)
+        elif sort_by == 'box_quantity':
+            materials.sort(key=lambda x: x['box_quantity'], reverse=reverse)
+
+        return render_template('materials.html',
+                               materials=materials,
+                               query=query,
+                               search_type=search_type,
+                               sort_by=sort_by,
+                               sort_order=sort_order)
+    except Exception as e:
+        print(f"Ошибка в search_materials: {e}")
+        traceback.print_exc()
+        flash(f'Ошибка при поиске: {str(e)}', 'danger')
+        return redirect(url_for('materials_page'))
+
+
 @app.route('/upload', methods=['POST'])
 @labels_access_required
 def upload_file():
@@ -1954,7 +2156,7 @@ def upload_file():
             return redirect(url_for('index'))
 
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        filepath = os.path.join(UPLOADS_DIR, filename)
         file.save(filepath)
 
         try:
@@ -2002,12 +2204,12 @@ def upload_file():
         except Exception as e:
             if os.path.exists(filepath):
                 os.remove(filepath)
-            print(f"❌ Ошибка при обработке: {e}")
+            print(f"Ошибка при обработке: {e}")
             traceback.print_exc()
             flash(f'Ошибка при обработке файла: {str(e)}', 'danger')
             return redirect(url_for('index'))
     except Exception as e:
-        print(f"❌ Ошибка в upload_file: {e}")
+        print(f"Ошибка в upload_file: {e}")
         traceback.print_exc()
         flash(f'Ошибка при загрузке файла: {str(e)}', 'danger')
         return redirect(url_for('index'))
@@ -2085,7 +2287,9 @@ def generate_labels():
             flash('Не сгенерировано ни одной этикетки (нет выбранных товаров)', 'warning')
             return redirect(url_for('index'))
 
+        # Определяем режим работы и формат вывода
         if os.environ.get('RENDER'):
+            # На Render - всегда показываем ссылку на скачивание
             return render_template('success_render.html',
                                    filepath=filepath,
                                    filename=os.path.basename(filepath),
@@ -2093,16 +2297,16 @@ def generate_labels():
                                    order_number=order_number,
                                    total_pallets=total_labels)
         else:
+            # В десктопном и локальном веб-режиме - открываем в Word
             open_in_word(filepath)
+            db.log_action(session['user'], 'GENERATE_LABELS',
+                          f"Сгенерировано {total_labels} этикеток для заказа {order_number}")
+            return render_template('success.html',
+                                   filepath=filepath,
+                                   product_count=len(products),
+                                   order_number=order_number,
+                                   total_pallets=total_labels)
 
-        db.log_action(session['user'], 'GENERATE_LABELS',
-                      f"Сгенерировано {total_labels} этикеток для заказа {order_number}")
-
-        return render_template('success.html',
-                               filepath=filepath,
-                               product_count=len(products),
-                               order_number=order_number,
-                               total_pallets=total_labels)
     except Exception as e:
         print(f"Ошибка в generate_labels: {e}")
         traceback.print_exc()
@@ -2116,7 +2320,7 @@ def download_file(filename):
     """Скачивание сгенерированного файла"""
     try:
         settings = load_settings()
-        save_path = settings.get('save_path', os.path.join(BASE_DIR, 'generated_labels'))
+        save_path = settings.get('save_path', GENERATED_LABELS_DIR)
         filepath = os.path.join(save_path, filename)
 
         if not os.path.exists(filepath):
@@ -2138,7 +2342,7 @@ def settings_page():
         settings = load_settings()
         drives = get_available_drives()
 
-        current_path = settings.get('save_path', os.path.join(BASE_DIR, 'generated_labels'))
+        current_path = settings.get('save_path', GENERATED_LABELS_DIR)
 
         path_param = request.args.get('path')
         if path_param and os.path.exists(path_param):
@@ -2266,4 +2470,11 @@ def exit_app():
 
 if __name__ == '__main__':
     load_settings()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+
+    if DESKTOP_MODE:
+        print("Running desktop application")
+        print("   Press Ctrl+C to exit")
+        app.run(debug=False, host='127.0.0.1', port=5000)
+    else:
+        print("Running web server")
+        app.run(debug=True, host='0.0.0.0', port=5000)
