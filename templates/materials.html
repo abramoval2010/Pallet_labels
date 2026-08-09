@@ -232,10 +232,6 @@ tr:hover {
     outline: none;
     border-color: #00897b;
 }
-.search-bar input:focus {
-    outline: none;
-    border-color: #00897b;
-}
 .search-bar select {
     padding: 10px 15px;
     border: 2px solid #e0e0e0;
@@ -334,7 +330,10 @@ tr:hover {
                 </thead>
                 <tbody id="tableBody">
                     {% for material in materials %}
-                    <tr data-sap="{{ material.sap_code }}" data-name="{{ material.material_name }}" data-palletization="{{ material.palletization }}" data-box-quantity="{{ material.box_quantity }}">
+                    <tr data-sap="{{ material.sap_code }}"
+                        data-name="{{ material.material_name }}"
+                        data-palletization="{{ material.palletization }}"
+                        data-box-quantity="{{ material.box_quantity }}">
                         <td>
                             <strong>{{ material.sap_code }}</strong>
                             <input type="hidden" name="sap_code[]" value="{{ material.sap_code }}">
@@ -397,14 +396,24 @@ function initData() {
     const rows = document.querySelectorAll('#tableBody tr');
     originalData = [];
     rows.forEach(row => {
+        // Получаем значения из data-атрибутов
+        // Используем box_quantity (с подчеркиванием), потому что так он записывается в HTML
+        const sap = row.getAttribute('data-sap') || '';
+        const name = row.getAttribute('data-name') || '';
+        const palletization = row.getAttribute('data-palletization') || '0';
+        const boxQuantity = row.getAttribute('data-box-quantity') || '0';
+
+        console.log('Row data:', { sap, name, palletization, boxQuantity });
+
         originalData.push({
             element: row,
-            sap: row.dataset.sap,
-            name: row.dataset.name,
-            palletization: parseInt(row.dataset.palletization) || 0,
-            boxQuantity: parseInt(row.dataset.box_quantity) || 0
+            sap: sap,
+            name: name,
+            palletization: parseInt(palletization) || 0,
+            boxQuantity: parseInt(boxQuantity) || 0
         });
     });
+    console.log('Initialized data:', originalData.length, 'rows');
 }
 
 // Фильтрация таблицы
@@ -415,8 +424,8 @@ function filterTable() {
     let visibleCount = 0;
 
     rows.forEach(row => {
-        const sap = row.dataset.sap || '';
-        const name = row.dataset.name || '';
+        const sap = row.getAttribute('data-sap') || '';
+        const name = row.getAttribute('data-name') || '';
         let match = false;
 
         if (!query) {
@@ -457,6 +466,8 @@ function filterTable() {
 
 // Сортировка таблицы
 function sortTable(column) {
+    console.log('Sorting by column:', column);
+
     const rows = document.querySelectorAll('#tableBody tr');
     const rowArray = Array.from(rows);
 
@@ -467,6 +478,7 @@ function sortTable(column) {
         currentSortColumn = column;
         currentSortOrder = 'asc';
     }
+    console.log('Sort order:', currentSortOrder);
 
     // Обновляем иконки сортировки
     updateSortIcons(column, currentSortOrder);
@@ -476,20 +488,21 @@ function sortTable(column) {
         let valA, valB;
         switch(column) {
             case 'sap_code':
-                valA = parseInt(a.dataset.sap) || 0;
-                valB = parseInt(b.dataset.sap) || 0;
+                valA = parseInt(a.getAttribute('data-sap')) || 0;
+                valB = parseInt(b.getAttribute('data-sap')) || 0;
                 break;
             case 'material_name':
-                valA = (a.dataset.name || '').toLowerCase();
-                valB = (b.dataset.name || '').toLowerCase();
+                valA = (a.getAttribute('data-name') || '').toLowerCase();
+                valB = (b.getAttribute('data-name') || '').toLowerCase();
                 break;
             case 'palletization':
-                valA = parseInt(a.dataset.palletization) || 0;
-                valB = parseInt(b.dataset.palletization) || 0;
+                valA = parseInt(a.getAttribute('data-palletization')) || 0;
+                valB = parseInt(b.getAttribute('data-palletization')) || 0;
                 break;
             case 'box_quantity':
-                valA = parseInt(a.dataset.box_quantity) || 0;
-                valB = parseInt(b.dataset.box_quantity) || 0;
+                valA = parseInt(a.getAttribute('data-box-quantity')) || 0;
+                valB = parseInt(b.getAttribute('data-box-quantity')) || 0;
+                console.log('Box quantity compare:', valA, valB);
                 break;
             default:
                 return 0;
@@ -513,10 +526,12 @@ function updateSortIcons(activeColumn, order) {
     const columns = ['sap_code', 'material_name', 'palletization', 'box_quantity'];
     columns.forEach(col => {
         const icon = document.getElementById(`sort-${col}`);
-        if (col === activeColumn) {
-            icon.textContent = order === 'asc' ? '↑' : '↓';
-        } else {
-            icon.textContent = '↕';
+        if (icon) {
+            if (col === activeColumn) {
+                icon.textContent = order === 'asc' ? '↑' : '↓';
+            } else {
+                icon.textContent = '↕';
+            }
         }
     });
 }
@@ -594,6 +609,7 @@ document.querySelectorAll('.editable-input').forEach(input => {
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...');
     initData();
     // Применяем фильтр, если есть параметры из URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -602,15 +618,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('searchQuery').value = query;
         filterTable();
     }
-});
-
-// Сохраняем состояние сортировки при отправке формы
-document.getElementById('materialsForm').addEventListener('submit', function() {
-    // Сохраняем текущий порядок строк в скрытых полях
-    const rows = document.querySelectorAll('#tableBody tr');
-    rows.forEach((row, index) => {
-        // Добавляем скрытое поле с порядком, если нужно
-    });
 });
 </script>
 </body>
