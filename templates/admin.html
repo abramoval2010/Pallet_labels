@@ -238,7 +238,7 @@ margin-left: 8px;
 {% if user_rights in ['Администратор', 'Менеджер ОСЛ'] %}
 <div>
     <h2>➕ Создать пользователя</h2>
-    <form action="/admin/add_user" method="POST">
+    <form action="{{ url_for('admin.add_user') }}" method="POST">
         <div class="form-group">
             <label>Логин *</label>
             <input type="text" name="login" required>

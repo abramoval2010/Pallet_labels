@@ -179,7 +179,7 @@
     <div class="menu-grid">
         <!-- 1. Сформировать палетные этикетки (СиМ) -->
         {% set has_labels_access = session.user_rights in ['Администратор', 'Оператор СиМ', 'Менеджер ОСЛ'] and session.user_plant == 'Вольгинский' %}
-        <a href="{{ url_for('upload_form') if has_labels_access else url_for('functionality_not_available') }}"
+        <a href="{{ url_for('upload.upload_form') if has_labels_access else url_for('main.functionality_not_available') }}"
            class="menu-item {% if not has_labels_access %}disabled{% endif %}">
             <span class="icon">📦</span>
             <div class="title">Сформировать палетные этикетки (СиМ)</div>
@@ -187,35 +187,35 @@
         </a>
 
         <!-- 2. Сформировать стеллажную карту (СиМ) -->
-        <a href="{{ url_for('functionality_not_available') }}" class="menu-item">
+        <a href="{{ url_for('main.functionality_not_available') }}" class="menu-item">
             <span class="icon">🏷️</span>
             <div class="title">Сформировать стеллажную карту (СиМ)</div>
             <div class="description">Формирование стеллажных карт</div>
         </a>
 
         <!-- 3. Сформировать транспортную заявку в РТЭ -->
-        <a href="{{ url_for('functionality_not_available') }}" class="menu-item">
+        <a href="{{ url_for('main.functionality_not_available') }}" class="menu-item">
             <span class="icon">🚛</span>
             <div class="title">Сформировать транспортную заявку в РТЭ</div>
             <div class="description">Создание заявок на перевозку</div>
         </a>
 
         <!-- 4. Сформировать ТТН (наем и собств) -->
-        <a href="{{ url_for('functionality_not_available') }}" class="menu-item">
+        <a href="{{ url_for('main.functionality_not_available')}}" class="menu-item">
             <span class="icon">📄</span>
             <div class="title">Сформировать ТТН (наем и собств)</div>
             <div class="description">Товарно-транспортные накладные</div>
         </a>
 
         <!-- 5. Настройки -->
-        <a href="{{ url_for('settings_page') }}" class="menu-item">
+        <a href="{{ url_for('settings.settings_page')}}" class="menu-item">
             <span class="icon">⚙️</span>
             <div class="title">Настройки</div>
             <div class="description">Параметры системы и управление</div>
         </a>
 
         <!-- 6. Смена пароля -->
-        <a href="{{ url_for('change_password') }}" class="menu-item">
+        <a href="{{ url_for('auth.change_password') }}" class="menu-item">
             <span class="icon">🔑</span>
             <div class="title">Смена пароля</div>
             <div class="description">Изменение пароля пользователя</div>

@@ -270,9 +270,9 @@ tr:hover {
     <div class="header">
         <h1>📦 Мастер-данные сырья и материалов</h1>
         <div>
-            <a href="/materials/export" class="btn btn-export">📤 Экспорт</a>
+            <a href="{{ url_for('materials.export_materials') }}" class="btn btn-export">📤 Экспорт</a>
             <a href="/settings" class="btn btn-secondary">⚙️ Настройки</a>
-            <a href="/materials/import" class="btn btn-settings">📤 Импорт</a>
+            <a href="{{ url_for('materials.import_materials') }}" class="btn btn-settings">📤 Импорт</a>
             <a href="/" class="btn btn-primary">🏠 На главную</a>
         </div>
     </div>
