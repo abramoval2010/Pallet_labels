@@ -1,4 +1,5 @@
 # app/routes/upload.py
+import tempfile
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from werkzeug.utils import secure_filename
@@ -26,7 +27,6 @@ def upload_form():
 @upload_bp.route('/upload', methods=['POST'])
 @labels_access_required
 def upload_file():
-    """Обработка загрузки PDF-файла"""
     try:
         if 'file' not in request.files:
             flash('Файл не выбран', 'warning')
@@ -42,8 +42,13 @@ def upload_file():
             flash('Пожалуйста, загрузите файл в формате PDF', 'danger')
             return redirect(url_for('main.index'))
 
+        # Используем временную папку для загрузки
+        if os.environ.get('RENDER'):
+            uploads_dir = tempfile.mkdtemp()
+        else:
+            uploads_dir = current_app.config.get('UPLOADS_DIR')
+
         filename = secure_filename(file.filename)
-        uploads_dir = current_app.config.get('UPLOADS_DIR')
         filepath = os.path.join(uploads_dir, filename)
         file.save(filepath)
 

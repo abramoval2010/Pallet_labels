@@ -1,10 +1,11 @@
 # app/routes/labels.py
 import os
 import json
-from flask import current_app,  Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file
+import tempfile
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file, \
+    current_app
 from app.utils.decorators import labels_access_required, login_required
 from app.services.label_generator import create_pallet_labels_file
-from app.services.pdf_parser import extract_data_from_pdf
 from app.utils.helpers import calculate_pallets, open_in_word
 
 labels_bp = Blueprint('labels', __name__)
@@ -73,10 +74,21 @@ def generate_labels():
             flash('Не выбрано ни одного товара для формирования этикеток', 'warning')
             return redirect(url_for('main.index'))
 
+        # Получаем настройки
         settings_manager = current_app.config.get('settings_manager')
-        save_path = settings_manager.get('save_path')
         sop_code = settings_manager.get('sop_code')
         font_settings = settings_manager.get_font_settings()
+
+        # Определяем, где сохранять файл
+        is_render = os.environ.get('RENDER') == 'true'
+        is_desktop = current_app.config.get('DESKTOP_MODE', False)
+
+        if is_render or not is_desktop:
+            # На Render или в веб-режиме используем временную папку
+            save_path = tempfile.mkdtemp()
+        else:
+            # В десктопном режиме используем папку из настроек
+            save_path = settings_manager.get('save_path')
 
         filepath, total_labels = create_pallet_labels_file(
             products, order_number, supplier_name, order_date,
@@ -91,19 +103,16 @@ def generate_labels():
         db.log_action(session['user'], 'GENERATE_LABELS',
                       f"Сгенерировано {total_labels} этикеток для заказа {order_number}")
 
-        desktop_mode = current_app.config.get('DESKTOP_MODE', False)
-        is_render = os.environ.get('RENDER') == 'true'
-
-        if is_render:
-            # На Render - показываем ссылку на скачивание
-            return render_template('success_render.html',
-                                   filepath=filepath,
-                                   filename=os.path.basename(filepath),
-                                   product_count=len(products),
-                                   order_number=order_number,
-                                   total_pallets=total_labels)
+        # На Render или в веб-режиме отправляем файл на скачивание
+        if is_render or not is_desktop:
+            return send_file(
+                filepath,
+                as_attachment=True,
+                download_name=os.path.basename(filepath),
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
         else:
-            # В десктопном режиме - открываем в Word
+            # В десктопном режиме открываем в Word
             open_in_word(filepath)
             return render_template('success.html',
                                    filepath=filepath,
@@ -127,6 +136,14 @@ def download_file(filename):
         settings_manager = current_app.config.get('settings_manager')
         save_path = settings_manager.get('save_path')
         filepath = os.path.join(save_path, filename)
+
+        # Проверяем также временную папку
+        if not os.path.exists(filepath):
+            # Пробуем найти во временной папке
+            temp_dir = tempfile.gettempdir()
+            temp_path = os.path.join(temp_dir, filename)
+            if os.path.exists(temp_path):
+                filepath = temp_path
 
         if not os.path.exists(filepath):
             flash('Файл не найден', 'danger')
