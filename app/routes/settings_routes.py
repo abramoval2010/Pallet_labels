@@ -3,6 +3,7 @@ import os
 import sys
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from app.utils.decorators import login_required
+from app.utils.helpers import normalize_user_path
 from app.services.file_utils import get_available_drives, get_subdirectories
 
 settings_bp = Blueprint('settings', __name__)
@@ -49,11 +50,12 @@ def settings_page():
 
         # --- Личная папка текущего пользователя ---
         current_user = db.find_user(session['user']) if db else None
-        user_folder_path = (current_user.get('folder_path') or '') if current_user else ''
+        user_folder_path = normalize_user_path(current_user.get('folder_path') if current_user else '')
 
+        # Навигация по личной папке: ?user_path=...
         user_path_param = request.args.get('user_path')
         if user_path_param is not None:
-            user_folder_path = user_path_param
+            user_folder_path = normalize_user_path(user_path_param)
 
         user_path_parts = []
         if user_folder_path:
@@ -86,10 +88,18 @@ def settings_page():
 
             # --- Сохранение / очистка личной папки ---
             if action == 'save_user_folder' and can_use_personal_folder:
-                new_user_folder = request.form.get('user_folder_path', '').strip()
+                raw_path = request.form.get('user_folder_path', '')
+                new_user_folder = normalize_user_path(raw_path)
                 db.update_user_folder(session['user'], new_user_folder)
                 if new_user_folder:
-                    flash('Личная папка сохранена', 'success')
+                    if os.path.isdir(new_user_folder):
+                        flash('Личная папка сохранена', 'success')
+                    else:
+                        flash(
+                            f'Личная папка сохранена, но по указанному пути папка не найдена: '
+                            f'{new_user_folder}',
+                            'warning'
+                        )
                 else:
                     flash('Личная папка очищена', 'info')
                 return redirect(url_for('settings.settings_page'))

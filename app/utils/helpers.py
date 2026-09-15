@@ -3,37 +3,32 @@ import os
 import re
 import math
 import sys
+import unicodedata
 from datetime import datetime
 
 
 def is_desktop_mode():
     """Определяет, запущено ли приложение в десктопном режиме"""
-    # Проверяем переменную окружения (приоритет)
     if os.environ.get('DESKTOP_MODE') == 'false':
         return False
     if os.environ.get('DESKTOP_MODE') == 'true':
         return True
 
-    # Проверяем, запущен ли скрипт как замороженное приложение
     if getattr(sys, 'frozen', False):
         return True
 
-    # Проверяем имя файла
     script_name = os.path.basename(sys.argv[0]).lower()
     if script_name in ['desktop.py', 'rmo_osl.exe']:
         return True
     if '.exe' in script_name and 'rmo_osl' in script_name:
         return True
 
-    # Проверяем аргументы
     if '--desktop' in sys.argv:
         return True
 
-    # Проверяем Render
     if os.environ.get('RENDER'):
         return False
 
-    # По умолчанию - web-режим
     return False
 
 
@@ -42,7 +37,6 @@ def get_app_data_dir(app_name="RMO_OSL"):
     desktop_mode = is_desktop_mode()
 
     if desktop_mode:
-        # Десктопный режим - используем стандартные папки ОС
         if sys.platform == 'win32':
             base_dir = os.environ.get('APPDATA', os.path.expanduser('~\\AppData\\Roaming'))
             app_dir = os.path.join(base_dir, app_name)
@@ -51,13 +45,45 @@ def get_app_data_dir(app_name="RMO_OSL"):
         else:
             app_dir = os.path.expanduser(f'~/.local/share/{app_name}')
     else:
-        # Web-режим - используем папку проекта
-        # Определяем корневую папку проекта
-        current_file = os.path.abspath(__file__)  # /path/to/app/utils/helpers.py
-        app_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))  # /path/to/project/
+        current_file = os.path.abspath(__file__)
+        app_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
 
     os.makedirs(app_dir, exist_ok=True)
     return app_dir
+
+
+def normalize_user_path(raw_path):
+    """
+    Приводит путь, введённый пользователем, к «чистому» виду:
+      - убирает обрамляющие пробелы, табы, переводы строк;
+      - снимает обрамляющие кавычки (одинарные или двойные),
+        которые часто попадают при копировании через «Копировать как путь» в Windows;
+      - нормализует Unicode к форме NFC,
+        чтобы кириллические буквы совпадали с тем, как их хранит файловая система;
+      - убирает завершающий слэш/бэкслэш (кроме корня диска вида "C:\\").
+    Возвращает очищенную строку.
+    """
+    if raw_path is None:
+        return ''
+
+    p = str(raw_path).strip()
+
+    # Снимаем обрамляющие кавычки
+    if len(p) >= 2 and p[0] == p[-1] and p[0] in ('"', "'"):
+        p = p[1:-1].strip()
+
+    # Нормализация Unicode — критично для кириллицы
+    p = unicodedata.normalize('NFC', p)
+
+    # Убираем завершающий слэш/бэкслэш, но не трогаем "C:\" и "/"
+    if len(p) > 3:
+        if p.endswith('\\') or p.endswith('/'):
+            # не убираем, если это корень диска "C:\"
+            if not (len(p) == 3 and p[1] == ':'):
+                p = p.rstrip('\\/')
+
+    return p
+
 
 def calculate_pallets(quantity, palletization):
     """Рассчитывает количество паллет"""
@@ -65,12 +91,12 @@ def calculate_pallets(quantity, palletization):
         return 1
     try:
         qty = int(quantity)
-    except:
+    except Exception:
         return 1
     if palletization > 0:
         try:
             return math.ceil(qty / palletization)
-        except:
+        except Exception:
             return 1
     return 1
 

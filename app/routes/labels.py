@@ -5,8 +5,8 @@ import tempfile
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file, \
     current_app
 from app.utils.decorators import labels_access_required, login_required
+from app.utils.helpers import calculate_pallets, open_in_word, normalize_user_path
 from app.services.label_generator import create_pallet_labels_file
-from app.utils.helpers import calculate_pallets, open_in_word
 
 labels_bp = Blueprint('labels', __name__)
 
@@ -30,10 +30,7 @@ def _is_web_mode():
 
 
 def _build_labels_file(products, selected_indices, order_number, supplier_name, order_date):
-    """
-    Общая функция формирования .docx с палетными этикетками.
-    Используется и в /generate_labels, и в /last_order.
-    """
+    """Общая функция формирования .docx с палетными этикетками."""
     settings_manager = current_app.config.get('settings_manager')
     sop_code = settings_manager.get('sop_code')
     font_settings = settings_manager.get_font_settings()
@@ -46,10 +43,7 @@ def _build_labels_file(products, selected_indices, order_number, supplier_name, 
 
 
 def _send_or_open_result(filepath, total_labels, products, order_number):
-    """
-    В web-режиме (включая Render) — отдаём файл на скачивание.
-    В десктопном режиме — открываем в Word и показываем success.html.
-    """
+    """Web-режим — скачивание, десктоп — открыть в Word."""
     if _is_web_mode():
         return send_file(
             filepath,
@@ -70,11 +64,8 @@ def _send_or_open_result(filepath, total_labels, products, order_number):
 
 def _get_file_timestamp(path):
     """
-    Возвращает метку времени файла для определения «самый новый / самый старый».
-    Используем mtime — время последнего изменения содержимого файла.
-    Оно одинаково надёжно работает и на Windows, и на Linux/Render.
-    getctime здесь не подходит: на Linux это время смены метаданных, а не создания файла.
-    Если mtime недоступно — откатываемся на ctime.
+    Метка времени файла для определения «самый новый / самый старый».
+    Используем mtime — одинаково надёжно на Windows и Linux/Render.
     """
     try:
         return os.path.getmtime(path)
@@ -88,33 +79,27 @@ def _get_file_timestamp(path):
 def _collect_pdf_files_top_level(folder_path):
     """
     Собирает PDF-файлы ТОЛЬКО на верхнем уровне папки (без подпапок).
-    Возвращает (список_путей, диагностика).
-    Диагностика — словарь {'dirs': [...], 'files': [...]}.
+    Возвращает (список_путей, диагностика {'dirs': [...], 'files': [...]}).
     """
     pdf_files = []
     dirs_list = []
     files_list = []
 
-    try:
-        for name in os.listdir(folder_path):
-            full_path = os.path.join(folder_path, name)
-
-            if os.path.isdir(full_path):
-                dirs_list.append(name)
-                continue
-
-            if os.path.isfile(full_path):
-                files_list.append(name)
-                if name.lower().endswith('.pdf'):
-                    pdf_files.append(full_path)
-    except OSError:
-        raise
+    for name in os.listdir(folder_path):
+        full_path = os.path.join(folder_path, name)
+        if os.path.isdir(full_path):
+            dirs_list.append(name)
+            continue
+        if os.path.isfile(full_path):
+            files_list.append(name)
+            if name.lower().endswith('.pdf'):
+                pdf_files.append(full_path)
 
     return pdf_files, {'dirs': dirs_list, 'files': files_list}
 
 
 def _format_missing_pdfs_message(folder_path, diagnostics):
-    """Собирает подробное диагностическое сообщение, если PDF не найдены."""
+    """Подробное сообщение, если PDF не найдены на верхнем уровне папки."""
     dirs_preview = diagnostics['dirs'][:5]
     files_preview = diagnostics['files'][:5]
     parts = []
@@ -133,6 +118,76 @@ def _format_missing_pdfs_message(folder_path, diagnostics):
         f'В папке «{folder_path}» не найдено PDF-файлов на верхнем уровне. '
         f'Содержимое папки — {diag}.'
     )
+
+
+def _diagnose_path(folder_path):
+    """
+    Умная диагностика, если путь не существует.
+    Идёт по пути сверху вниз, находит самый глубокий существующий префикс
+    и показывает, что в нём реально лежит (папки и файлы).
+    Это помогает увидеть настоящее имя папки, если пользователь
+    ввёл путь с опечаткой, пробелами вместо подчёркиваний и т.п.
+    """
+    # Случай: путь существует, но это файл, а не папка
+    if os.path.exists(folder_path) and not os.path.isdir(folder_path):
+        return f'По пути {folder_path} находится файл, а не папка.'
+
+    # Ищем самый длинный существующий префикс
+    missing_parts = []
+    current = os.path.normpath(folder_path)
+
+    while True:
+        if os.path.exists(current):
+            break
+        head, tail = os.path.split(current)
+        if not tail or head == current:
+            # дошли до корня — ничего не существует
+            break
+        missing_parts.insert(0, tail)
+        current = head
+
+    if not os.path.isdir(current):
+        return (
+            f'Папка не найдена: {folder_path}. '
+            f'Ни один элемент пути не существует, начиная с {current!r}.'
+        )
+
+    # Собираем содержимое ближайшей существующей папки
+    existing_dirs = []
+    existing_files = []
+    try:
+        for name in os.listdir(current):
+            full = os.path.join(current, name)
+            if os.path.isdir(full):
+                existing_dirs.append(name)
+            else:
+                existing_files.append(name)
+    except OSError as e:
+        return f'Папка не найдена: {folder_path}. Не удалось прочитать {current}: {e}'
+
+    message_parts = [
+        f'Папка не найдена: {folder_path}',
+        f'Существует только: {current}',
+    ]
+
+    if missing_parts:
+        message_parts.append(f'Отсутствует часть: {" → ".join(missing_parts)}')
+
+    if existing_dirs:
+        preview = existing_dirs[:10]
+        suffix = f' (+{len(existing_dirs) - 10})' if len(existing_dirs) > 10 else ''
+        message_parts.append(
+            f'Папки в {current}: {", ".join(preview)}{suffix}'
+        )
+
+    if existing_files:
+        preview = existing_files[:5]
+        suffix = f' (+{len(existing_files) - 5})' if len(existing_files) > 5 else ''
+        message_parts.append(
+            f'Файлы в {current}: {", ".join(preview)}{suffix}'
+        )
+
+    return ' | '.join(message_parts)
 
 
 @labels_bp.route('/recalculate_pallets', methods=['POST'])
@@ -225,10 +280,10 @@ def generate_labels():
 def last_order():
     """
     Быстрое формирование палетных этикеток с САМОГО НОВОГО прихода:
-    1. Берёт личную папку пользователя из БД.
-    2. Проверяет её существование.
-    3. Ищет PDF ТОЛЬКО на верхнем уровне папки (без подпапок).
-    4. Выбирает САМЫЙ НОВЫЙ файл через max() по mtime (времени изменения файла).
+    1. Берёт личную папку пользователя из БД (с нормализацией пути).
+    2. Проверяет её существование (с умной диагностикой, если нет).
+    3. Ищет PDF ТОЛЬКО на верхнем уровне папки.
+    4. Выбирает САМЫЙ НОВЫЙ файл через max() по mtime.
     5. Парсит его существующим алгоритмом.
     6. Сразу формирует .docx со всеми товарами (selected_indices = все).
     7. В web-режиме отдаёт файл на скачивание, локально открывает в Word.
@@ -241,7 +296,7 @@ def last_order():
             flash('Пользователь не найден', 'danger')
             return redirect(url_for('main.index'))
 
-        folder_path = (user.get('folder_path') or '').strip()
+        folder_path = normalize_user_path(user.get('folder_path') or '')
 
         if not folder_path:
             flash('У вас не выбрана личная папка с приходными ордерами. '
@@ -249,21 +304,21 @@ def last_order():
             return redirect(url_for('settings.settings_page'))
 
         if not os.path.isdir(folder_path):
-            flash(f'Папка не найдена: {folder_path}. Проверьте путь в настройках.', 'danger')
+            flash(_diagnose_path(folder_path), 'danger')
             return redirect(url_for('settings.settings_page'))
 
         # Поиск PDF только на верхнем уровне папки
         try:
             pdf_files, diagnostics = _collect_pdf_files_top_level(folder_path)
         except OSError as e:
-            flash(f'Не удалось прочитать папку: {e}', 'danger')
+            flash(f'Не удалось прочитать папку {folder_path}: {e}', 'danger')
             return redirect(url_for('settings.settings_page'))
 
         if not pdf_files:
             flash(_format_missing_pdfs_message(folder_path, diagnostics), 'warning')
             return redirect(url_for('main.index'))
 
-        # Берём САМЫЙ НОВЫЙ файл: max по mtime (времени последнего изменения содержимого).
+        # Самый новый файл — max по mtime
         latest_pdf = max(pdf_files, key=_get_file_timestamp)
 
         # Импорт внутри функции — чтобы не было циклической зависимости модулей
@@ -284,7 +339,6 @@ def last_order():
         supplier_name = data.get('название_поставщика') or ''
         order_date = data.get('дата_приемки') or ''
 
-        # Все товары из последнего ордера — на печать
         selected_indices = list(range(len(products)))
 
         filepath, total_labels = _build_labels_file(

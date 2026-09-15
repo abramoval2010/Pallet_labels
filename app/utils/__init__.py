@@ -4,6 +4,7 @@
 from app.utils.helpers import (
     is_desktop_mode,
     get_app_data_dir,
+    normalize_user_path,
     calculate_pallets,
     clean_filename,
     get_unique_filename,
@@ -19,6 +20,7 @@ from app.utils.decorators import (
 __all__ = [
     'is_desktop_mode',
     'get_app_data_dir',
+    'normalize_user_path',
     'calculate_pallets',
     'clean_filename',
     'get_unique_filename',
