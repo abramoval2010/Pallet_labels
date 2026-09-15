@@ -85,6 +85,56 @@ def _get_file_timestamp(path):
             return 0
 
 
+def _collect_pdf_files_top_level(folder_path):
+    """
+    Собирает PDF-файлы ТОЛЬКО на верхнем уровне папки (без подпапок).
+    Возвращает (список_путей, диагностика).
+    Диагностика — словарь {'dirs': [...], 'files': [...]}.
+    """
+    pdf_files = []
+    dirs_list = []
+    files_list = []
+
+    try:
+        for name in os.listdir(folder_path):
+            full_path = os.path.join(folder_path, name)
+
+            if os.path.isdir(full_path):
+                dirs_list.append(name)
+                continue
+
+            if os.path.isfile(full_path):
+                files_list.append(name)
+                if name.lower().endswith('.pdf'):
+                    pdf_files.append(full_path)
+    except OSError:
+        raise
+
+    return pdf_files, {'dirs': dirs_list, 'files': files_list}
+
+
+def _format_missing_pdfs_message(folder_path, diagnostics):
+    """Собирает подробное диагностическое сообщение, если PDF не найдены."""
+    dirs_preview = diagnostics['dirs'][:5]
+    files_preview = diagnostics['files'][:5]
+    parts = []
+
+    if dirs_preview:
+        suffix = f" (+{len(diagnostics['dirs']) - 5})" if len(diagnostics['dirs']) > 5 else ""
+        parts.append(f"папки: {', '.join(dirs_preview)}{suffix}")
+
+    if files_preview:
+        suffix = f" (+{len(diagnostics['files']) - 5})" if len(diagnostics['files']) > 5 else ""
+        parts.append(f"файлы: {', '.join(files_preview)}{suffix}")
+
+    diag = "; ".join(parts) if parts else "папка пуста"
+
+    return (
+        f'В папке «{folder_path}» не найдено PDF-файлов на верхнем уровне. '
+        f'Содержимое папки — {diag}.'
+    )
+
+
 @labels_bp.route('/recalculate_pallets', methods=['POST'])
 @labels_access_required
 def recalculate_pallets():
@@ -177,10 +227,11 @@ def last_order():
     Быстрое формирование палетных этикеток с САМОГО НОВОГО прихода:
     1. Берёт личную папку пользователя из БД.
     2. Проверяет её существование.
-    3. Находит САМЫЙ НОВЫЙ PDF в папке (по mtime — времени последнего изменения файла).
-    4. Парсит его существующим алгоритмом.
-    5. Сразу формирует .docx со всеми товарами (selected_indices = все).
-    6. В web-режиме отдаёт файл на скачивание, локально открывает в Word.
+    3. Ищет PDF ТОЛЬКО на верхнем уровне папки (без подпапок).
+    4. Выбирает САМЫЙ НОВЫЙ файл через max() по mtime (времени изменения файла).
+    5. Парсит его существующим алгоритмом.
+    6. Сразу формирует .docx со всеми товарами (selected_indices = все).
+    7. В web-режиме отдаёт файл на скачивание, локально открывает в Word.
     """
     try:
         db = current_app.config.get('db')
@@ -201,29 +252,21 @@ def last_order():
             flash(f'Папка не найдена: {folder_path}. Проверьте путь в настройках.', 'danger')
             return redirect(url_for('settings.settings_page'))
 
-        # Собираем все PDF в папке (не рекурсивно)
-        pdf_files = []
+        # Поиск PDF только на верхнем уровне папки
         try:
-            for name in os.listdir(folder_path):
-                if not name.lower().endswith('.pdf'):
-                    continue
-                full_path = os.path.join(folder_path, name)
-                if not os.path.isfile(full_path):
-                    continue
-                pdf_files.append(full_path)
+            pdf_files, diagnostics = _collect_pdf_files_top_level(folder_path)
         except OSError as e:
             flash(f'Не удалось прочитать папку: {e}', 'danger')
             return redirect(url_for('settings.settings_page'))
 
         if not pdf_files:
-            flash(f'В личной папке нет PDF-файлов: {folder_path}', 'warning')
+            flash(_format_missing_pdfs_message(folder_path, diagnostics), 'warning')
             return redirect(url_for('main.index'))
 
-        # Берём САМЫЙ НОВЫЙ файл: max по mtime (времени последнего изменения).
-        # Именно max, а не sort[0] — так невозможно спутать «самый новый» и «самый старый».
+        # Берём САМЫЙ НОВЫЙ файл: max по mtime (времени последнего изменения содержимого).
         latest_pdf = max(pdf_files, key=_get_file_timestamp)
 
-        # Импортируем здесь, чтобы избежать циклической зависимости на этапе импорта модулей
+        # Импорт внутри функции — чтобы не было циклической зависимости модулей
         from app.routes.upload import prepare_result_data
 
         data, total_pallets, error = prepare_result_data(latest_pdf)
