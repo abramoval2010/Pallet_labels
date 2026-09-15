@@ -178,12 +178,20 @@
 
     <div class="menu-grid">
         <!-- 1. Сформировать палетные этикетки (СиМ) -->
-        {% set has_labels_access = session.user_rights in ['Администратор', 'Оператор СиМ', 'Менеджер ОСЛ'] and session.user_plant == 'Вольгинский' %}
+        {% set has_labels_access = session.user_rights in ['Администратор', 'Оператор СиМ', 'Мастер СиМ', 'Менеджер ОСЛ'] and session.user_plant == 'Вольгинский' %}
         <a href="{{ url_for('upload.upload_form') if has_labels_access else url_for('main.functionality_not_available') }}"
            class="menu-item {% if not has_labels_access %}disabled{% endif %}">
             <span class="icon">📦</span>
             <div class="title">Сформировать палетные этикетки (СиМ)</div>
             <div class="description">Загрузка приходного ордера в PDF</div>
+        </a>
+
+        <!-- 1.1 Последний ордер -->
+        <a href="{{ url_for('labels.last_order') if has_labels_access else url_for('main.functionality_not_available') }}"
+           class="menu-item {% if not has_labels_access %}disabled{% endif %}">
+            <span class="icon">⚡</span>
+            <div class="title">Последний ордер</div>
+            <div class="description">Быстрое формирование с последнего прихода</div>
         </a>
 
         <!-- 2. Сформировать стеллажную карту (СиМ) -->

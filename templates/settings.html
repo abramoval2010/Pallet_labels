@@ -2,16 +2,14 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,
-initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Настройки</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 min-height: 100vh;
-background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784
-70%, #a5d6a7 100%);
+background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
 padding: 20px;
 }
 .container {
@@ -398,6 +396,83 @@ margin-bottom: 10px;
 {% endif %}
 </div>
 </div>
+
+<!-- 1.5. Личная папка с приходными ордерами -->
+{% if can_use_personal_folder %}
+<div class="settings-section" style="border-left-color: #4caf50;">
+<h2>
+<span class="icon">📂</span>
+Личная папка с приходными ордерами
+</h2>
+<div class="desc">
+Выберите папку, в которой хранятся ваши приходные ордера в формате PDF.
+Кнопка «Последний ордер» на главной странице будет брать самый свежий PDF из этой папки.
+</div>
+
+<div class="current-path">
+<strong>Текущая папка:</strong>
+{{ user_folder_path if user_folder_path else 'Не выбрана' }}
+</div>
+
+<form method="POST">
+<input type="hidden" name="action" value="save_user_folder">
+<div class="form-row">
+<input type="text" name="user_folder_path"
+placeholder="Введите путь к папке"
+value="{{ user_folder_path }}">
+<button type="submit" class="btn btn-primary">💾 Сохранить папку</button>
+</div>
+</form>
+
+{% if user_folder_path %}
+<form method="POST" style="margin-top: 8px;">
+<input type="hidden" name="action" value="clear_user_folder">
+<button type="submit" class="btn btn-danger"
+style="font-size: 13px; padding: 8px 18px;"
+onclick="return confirm('Очистить путь к личной папке?');">
+🗑️ Очистить путь
+</button>
+</form>
+{% endif %}
+
+<h3 style="font-size: 14px; color: #666; margin-top: 15px;">💾 Быстрый выбор диска</h3>
+<div class="form-row">
+<select id="userDriveSelect"
+onchange="if(this.value){window.location.href='/settings?user_path=' + encodeURIComponent(this.value);}">
+<option value="">— Выберите диск —</option>
+{% for drive in drives %}
+<option value="{{ drive }}"
+{% if user_folder_path and user_folder_path.startswith(drive) %}selected{% endif %}>
+{{ drive }}
+</option>
+{% endfor %}
+</select>
+</div>
+
+{% if user_path_parts %}
+<h3 style="font-size: 14px; color: #666; margin-top: 10px;">🧭 Навигация по пути</h3>
+<div class="path-nav">
+{% for part in user_path_parts %}
+<a href="/settings?user_path={{ part.path }}" class="btn btn-secondary">
+{{ part.name }}
+</a>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if user_subdirs %}
+<h3 style="font-size: 14px; color: #666; margin-top: 10px;">📁 Папки в текущей директории</h3>
+<div class="drive-list">
+{% for subdir in user_subdirs %}
+<a href="/settings?user_path={{ user_folder_path }}{{ os_sep }}{{ subdir }}"
+class="btn btn-secondary">
+📁 {{ subdir }}
+</a>
+{% endfor %}
+</div>
+{% endif %}
+</div>
+{% endif %}
 
 <!-- 2. Номер СОП (только для администратора) -->
 {% if is_admin %}

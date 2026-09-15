@@ -17,7 +17,6 @@ class UserDatabase:
         print(f"Users DB: {self.db_file}")
 
     def _get_master_key(self):
-        """Получает или создает мастер-ключ для шифрования"""
         if os.path.exists(self.master_key_file):
             with open(self.master_key_file, 'rb') as f:
                 return f.read()
@@ -29,7 +28,6 @@ class UserDatabase:
             return key
 
     def _encrypt(self, data):
-        """Шифрует данные (XOR)"""
         if not data:
             return ''
         key = self.master_key
@@ -39,7 +37,6 @@ class UserDatabase:
         return encrypted.hex()
 
     def _decrypt(self, encrypted_data):
-        """Расшифровывает данные"""
         if not encrypted_data:
             return ''
         key = self.master_key
@@ -51,7 +48,6 @@ class UserDatabase:
 
     @contextmanager
     def get_connection(self):
-        """Получает соединение с базой данных"""
         conn = sqlite3.connect(self.db_file)
         conn.row_factory = sqlite3.Row
         try:
@@ -76,17 +72,24 @@ class UserDatabase:
                     plant TEXT,
                     rights TEXT,
                     status TEXT DEFAULT 'active',
+                    folder_path TEXT DEFAULT '',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
+            # --- Миграции ---
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
+
             if 'status' not in columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'")
                 conn.commit()
                 cursor.execute("UPDATE users SET status = 'active' WHERE status IS NULL")
+                conn.commit()
+
+            if 'folder_path' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN folder_path TEXT DEFAULT ''")
                 conn.commit()
 
             cursor.execute('''
@@ -119,7 +122,8 @@ class UserDatabase:
                 'enterprise': 'ООО "Верофарм"',
                 'plant': 'Вольгинский',
                 'rights': 'Администратор',
-                'status': 'active'
+                'status': 'active',
+                'folder_path': ''
             },
             {
                 'login': 'operator',
@@ -130,7 +134,8 @@ class UserDatabase:
                 'enterprise': 'ООО "Верофарм"',
                 'plant': 'Вольгинский',
                 'rights': 'Оператор СиМ',
-                'status': 'active'
+                'status': 'active',
+                'folder_path': ''
             },
             {
                 'login': 'alexander.abramov@abbott.com',
@@ -141,7 +146,8 @@ class UserDatabase:
                 'enterprise': 'ООО "Верофарм"',
                 'plant': 'Вольгинский',
                 'rights': 'Администратор',
-                'status': 'active'
+                'status': 'active',
+                'folder_path': ''
             },
             {
                 'login': 'anastasia.yudashkina@abbott.com',
@@ -152,7 +158,8 @@ class UserDatabase:
                 'enterprise': 'ООО "Верофарм"',
                 'plant': 'Вольгинский',
                 'rights': 'Оператор СиМ',
-                'status': 'active'
+                'status': 'active',
+                'folder_path': ''
             }
         ]
 
@@ -167,8 +174,8 @@ class UserDatabase:
                 password_hash = generate_password_hash(user_data['password'])
 
                 cursor.execute('''
-                    INSERT INTO users (login, email, password_hash, fname, lname, enterprise, plant, rights, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (login, email, password_hash, fname, lname, enterprise, plant, rights, status, folder_path)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     user_data['login'],
                     user_data['email'],
@@ -178,7 +185,8 @@ class UserDatabase:
                     user_data.get('enterprise', ''),
                     user_data.get('plant', ''),
                     user_data.get('rights', 'Оператор СиМ'),
-                    user_data.get('status', 'active')
+                    user_data.get('status', 'active'),
+                    user_data.get('folder_path', '')
                 ))
                 conn.commit()
                 self.log_action(user_data['login'], 'ADD_USER', f"Добавлен пользователь {user_data['login']}")
@@ -234,6 +242,22 @@ class UserDatabase:
             print(f"Ошибка обновления пароля: {e}")
             return False
 
+    def update_user_folder(self, login, folder_path):
+        """Обновляет путь к личной папке пользователя с приходными ордерами"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET folder_path = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?",
+                    (folder_path or '', login)
+                )
+                conn.commit()
+                self.log_action(login, 'UPDATE_USER_FOLDER', f"Личная папка: {folder_path or '(очищено)'}")
+                return True
+        except Exception as e:
+            print(f"Ошибка обновления папки: {e}")
+            return False
+
     def update_user(self, login, new_data):
         """Обновляет данные пользователя"""
         try:
@@ -243,7 +267,7 @@ class UserDatabase:
                 fields = []
                 values = []
 
-                for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status']:
+                for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status', 'folder_path']:
                     if key in new_data:
                         fields.append(f"{key} = ?")
                         values.append(new_data[key])
@@ -320,7 +344,7 @@ class UserDatabase:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, login, email, fname, lname, enterprise, plant, rights, status, created_at FROM users ORDER BY login"
+                "SELECT id, login, email, fname, lname, enterprise, plant, rights, status, folder_path, created_at FROM users ORDER BY login"
             )
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
