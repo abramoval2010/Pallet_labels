@@ -20,19 +20,9 @@
             padding: 40px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            color: #1a237e;
-            font-size: 2em;
-            font-weight: 600;
-        }
-        .header .subtitle {
-            color: #4a6fa5;
-            font-size: 1.1em;
-        }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #1a237e; font-size: 2em; font-weight: 600; }
+        .header .subtitle { color: #4a6fa5; font-size: 1.1em; }
         .greeting {
             text-align: center;
             font-size: 1.1em;
@@ -43,21 +33,14 @@
             border-radius: 12px;
             border-left: 4px solid #4caf50;
         }
-        .greeting .user-name {
-            font-weight: 600;
-            color: #2e7d32;
-        }
+        .greeting .user-name { font-weight: 600; color: #2e7d32; }
         .menu-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
             margin-bottom: 20px;
         }
-        @media (max-width: 600px) {
-            .menu-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+        @media (max-width: 600px) { .menu-grid { grid-template-columns: 1fr; } }
         .menu-item {
             background: #f8f9fa;
             border-radius: 15px;
@@ -76,30 +59,13 @@
             border-color: #4caf50;
             background: #e8f5e9;
         }
-        .menu-item .icon {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            display: block;
-        }
-        .menu-item .title {
-            font-size: 1.1em;
-            font-weight: 500;
-            color: #1a237e;
-        }
-        .menu-item .description {
-            font-size: 0.85em;
-            color: #78909c;
-            margin-top: 5px;
-        }
-        .menu-item.disabled {
-            opacity: 0.6;
-            cursor: default;
-        }
+        .menu-item .icon { font-size: 2.5em; margin-bottom: 10px; display: block; }
+        .menu-item .title { font-size: 1.1em; font-weight: 500; color: #1a237e; }
+        .menu-item .description { font-size: 0.85em; color: #78909c; margin-top: 5px; }
+        .menu-item.disabled { opacity: 0.6; cursor: default; }
         .menu-item.disabled:hover {
-            transform: none;
-            box-shadow: none;
-            border-color: transparent;
-            background: #f8f9fa;
+            transform: none; box-shadow: none;
+            border-color: transparent; background: #f8f9fa;
         }
         .menu-footer {
             margin-top: 20px;
@@ -121,25 +87,11 @@
             display: inline-block;
             transition: all 0.3s ease;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-        }
-        .btn-settings {
-            background: linear-gradient(135deg, #ff9800, #ffa726);
-            color: white;
-        }
-        .btn-secondary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, #f44336, #ef5350);
-            color: white;
-        }
-        .flash-messages {
-            margin-bottom: 15px;
-        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15); }
+        .btn-settings { background: linear-gradient(135deg, #ff9800, #ffa726); color: white; }
+        .btn-secondary { background: linear-gradient(135deg, #2196f3, #64b5f6); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #f44336, #ef5350); color: white; }
+        .flash-messages { margin-bottom: 15px; }
         .flash-message {
             padding: 12px 20px;
             border-radius: 10px;
@@ -186,7 +138,7 @@
             <div class="description">Загрузка приходного ордера в PDF</div>
         </a>
 
-        <!-- 1.1 Последний ордер -->
+        <!-- 2. Последний ордер -->
         <a href="{{ url_for('labels.last_order') if has_labels_access else url_for('main.functionality_not_available') }}"
            class="menu-item {% if not has_labels_access %}disabled{% endif %}">
             <span class="icon">⚡</span>
@@ -194,35 +146,43 @@
             <div class="description">Быстрое формирование с последнего прихода</div>
         </a>
 
-        <!-- 2. Сформировать стеллажную карту (СиМ) -->
+        <!-- 3. Личная папка с приходными ордерами -->
+        <a href="{{ url_for('main.personal_folder') if has_labels_access else url_for('main.functionality_not_available') }}"
+           class="menu-item {% if not has_labels_access %}disabled{% endif %}">
+            <span class="icon">📂</span>
+            <div class="title">Личная папка с приходными ордерами</div>
+            <div class="description">Выбор папки для кнопки «Последний ордер»</div>
+        </a>
+
+        <!-- 4. Сформировать стеллажную карту (СиМ) -->
         <a href="{{ url_for('main.functionality_not_available') }}" class="menu-item">
             <span class="icon">🏷️</span>
             <div class="title">Сформировать стеллажную карту (СиМ)</div>
             <div class="description">Формирование стеллажных карт</div>
         </a>
 
-        <!-- 3. Сформировать транспортную заявку в РТЭ -->
+        <!-- 5. Сформировать транспортную заявку в РТЭ -->
         <a href="{{ url_for('main.functionality_not_available') }}" class="menu-item">
             <span class="icon">🚛</span>
             <div class="title">Сформировать транспортную заявку в РТЭ</div>
             <div class="description">Создание заявок на перевозку</div>
         </a>
 
-        <!-- 4. Сформировать ТТН (наем и собств) -->
+        <!-- 6. Сформировать ТТН (наем и собств) -->
         <a href="{{ url_for('main.functionality_not_available')}}" class="menu-item">
             <span class="icon">📄</span>
             <div class="title">Сформировать ТТН (наем и собств)</div>
             <div class="description">Товарно-транспортные накладные</div>
         </a>
 
-        <!-- 5. Настройки -->
+        <!-- 7. Настройки -->
         <a href="{{ url_for('settings.settings_page')}}" class="menu-item">
             <span class="icon">⚙️</span>
             <div class="title">Настройки</div>
             <div class="description">Параметры системы и управление</div>
         </a>
 
-        <!-- 6. Смена пароля -->
+        <!-- 8. Смена пароля -->
         <a href="{{ url_for('auth.change_password') }}" class="menu-item">
             <span class="icon">🔑</span>
             <div class="title">Смена пароля</div>

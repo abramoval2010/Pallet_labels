@@ -4,8 +4,9 @@ import json
 import tempfile
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file, \
     current_app
+from werkzeug.utils import secure_filename
 from app.utils.decorators import labels_access_required, login_required
-from app.utils.helpers import calculate_pallets, open_in_word, normalize_user_path
+from app.utils.helpers import calculate_pallets, open_in_word
 from app.services.label_generator import create_pallet_labels_file
 
 labels_bp = Blueprint('labels', __name__)
@@ -22,13 +23,6 @@ def _get_save_path():
     return settings_manager.get('save_path')
 
 
-def _is_web_mode():
-    """True, если работаем в режиме скачивания файла (Render или обычный web)."""
-    is_render = os.environ.get('RENDER') == 'true'
-    is_desktop = current_app.config.get('DESKTOP_MODE', False)
-    return is_render or not is_desktop
-
-
 def _build_labels_file(products, selected_indices, order_number, supplier_name, order_date):
     """Общая функция формирования .docx с палетными этикетками."""
     settings_manager = current_app.config.get('settings_manager')
@@ -43,8 +37,15 @@ def _build_labels_file(products, selected_indices, order_number, supplier_name, 
 
 
 def _send_or_open_result(filepath, total_labels, products, order_number):
-    """Web-режим — скачивание, десктоп — открыть в Word."""
-    if _is_web_mode():
+    """
+    В web-режиме (включая Render) — отдаём файл на скачивание.
+    В десктопном режиме — открываем в Word и показываем success.html.
+    """
+    is_render = os.environ.get('RENDER') == 'true'
+    is_desktop = current_app.config.get('DESKTOP_MODE', False)
+    web_mode = is_render or not is_desktop
+
+    if web_mode:
         return send_file(
             filepath,
             as_attachment=True,
@@ -60,134 +61,6 @@ def _send_or_open_result(filepath, total_labels, products, order_number):
         order_number=order_number,
         total_pallets=total_labels
     )
-
-
-def _get_file_timestamp(path):
-    """
-    Метка времени файла для определения «самый новый / самый старый».
-    Используем mtime — одинаково надёжно на Windows и Linux/Render.
-    """
-    try:
-        return os.path.getmtime(path)
-    except OSError:
-        try:
-            return os.path.getctime(path)
-        except OSError:
-            return 0
-
-
-def _collect_pdf_files_top_level(folder_path):
-    """
-    Собирает PDF-файлы ТОЛЬКО на верхнем уровне папки (без подпапок).
-    Возвращает (список_путей, диагностика {'dirs': [...], 'files': [...]}).
-    """
-    pdf_files = []
-    dirs_list = []
-    files_list = []
-
-    for name in os.listdir(folder_path):
-        full_path = os.path.join(folder_path, name)
-        if os.path.isdir(full_path):
-            dirs_list.append(name)
-            continue
-        if os.path.isfile(full_path):
-            files_list.append(name)
-            if name.lower().endswith('.pdf'):
-                pdf_files.append(full_path)
-
-    return pdf_files, {'dirs': dirs_list, 'files': files_list}
-
-
-def _format_missing_pdfs_message(folder_path, diagnostics):
-    """Подробное сообщение, если PDF не найдены на верхнем уровне папки."""
-    dirs_preview = diagnostics['dirs'][:5]
-    files_preview = diagnostics['files'][:5]
-    parts = []
-
-    if dirs_preview:
-        suffix = f" (+{len(diagnostics['dirs']) - 5})" if len(diagnostics['dirs']) > 5 else ""
-        parts.append(f"папки: {', '.join(dirs_preview)}{suffix}")
-
-    if files_preview:
-        suffix = f" (+{len(diagnostics['files']) - 5})" if len(diagnostics['files']) > 5 else ""
-        parts.append(f"файлы: {', '.join(files_preview)}{suffix}")
-
-    diag = "; ".join(parts) if parts else "папка пуста"
-
-    return (
-        f'В папке «{folder_path}» не найдено PDF-файлов на верхнем уровне. '
-        f'Содержимое папки — {diag}.'
-    )
-
-
-def _diagnose_path(folder_path):
-    """
-    Умная диагностика, если путь не существует.
-    Идёт по пути сверху вниз, находит самый глубокий существующий префикс
-    и показывает, что в нём реально лежит (папки и файлы).
-    Это помогает увидеть настоящее имя папки, если пользователь
-    ввёл путь с опечаткой, пробелами вместо подчёркиваний и т.п.
-    """
-    # Случай: путь существует, но это файл, а не папка
-    if os.path.exists(folder_path) and not os.path.isdir(folder_path):
-        return f'По пути {folder_path} находится файл, а не папка.'
-
-    # Ищем самый длинный существующий префикс
-    missing_parts = []
-    current = os.path.normpath(folder_path)
-
-    while True:
-        if os.path.exists(current):
-            break
-        head, tail = os.path.split(current)
-        if not tail or head == current:
-            # дошли до корня — ничего не существует
-            break
-        missing_parts.insert(0, tail)
-        current = head
-
-    if not os.path.isdir(current):
-        return (
-            f'Папка не найдена: {folder_path}. '
-            f'Ни один элемент пути не существует, начиная с {current!r}.'
-        )
-
-    # Собираем содержимое ближайшей существующей папки
-    existing_dirs = []
-    existing_files = []
-    try:
-        for name in os.listdir(current):
-            full = os.path.join(current, name)
-            if os.path.isdir(full):
-                existing_dirs.append(name)
-            else:
-                existing_files.append(name)
-    except OSError as e:
-        return f'Папка не найдена: {folder_path}. Не удалось прочитать {current}: {e}'
-
-    message_parts = [
-        f'Папка не найдена: {folder_path}',
-        f'Существует только: {current}',
-    ]
-
-    if missing_parts:
-        message_parts.append(f'Отсутствует часть: {" → ".join(missing_parts)}')
-
-    if existing_dirs:
-        preview = existing_dirs[:10]
-        suffix = f' (+{len(existing_dirs) - 10})' if len(existing_dirs) > 10 else ''
-        message_parts.append(
-            f'Папки в {current}: {", ".join(preview)}{suffix}'
-        )
-
-    if existing_files:
-        preview = existing_files[:5]
-        suffix = f' (+{len(existing_files) - 5})' if len(existing_files) > 5 else ''
-        message_parts.append(
-            f'Файлы в {current}: {", ".join(preview)}{suffix}'
-        )
-
-    return ' | '.join(message_parts)
 
 
 @labels_bp.route('/recalculate_pallets', methods=['POST'])
@@ -275,65 +148,54 @@ def generate_labels():
         return redirect(url_for('main.index'))
 
 
-@labels_bp.route('/last_order')
+@labels_bp.route('/last_order', methods=['GET', 'POST'])
 @labels_access_required
 def last_order():
     """
-    Быстрое формирование палетных этикеток с САМОГО НОВОГО прихода:
-    1. Берёт личную папку пользователя из БД (с нормализацией пути).
-    2. Проверяет её существование (с умной диагностикой, если нет).
-    3. Ищет PDF ТОЛЬКО на верхнем уровне папки.
-    4. Выбирает САМЫЙ НОВЫЙ файл через max() по mtime.
-    5. Парсит его существующим алгоритмом.
-    6. Сразу формирует .docx со всеми товарами (selected_indices = все).
-    7. В web-режиме отдаёт файл на скачивание, локально открывает в Word.
+    GET  — страница с JS, которая через File System Access API
+           читает самый свежий PDF из личной папки пользователя
+           и отправляет его POST-ом сюда же.
+    POST — принимает PDF, формирует .docx и отдаёт файл на скачивание.
+
+    Файловая система пользователя читается браузером на его машине.
+    Сервер получает уже готовый PDF — ему не нужен доступ к диску пользователя.
     """
+    if request.method == 'GET':
+        return render_template('last_order.html')
+
+    # POST
     try:
-        db = current_app.config.get('db')
-        user = db.find_user(session['user'])
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'Файл не передан'}), 400
 
-        if not user:
-            flash('Пользователь не найден', 'danger')
-            return redirect(url_for('main.index'))
+        file = request.files['file']
+        if not file.filename or not file.filename.lower().endswith('.pdf'):
+            return jsonify({'success': False, 'error': 'Получен не PDF-файл'}), 400
 
-        folder_path = normalize_user_path(user.get('folder_path') or '')
+        uploads_dir = tempfile.mkdtemp()
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(uploads_dir, filename)
+        file.save(filepath)
 
-        if not folder_path:
-            flash('У вас не выбрана личная папка с приходными ордерами. '
-                  'Перейдите в «Настройки» и укажите её.', 'warning')
-            return redirect(url_for('settings.settings_page'))
-
-        if not os.path.isdir(folder_path):
-            flash(_diagnose_path(folder_path), 'danger')
-            return redirect(url_for('settings.settings_page'))
-
-        # Поиск PDF только на верхнем уровне папки
         try:
-            pdf_files, diagnostics = _collect_pdf_files_top_level(folder_path)
-        except OSError as e:
-            flash(f'Не удалось прочитать папку {folder_path}: {e}', 'danger')
-            return redirect(url_for('settings.settings_page'))
-
-        if not pdf_files:
-            flash(_format_missing_pdfs_message(folder_path, diagnostics), 'warning')
-            return redirect(url_for('main.index'))
-
-        # Самый новый файл — max по mtime
-        latest_pdf = max(pdf_files, key=_get_file_timestamp)
-
-        # Импорт внутри функции — чтобы не было циклической зависимости модулей
-        from app.routes.upload import prepare_result_data
-
-        data, total_pallets, error = prepare_result_data(latest_pdf)
+            from app.routes.upload import prepare_result_data
+            data, total_pallets, error = prepare_result_data(filepath)
+        finally:
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
 
         if error:
-            flash(f'{error} (файл: {os.path.basename(latest_pdf)})', 'danger')
-            return redirect(url_for('main.index'))
+            return jsonify({'success': False, 'error': error}), 400
 
         products = data.get('товары', [])
         if not products:
-            flash(f'В файле {os.path.basename(latest_pdf)} не найдены товары', 'warning')
-            return redirect(url_for('main.index'))
+            return jsonify({
+                'success': False,
+                'error': f'В файле {filename} не найдены товары'
+            }), 400
 
         order_number = data.get('номер_ордера') or 'Без номера'
         supplier_name = data.get('название_поставщика') or ''
@@ -341,28 +203,32 @@ def last_order():
 
         selected_indices = list(range(len(products)))
 
-        filepath, total_labels = _build_labels_file(
+        out_path, total_labels = _build_labels_file(
             products, selected_indices, order_number, supplier_name, order_date
         )
 
         if total_labels == 0:
-            flash('Не удалось сформировать ни одной этикетки', 'warning')
-            return redirect(url_for('main.index'))
+            return jsonify({'success': False, 'error': 'Не удалось сформировать этикетки'}), 400
 
+        db = current_app.config.get('db')
         db.log_action(
             session['user'],
             'LAST_ORDER',
-            f"Последний ордер: {os.path.basename(latest_pdf)} → {total_labels} этикеток"
+            f"Последний ордер из браузера: {filename} → {total_labels} этикеток"
         )
 
-        return _send_or_open_result(filepath, total_labels, products, order_number)
+        return send_file(
+            out_path,
+            as_attachment=True,
+            download_name=os.path.basename(out_path),
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
 
     except Exception as e:
-        print(f"Ошибка в last_order: {e}")
+        print(f"Ошибка в last_order POST: {e}")
         import traceback
         traceback.print_exc()
-        flash(f'Ошибка при обработке последнего ордера: {str(e)}', 'danger')
-        return redirect(url_for('main.index'))
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @labels_bp.route('/download/<path:filename>')

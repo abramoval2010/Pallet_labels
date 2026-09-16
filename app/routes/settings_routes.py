@@ -3,13 +3,9 @@ import os
 import sys
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from app.utils.decorators import login_required
-from app.utils.helpers import normalize_user_path
 from app.services.file_utils import get_available_drives, get_subdirectories
 
 settings_bp = Blueprint('settings', __name__)
-
-# Роли, которым доступна личная папка и кнопка «Последний ордер»
-PERSONAL_FOLDER_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер СиМ', 'Оператор СиМ']
 
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
@@ -18,7 +14,6 @@ def settings_page():
     """Страница настроек"""
     try:
         settings_manager = current_app.config.get('settings_manager')
-        db = current_app.config.get('db')
         settings = settings_manager.get()
         drives = get_available_drives()
 
@@ -48,68 +43,7 @@ def settings_page():
 
         subdirs = get_subdirectories(current_path)
 
-        # --- Личная папка текущего пользователя ---
-        current_user = db.find_user(session['user']) if db else None
-        user_folder_path = normalize_user_path(current_user.get('folder_path') if current_user else '')
-
-        # Навигация по личной папке: ?user_path=...
-        user_path_param = request.args.get('user_path')
-        if user_path_param is not None:
-            user_folder_path = normalize_user_path(user_path_param)
-
-        user_path_parts = []
-        if user_folder_path:
-            try:
-                normalized_user_path = os.path.normpath(user_folder_path)
-                parts = normalized_user_path.split(os.sep)
-                temp_path = ""
-                for part in parts:
-                    if part:
-                        if temp_path:
-                            temp_path = os.path.join(temp_path, part)
-                        else:
-                            if sys.platform == 'win32' and ':' in part:
-                                temp_path = part + os.sep
-                            else:
-                                temp_path = os.sep + part
-                        user_path_parts.append({
-                            'name': part,
-                            'path': temp_path
-                        })
-            except Exception:
-                user_path_parts = []
-
-        user_subdirs = get_subdirectories(user_folder_path) if user_folder_path else []
-
-        can_use_personal_folder = session.get('user_rights') in PERSONAL_FOLDER_ROLES
-
         if request.method == 'POST':
-            action = request.form.get('action', '')
-
-            # --- Сохранение / очистка личной папки ---
-            if action == 'save_user_folder' and can_use_personal_folder:
-                raw_path = request.form.get('user_folder_path', '')
-                new_user_folder = normalize_user_path(raw_path)
-                db.update_user_folder(session['user'], new_user_folder)
-                if new_user_folder:
-                    if os.path.isdir(new_user_folder):
-                        flash('Личная папка сохранена', 'success')
-                    else:
-                        flash(
-                            f'Личная папка сохранена, но по указанному пути папка не найдена: '
-                            f'{new_user_folder}',
-                            'warning'
-                        )
-                else:
-                    flash('Личная папка очищена', 'info')
-                return redirect(url_for('settings.settings_page'))
-
-            if action == 'clear_user_folder' and can_use_personal_folder:
-                db.update_user_folder(session['user'], '')
-                flash('Личная папка очищена', 'info')
-                return redirect(url_for('settings.settings_page'))
-
-            # --- Существующие действия ---
             selected_path = request.form.get('selected_path')
             if selected_path:
                 settings_manager.set('save_path', selected_path)
@@ -170,11 +104,7 @@ def settings_page():
                                is_admin=is_admin,
                                is_manager=is_manager,
                                material_count=material_count,
-                               font_settings=font_settings,
-                               user_folder_path=user_folder_path,
-                               user_path_parts=user_path_parts,
-                               user_subdirs=user_subdirs,
-                               can_use_personal_folder=can_use_personal_folder)
+                               font_settings=font_settings)
     except Exception as e:
         print(f"Ошибка в settings_page: {e}")
         import traceback
