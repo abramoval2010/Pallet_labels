@@ -60,9 +60,7 @@ color: #666;
 font-size: 14px;
 margin-bottom: 15px;
 }
-.settings-section .icon {
-font-size: 24px;
-}
+.settings-section .icon { font-size: 24px; }
 .current-path {
 background: #e8f5e9;
 padding: 12px 15px;
@@ -72,9 +70,7 @@ border-left: 4px solid #4caf50;
 word-break: break-all;
 font-size: 14px;
 }
-.current-path strong {
-color: #2e7d32;
-}
+.current-path strong { color: #2e7d32; }
 .current-sop {
 background: #e3f2fd;
 padding: 12px 15px;
@@ -84,9 +80,7 @@ border-left: 4px solid #2196f3;
 word-break: break-all;
 font-size: 14px;
 }
-.current-sop strong {
-color: #0d47a1;
-}
+.current-sop strong { color: #0d47a1; }
 .btn {
 padding: 10px 25px;
 border: none;
@@ -98,91 +92,27 @@ text-decoration: none;
 display: inline-block;
 transition: all 0.3s ease;
 }
-.btn:hover {
-transform: translateY(-2px);
-box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-}
-.btn-primary {
-background: linear-gradient(135deg, #4caf50, #66bb6a);
-color: white;
-}
-.btn-primary:hover {
-background: linear-gradient(135deg, #43a047, #4caf50);
-}
-.btn-secondary {
-background: linear-gradient(135deg, #2196f3, #64b5f6);
-color: white;
-}
-.btn-secondary:hover {
-background: linear-gradient(135deg, #1e88e5, #42a5f5);
-}
-.btn-danger {
-background: linear-gradient(135deg, #f44336, #ef5350);
-color: white;
-}
-.btn-danger:hover {
-background: linear-gradient(135deg, #d32f2f, #e53935);
-}
-.btn-settings {
-background: linear-gradient(135deg, #ff9800, #ffa726);
-color: white;
-}
-.btn-settings:hover {
-background: linear-gradient(135deg, #f57c00, #fb8c00);
-}
-.btn-admin {
-background: linear-gradient(135deg, #9c27b0, #ab47bc);
-color: white;
-}
-.btn-admin:hover {
-background: linear-gradient(135deg, #7b1fa2, #8e24aa);
-}
-.btn-materials {
-background: linear-gradient(135deg, #00897b, #26a69a);
-color: white;
-}
-.btn-materials:hover {
-background: linear-gradient(135deg, #00695c, #00897b);
-}
-.btn-font {
-background: linear-gradient(135deg, #5c6bc0, #7986cb);
-color: white;
-}
-.btn-font:hover {
-background: linear-gradient(135deg, #3949ab, #5c6bc0);
-}
-.alert {
-padding: 12px 20px;
-border-radius: 10px;
-margin-bottom: 15px;
-font-weight: 500;
-}
-.alert-success {
-background: #d4edda;
-color: #155724;
-border: 1px solid #c3e6cb;
-}
-.alert-danger {
-background: #f8d7da;
-color: #721c24;
-border: 1px solid #f5c6cb;
-}
-.alert-warning {
-background: #fff3cd;
-color: #856404;
-border: 1px solid #ffeeba;
-}
-.alert-info {
-background: #d1ecf1;
-color: #0c5460;
-border: 1px solid #bee5eb;
-}
-.form-row {
-display: flex;
-gap: 10px;
-flex-wrap: wrap;
-margin: 10px 0;
-}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15); }
+.btn-primary { background: linear-gradient(135deg, #4caf50, #66bb6a); color: white; }
+.btn-primary:hover { background: linear-gradient(135deg, #43a047, #4caf50); }
+.btn-secondary { background: linear-gradient(135deg, #2196f3, #64b5f6); color: white; }
+.btn-secondary:hover { background: linear-gradient(135deg, #1e88e5, #42a5f5); }
+.btn-danger { background: linear-gradient(135deg, #f44336, #ef5350); color: white; }
+.btn-danger:hover { background: linear-gradient(135deg, #d32f2f, #e53935); }
+.btn-settings { background: linear-gradient(135deg, #ff9800, #ffa726); color: white; }
+.btn-settings:hover { background: linear-gradient(135deg, #f57c00, #fb8c00); }
+.btn-admin { background: linear-gradient(135deg, #9c27b0, #ab47bc); color: white; }
+.btn-admin:hover { background: linear-gradient(135deg, #7b1fa2, #8e24aa); }
+.btn-materials { background: linear-gradient(135deg, #00897b, #26a69a); color: white; }
+.btn-materials:hover { background: linear-gradient(135deg, #00695c, #00897b); }
+.btn-font { background: linear-gradient(135deg, #5c6bc0, #7986cb); color: white; }
+.btn-font:hover { background: linear-gradient(135deg, #3949ab, #5c6bc0); }
+.alert { padding: 12px 20px; border-radius: 10px; margin-bottom: 15px; font-weight: 500; }
+.alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
 .form-row input, .form-row select {
 flex: 1;
 padding: 12px 15px;
@@ -192,39 +122,13 @@ font-size: 15px;
 min-width: 200px;
 transition: border-color 0.3s;
 }
-.form-row input:focus, .form-row select:focus {
-outline: none;
-border-color: #9c27b0;
-}
-.form-row .btn {
-flex: 0 0 auto;
-}
-.drive-list {
-display: flex;
-flex-wrap: wrap;
-gap: 10px;
-margin: 10px 0;
-}
-.drive-list .btn {
-font-size: 13px;
-padding: 8px 18px;
-}
-.path-nav {
-display: flex;
-flex-wrap: wrap;
-gap: 8px;
-margin: 10px 0;
-}
-.path-nav .btn {
-font-size: 12px;
-padding: 5px 15px;
-}
-.admin-actions {
-display: flex;
-gap: 15px;
-flex-wrap: wrap;
-margin-top: 10px;
-}
+.form-row input:focus, .form-row select:focus { outline: none; border-color: #9c27b0; }
+.form-row .btn { flex: 0 0 auto; }
+.drive-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+.drive-list .btn { font-size: 13px; padding: 8px 18px; }
+.path-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.path-nav .btn { font-size: 12px; padding: 5px 15px; }
+.admin-actions { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; }
 .actions {
 margin-top: 25px;
 padding-top: 20px;
@@ -253,36 +157,12 @@ background: #ff9800;
 color: white;
 margin-left: 8px;
 }
-.material-stats {
-display: flex;
-gap: 20px;
-flex-wrap: wrap;
-margin: 10px 0;
-}
-.stat-item {
-background: #e8eaf6;
-padding: 8px 20px;
-border-radius: 20px;
-font-size: 14px;
-}
-.stat-item strong {
-color: #1a237e;
-}
-.font-grid {
-display: grid;
-grid-template-columns: 1fr 1fr;
-gap: 15px;
-}
-.font-item {
-display: flex;
-flex-direction: column;
-gap: 5px;
-}
-.font-item label {
-font-size: 13px;
-font-weight: 500;
-color: #333;
-}
+.material-stats { display: flex; gap: 20px; flex-wrap: wrap; margin: 10px 0; }
+.stat-item { background: #e8eaf6; padding: 8px 20px; border-radius: 20px; font-size: 14px; }
+.stat-item strong { color: #1a237e; }
+.font-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.font-item { display: flex; flex-direction: column; gap: 5px; }
+.font-item label { font-size: 13px; font-weight: 500; color: #333; }
 .font-item input {
 padding: 8px 12px;
 border: 2px solid #e0e0e0;
@@ -290,25 +170,10 @@ border-radius: 8px;
 font-size: 14px;
 width: 100%;
 }
-.font-item input:focus {
-outline: none;
-border-color: #5c6bc0;
-}
-.font-item .hint {
-font-size: 12px;
-color: #999;
-}
-.font-section {
-background: #e8eaf6;
-padding: 15px;
-border-radius: 10px;
-margin: 10px 0;
-}
-.font-section h3 {
-color: #1a237e;
-font-size: 16px;
-margin-bottom: 10px;
-}
+.font-item input:focus { outline: none; border-color: #5c6bc0; }
+.font-item .hint { font-size: 12px; color: #999; }
+.font-section { background: #e8eaf6; padding: 15px; border-radius: 10px; margin: 10px 0; }
+.font-section h3 { color: #1a237e; font-size: 16px; margin-bottom: 10px; }
 @media (max-width: 768px) {
 .container { padding: 20px; }
 .settings-section { padding: 20px; }
@@ -396,83 +261,6 @@ margin-bottom: 10px;
 {% endif %}
 </div>
 </div>
-
-<!-- 1.5. Личная папка с приходными ордерами -->
-{% if can_use_personal_folder %}
-<div class="settings-section" style="border-left-color: #4caf50;">
-<h2>
-<span class="icon">📂</span>
-Личная папка с приходными ордерами
-</h2>
-<div class="desc">
-Выберите папку, в которой хранятся ваши приходные ордера в формате PDF.
-Кнопка «Последний ордер» на главной странице будет брать самый свежий PDF из этой папки.
-</div>
-
-<div class="current-path">
-<strong>Текущая папка:</strong>
-{{ user_folder_path if user_folder_path else 'Не выбрана' }}
-</div>
-
-<form method="POST">
-<input type="hidden" name="action" value="save_user_folder">
-<div class="form-row">
-<input type="text" name="user_folder_path"
-placeholder="Введите путь к папке"
-value="{{ user_folder_path }}">
-<button type="submit" class="btn btn-primary">💾 Сохранить папку</button>
-</div>
-</form>
-
-{% if user_folder_path %}
-<form method="POST" style="margin-top: 8px;">
-<input type="hidden" name="action" value="clear_user_folder">
-<button type="submit" class="btn btn-danger"
-style="font-size: 13px; padding: 8px 18px;"
-onclick="return confirm('Очистить путь к личной папке?');">
-🗑️ Очистить путь
-</button>
-</form>
-{% endif %}
-
-<h3 style="font-size: 14px; color: #666; margin-top: 15px;">💾 Быстрый выбор диска</h3>
-<div class="form-row">
-<select id="userDriveSelect"
-onchange="if(this.value){window.location.href='/settings?user_path=' + encodeURIComponent(this.value);}">
-<option value="">— Выберите диск —</option>
-{% for drive in drives %}
-<option value="{{ drive }}"
-{% if user_folder_path and user_folder_path.startswith(drive) %}selected{% endif %}>
-{{ drive }}
-</option>
-{% endfor %}
-</select>
-</div>
-
-{% if user_path_parts %}
-<h3 style="font-size: 14px; color: #666; margin-top: 10px;">🧭 Навигация по пути</h3>
-<div class="path-nav">
-{% for part in user_path_parts %}
-<a href="/settings?user_path={{ part.path }}" class="btn btn-secondary">
-{{ part.name }}
-</a>
-{% endfor %}
-</div>
-{% endif %}
-
-{% if user_subdirs %}
-<h3 style="font-size: 14px; color: #666; margin-top: 10px;">📁 Папки в текущей директории</h3>
-<div class="drive-list">
-{% for subdir in user_subdirs %}
-<a href="/settings?user_path={{ user_folder_path }}{{ os_sep }}{{ subdir }}"
-class="btn btn-secondary">
-📁 {{ subdir }}
-</a>
-{% endfor %}
-</div>
-{% endif %}
-</div>
-{% endif %}
 
 <!-- 2. Номер СОП (только для администратора) -->
 {% if is_admin %}

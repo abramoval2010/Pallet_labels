@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Последний ордер</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            max-width: 650px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+        .icon { font-size: 60px; margin-bottom: 15px; }
+        h1 { color: #1a237e; margin-bottom: 20px; font-size: 1.6em; }
+        #status {
+            padding: 20px;
+            border-radius: 12px;
+            background: #f5f5f5;
+            color: #333;
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 20px 0;
+            word-break: break-word;
+        }
+        #status.ok { background: #e8f5e9; color: #2e7d32; }
+        #status.err { background: #f8d7da; color: #721c24; }
+        #status.warn { background: #fff3cd; color: #856404; }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #2196f3;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15); }
+        .btn-primary { background: linear-gradient(135deg, #4caf50, #66bb6a); color: white; }
+        .btn-secondary { background: linear-gradient(135deg, #2196f3, #64b5f6); color: white; }
+        .btn-settings { background: linear-gradient(135deg, #ff9800, #ffa726); color: white; }
+        a { color: #2196f3; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="icon">⚡</div>
+    <h1>Последний ордер</h1>
+    <div id="status"><span class="spinner"></span> Подготовка…</div>
+    <div>
+        <a href="/" class="btn btn-secondary">🏠 На главную</a>
+        <a href="/personal_folder" class="btn btn-settings">📂 Личная папка</a>
+    </div>
+</div>
+
+<script>
+const DB_NAME = 'rmo_osl_personal';
+const STORE_NAME = 'handles';
+const KEY = 'personalFolder';
+
+function openIDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function loadHandle() {
+    const db = await openIDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(KEY);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function setStatus(html, kind) {
+    const el = document.getElementById('status');
+    el.className = kind || '';
+    el.innerHTML = html;
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+}
+
+async function processFolder(handle) {
+    // Ищем самый свежий PDF
+    setStatus('<span class="spinner"></span> Ищу самый свежий PDF в папке…');
+    let latest = null;
+    let pdfCount = 0;
+
+    try {
+        for await (const entry of handle.values()) {
+            if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
+                pdfCount++;
+                const file = await entry.getFile();
+                if (!latest || file.lastModified > latest.lastModified) {
+                    latest = file;
+                }
+            }
+        }
+    } catch (e) {
+        setStatus('❌ Не удалось прочитать папку: ' + escapeHtml(e.message), 'err');
+        return;
+    }
+
+    if (!latest) {
+        setStatus('⚠️ В папке нет PDF-файлов. Загрузите приходные ордера в выбранную папку и попробуйте снова.', 'warn');
+        return;
+    }
+
+    setStatus('<span class="spinner"></span> Найден файл: <b>' + escapeHtml(latest.name) + '</b><br>Формирую этикетки…');
+
+    const formData = new FormData();
+    formData.append('file', latest, latest.name);
+
+    let response;
+    try {
+        response = await fetch('/last_order', { method: 'POST', body: formData });
+    } catch (e) {
+        setStatus('❌ Ошибка сети: ' + escapeHtml(e.message), 'err');
+        return;
+    }
+
+    if (!response.ok) {
+        let msg = 'Не удалось обработать файл (HTTP ' + response.status + ')';
+        try {
+            const data = await response.json();
+            if (data && data.error) msg = data.error;
+        } catch (e) {}
+        setStatus('❌ ' + escapeHtml(msg), 'err');
+        return;
+    }
+
+    // Скачиваем полученный файл
+    let blob;
+    try {
+        blob = await response.blob();
+    } catch (e) {
+        setStatus('❌ Не удалось получить файл от сервера: ' + escapeHtml(e.message), 'err');
+        return;
+    }
+
+    let filename = 'labels.docx';
+    const cd = response.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+    if (m) {
+        try { filename = decodeURIComponent(m[1]); } catch (e) { filename = m[1]; }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+
+    setStatus(
+        '✅ Этикетки сформированы.<br>' +
+        'Источник: <b>' + escapeHtml(latest.name) + '</b><br>' +
+        'Файл скачивается: <b>' + escapeHtml(filename) + '</b>',
+        'ok'
+    );
+}
+
+async function requestPermissionAndRun(handle) {
+    setStatus('Подтвердите доступ к папке…');
+    let permission = await handle.requestPermission({ mode: 'read' });
+    if (permission !== 'granted') {
+        setStatus('⚠️ Доступ к папке не разрешён. <a href="/personal_folder">Настроить заново</a>', 'warn');
+        return;
+    }
+    await processFolder(handle);
+}
+
+async function run() {
+    if (!window.showDirectoryPicker) {
+        setStatus('⚠️ Ваш браузер не поддерживает выбор папки. Используйте Chrome, Edge, Opera или Яндекс.Браузер.', 'warn');
+        return;
+    }
+
+    let handle;
+    try {
+        handle = await loadHandle();
+    } catch (e) {
+        setStatus('❌ Не удалось прочитать сохранённую папку: ' + escapeHtml(e.message), 'err');
+        return;
+    }
+
+    if (!handle) {
+        setStatus('⚠️ Личная папка не выбрана. <a href="/personal_folder">Перейти к выбору папки</a>.', 'warn');
+        return;
+    }
+
+    let permission = await handle.queryPermission({ mode: 'read' });
+    if (permission === 'granted') {
+        await processFolder(handle);
+        return;
+    }
+
+    // Нужно подтверждение — показываем кнопку
+    setStatus(
+        'Для доступа к папке «' + escapeHtml(handle.name) + '» нужно разрешение.<br><br>' +
+        '<button class="btn btn-primary" id="allowBtn">🔓 Разрешить доступ и сформировать</button>',
+        'warn'
+    );
+    document.getElementById('allowBtn').addEventListener('click', () => requestPermissionAndRun(handle));
+}
+
+window.addEventListener('DOMContentLoaded', run);
+</script>
+</body>
+</html>
