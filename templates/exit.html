@@ -4,44 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Выход из программы</title>
+
+    <!-- Общие стили: сброс, body, кнопки, alert'ы, flash, бейджи -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+
+    <!-- Стили, специфичные только для страницы выхода -->
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Центрирование карточки на странице */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
         }
+
         .container {
             background: white;
             border-radius: 20px;
             padding: 50px;
             max-width: 500px;
             width: 100%;
+            margin: 0 auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
             text-align: center;
         }
-        .exit-icon { font-size: 80px; margin-bottom: 20px; }
-        h1 { color: #1a237e; margin-bottom: 15px; }
-        p { color: #666; margin-bottom: 30px; font-size: 18px; line-height: 1.6; }
-        .btn {
+
+        .exit-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #1a237e;
+            margin-bottom: 15px;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        /* Кнопка «Вернуться» — зелёная, растянутая */
+        .btn-primary {
             padding: 12px 40px;
-            border: none;
             border-radius: 50px;
             font-size: 18px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
             transition: transform 0.2s;
         }
-        .btn:hover { transform: scale(1.05); }
-        .btn-primary {
-            background: linear-gradient(135deg, #4caf50, #66bb6a);
-            color: white;
+        .btn-primary:hover {
+            transform: scale(1.05);
         }
     </style>
 </head>

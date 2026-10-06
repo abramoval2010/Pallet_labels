@@ -4,28 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ошибка</title>
+
+    <!-- Общие стили: сброс, body, кнопки, alert'ы, flash, бейджи -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+
+    <!-- Стили, специфичные только для страницы ошибки -->
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Своя палитра — красный градиент */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
             background: linear-gradient(135deg, #ff6b6b, #ee5a24);
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
         }
+
         .container {
             background: white;
             border-radius: 20px;
             padding: 50px;
             max-width: 600px;
             width: 100%;
+            margin: 0 auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
             text-align: center;
         }
-        .error-icon { font-size: 80px; margin-bottom: 20px; }
-        h1 { color: #c0392b; margin-bottom: 15px; }
+
+        .error-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #c0392b;
+            margin-bottom: 15px;
+        }
+
         .error-message {
             color: #555;
             font-size: 18px;
@@ -35,6 +48,8 @@
             background: #f8f9fa;
             border-radius: 10px;
         }
+
+        /* Своя кнопка — зелёная, растянутая */
         .btn {
             padding: 12px 40px;
             background: linear-gradient(135deg, #4caf50, #66bb6a);
@@ -48,7 +63,9 @@
             display: inline-block;
             transition: transform 0.2s;
         }
-        .btn:hover { transform: scale(1.05); }
+        .btn:hover {
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>

@@ -4,41 +4,45 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Вход в систему</title>
+
+<!-- Общие стили: сброс, body, кнопки, alert'ы, flash, бейджи -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+
+<!-- Стили, специфичные только для страницы входа -->
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* Переопределяем общий body: своя палитра и центрирование карточки */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    min-height: 100vh;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
 }
+
 .login-card {
     background: white;
     border-radius: 15px;
     padding: 40px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     width: 100%;
     max-width: 400px;
 }
-.login-card h1 {
+
+.logo {
     text-align: center;
-    font-size: 24px;
-    color: #333;
-    margin-bottom: 5px;
+    margin-bottom: 20px;
 }
-.login-card .subtitle {
-    text-align: center;
+.logo h1 {
+    font-size: 28px;
+    color: #667eea;
+    font-weight: bold;
+}
+.logo p {
     color: #666;
-    margin-bottom: 30px;
+    margin-top: 5px;
     font-size: 14px;
 }
+
 .form-group {
     margin-bottom: 15px;
 }
@@ -60,6 +64,7 @@ body {
     outline: none;
     border-color: #667eea;
 }
+
 .checkbox-group {
     display: flex;
     align-items: center;
@@ -70,6 +75,8 @@ body {
     width: 18px;
     height: 18px;
 }
+
+/* Кнопка входа — своя, фиолетовая */
 .btn-login {
     width: 100%;
     padding: 14px;
@@ -86,48 +93,13 @@ body {
     transform: scale(1.02);
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
-.alert {
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    font-weight: 500;
-}
-.alert-success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-.alert-danger {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-.alert-warning {
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeeba;
-}
-.alert-info {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
-}
-.logo {
-    text-align: center;
-    margin-bottom: 20px;
-}
-.logo h1 {
-    font-size: 28px;
-    color: #667eea;
-    font-weight: bold;
-}
 </style>
 </head>
 <body>
 <div class="login-card">
     <div class="logo">
         <h1>🏷️ Рабочее место ОСЛ</h1>
-        <p style="color: #666; margin-top: 5px;">Вход в систему</p>
+        <p>Вход в систему</p>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}

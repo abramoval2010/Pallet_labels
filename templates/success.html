@@ -4,36 +4,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Успешно</title>
+
+    <!-- Общие стили: сброс, body, кнопки, alert'ы, flash, бейджи -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+
+    <!-- Стили, специфичные только для страницы успеха -->
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Своя палитра — светло-зелёный градиент */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
             background: linear-gradient(135deg, #81c784 0%, #a5d6a7 50%, #c8e6c9 100%);
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
         }
+
         .container {
             background: white;
             border-radius: 20px;
             padding: 50px;
             max-width: 600px;
             width: 100%;
+            margin: 0 auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
             text-align: center;
         }
-        .success-icon { font-size: 80px; margin-bottom: 20px; }
-        h1 { color: #2e7d32; margin-bottom: 15px; }
+
+        .success-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+
         .info {
             background: #e8f5e9;
             padding: 20px;
             border-radius: 10px;
             margin: 20px 0;
         }
-        .info p { margin: 8px 0; }
-        .btn {
+        .info p {
+            margin: 8px 0;
+        }
+
+        /* Своя кнопка успеха — темнее, чем в common.css */
+        .btn-success {
+            background: linear-gradient(135deg, #2e7d32, #43a047);
+            color: white;
             padding: 12px 30px;
             border: none;
             border-radius: 50px;
@@ -45,19 +64,26 @@
             margin: 5px;
             transition: transform 0.2s;
         }
-        .btn:hover { transform: scale(1.05); }
-        .btn-primary {
-            background: linear-gradient(135deg, #4caf50, #66bb6a);
-            color: white;
+        .btn-success:hover {
+            transform: scale(1.05);
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
         }
+
+        /* Свои кнопки — те же размеры, что в оригинале */
+        .btn-primary,
         .btn-secondary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            margin: 5px;
+            transition: transform 0.2s;
         }
-        .btn-success {
-            background: linear-gradient(135deg, #2e7d32, #43a047);
-            color: white;
+        .btn-primary:hover,
+        .btn-secondary:hover {
+            transform: scale(1.05);
         }
+
+        /* Бейдж на этой странице — зелёный */
         .badge {
             display: inline-block;
             padding: 5px 15px;
@@ -67,6 +93,7 @@
             background: #4caf50;
             color: white;
         }
+
         .stats {
             display: flex;
             gap: 20px;

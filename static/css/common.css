@@ -1,0 +1,211 @@
+/* =====================================================================
+   static/css/common.css
+   Общие стили для всех страниц приложения RMO OSL.
+
+   Здесь лежит только то, что одинаково во всех шаблонах:
+     - сброс браузерных стилей;
+     - базовое оформление страницы (шрифт, фон, отступы);
+     - все варианты кнопок .btn-*;
+     - все варианты alert'ов и flash-сообщений;
+     - бейджи ролей и статусов.
+
+   Стили, специфичные для конкретной страницы, задаются в её шаблоне
+   в блоке <style> после подключения common.css — так они корректно
+   переопределяют общие правила.
+   ===================================================================== */
+
+
+/* --- Сброс браузерных стилей --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+
+/* --- Базовое оформление страницы --- */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
+    padding: 20px;
+    color: #333;
+}
+
+
+/* --- Кнопки --- */
+.btn {
+    padding: 10px 25px;
+    border: none;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #4caf50, #66bb6a);
+    color: white;
+}
+.btn-primary:hover {
+    background: linear-gradient(135deg, #43a047, #4caf50);
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #2196f3, #64b5f6);
+    color: white;
+}
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #1e88e5, #42a5f5);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #f44336, #ef5350);
+    color: white;
+}
+.btn-danger:hover {
+    background: linear-gradient(135deg, #d32f2f, #e53935);
+}
+
+.btn-settings {
+    background: linear-gradient(135deg, #ff9800, #ffa726);
+    color: white;
+}
+.btn-settings:hover {
+    background: linear-gradient(135deg, #f57c00, #fb8c00);
+}
+
+.btn-admin {
+    background: linear-gradient(135deg, #9c27b0, #ab47bc);
+    color: white;
+}
+.btn-admin:hover {
+    background: linear-gradient(135deg, #7b1fa2, #8e24aa);
+}
+
+.btn-materials {
+    background: linear-gradient(135deg, #00897b, #26a69a);
+    color: white;
+}
+.btn-materials:hover {
+    background: linear-gradient(135deg, #00695c, #00897b);
+}
+
+.btn-font {
+    background: linear-gradient(135deg, #5c6bc0, #7986cb);
+    color: white;
+}
+.btn-font:hover {
+    background: linear-gradient(135deg, #3949ab, #5c6bc0);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #4caf50, #66bb6a);
+    color: white;
+}
+.btn-success:hover {
+    background: linear-gradient(135deg, #43a047, #4caf50);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #ff9800, #ffa726);
+    color: white;
+}
+.btn-warning:hover {
+    background: linear-gradient(135deg, #f57c00, #fb8c00);
+}
+
+/* Размерный модификатор для маленьких кнопок в таблицах */
+.btn-sm {
+    padding: 5px 12px;
+    font-size: 12px;
+}
+
+
+/* --- Alert'ы --- */
+.alert {
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+.alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.alert-danger  { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.alert-info    { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+
+/* --- Flash-сообщения --- */
+.flash-messages {
+    margin-bottom: 15px;
+}
+.flash-message {
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+.flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.flash-danger  { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.flash-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.flash-info    { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+
+/* --- Бейджи ролей --- */
+.admin-badge {
+    display: inline-block;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #9c27b0;
+    color: white;
+    margin-left: 8px;
+}
+
+.manager-badge {
+    display: inline-block;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #ff9800;
+    color: white;
+    margin-left: 8px;
+}
+
+
+/* --- Бейджи статусов и ролей (для таблиц) --- */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.badge-admin    { background: #f44336; color: white; }
+.badge-operator { background: #2196f3; color: white; }
+.badge-manager  { background: #ff9800; color: white; }
+.badge-master   { background: #00897b; color: white; }
+.badge-other    { background: #9e9e9e; color: white; }
+
+.badge-active   { background: #4caf50; color: white; }
+.badge-blocked  { background: #ff9800; color: white; }
+.badge-deleted  { background: #f44336; color: white; }
+
+.btn-export {
+    background: linear-gradient(135deg, #5c6bc0, #7986cb);
+    color: white;
+}
+.btn-export:hover {
+    background: linear-gradient(135deg, #3949ab, #5c6bc0);
+}

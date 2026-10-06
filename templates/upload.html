@@ -4,25 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Загрузка приходного ордера</title>
+
+    <!-- Общие стили: сброс, body, кнопки, alert'ы, flash, бейджи -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+
+    <!-- Стили, специфичные только для страницы загрузки PDF -->
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 30%, #81c784 70%, #a5d6a7 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
         .container {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
             padding: 50px;
             max-width: 700px;
             width: 100%;
+            margin: 0 auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
+
         .header {
             text-align: center;
             margin-bottom: 30px;
@@ -36,6 +33,8 @@
             color: #4a6fa5;
             font-size: 1.1em;
         }
+
+        /* --- Зона загрузки файла --- */
         .upload-area {
             border: 2px dashed #4caf50;
             border-radius: 15px;
@@ -61,6 +60,7 @@
         .upload-area p {
             color: #78909c;
         }
+
         .file-input-wrapper {
             position: relative;
             display: inline-block;
@@ -75,55 +75,24 @@
             height: 100%;
             cursor: pointer;
         }
-        .btn {
-            padding: 12px 35px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-            text-decoration: none;
-            display: inline-block;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #4caf50, #66bb6a);
-            color: white;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(76, 175, 80, 0.4);
-        }
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-secondary {
-            background: linear-gradient(135deg, #2196f3, #64b5f6);
-            color: white;
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
-        }
-        .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(33, 150, 243, 0.4);
-        }
+
         .file-name {
             margin-top: 15px;
             color: #4a6fa5;
             font-size: 0.95em;
         }
+
+        /* Кнопка «На главную» — своя, отдельная от .btn-settings */
         .btn-back {
             background: linear-gradient(135deg, #ff9800, #ffa726);
             color: white;
             box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
-            margin-top: 15px;
         }
         .btn-back:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 25px rgba(255, 152, 0, 0.4);
         }
+
         .button-group {
             display: flex;
             gap: 10px;
@@ -131,19 +100,15 @@
             flex-wrap: wrap;
             margin-top: 15px;
         }
-        .flash-messages {
-            margin-bottom: 15px;
+
+        /* Кнопка отправки — отключается до выбора файла */
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
-        .flash-message {
-            padding: 12px 20px;
-            border-radius: 10px;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        .flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .flash-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .flash-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .flash-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
         @media (max-width: 768px) {
             .container { padding: 30px 20px; }
             .upload-area { padding: 25px; }

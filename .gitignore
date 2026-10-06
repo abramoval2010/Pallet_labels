@@ -9,3 +9,18 @@ master.key
 venv/
 .venv/
 env/
+
+# База данных пользователей
+users.db
+users.db-journal
+users.db-wal
+users.db-shm
+
+# Ключ шифрования
+master.key
+
+# Данные приложения
+instance/
+uploads/
+generated_labels/
+*.docx
