@@ -129,12 +129,30 @@ def extract_data_from_pdf(pdf_path):
                 sap_row = i
 
                 # --- 1. НАЗВАНИЕ ---
+                # Раньше здесь была ошибка: проверка `'x' in prev_line.lower()`
+                # считала служебной любую строку, содержащую букву "x" где угодно.
+                # Из-за этого название «...НИПРО FIOLAX» отбрасывалось и товар
+                # получал наименование «Не указано».
+                #
+                # Теперь строка считается служебной, только если она ЦЕЛИКОМ
+                # совпадает с одиночной "X" (или "x"). Служебные слова «итого»,
+                # «принял», «сдал» по-прежнему ищутся как подстрока, потому что
+                # они действительно не могут встретиться внутри названия.
                 name_parts = []
+                skip_words = ['итого', 'принял', 'сдал']
                 for j in range(sap_row - 1, marker_index, -1):
                     prev_line = table_lines[j]
-                    if (re.search(r'[А-ЯЁA-Z]', prev_line) and
-                            not re.match(r'^\d+$', prev_line) and
-                            not any(keyword in prev_line.lower() for keyword in ['итого', 'x', 'принял', 'сдал'])):
+                    prev_stripped = prev_line.strip()
+                    is_x_marker = prev_stripped.upper() == 'X'
+                    is_service_word = any(
+                        keyword in prev_stripped.lower() for keyword in skip_words
+                    )
+                    if (
+                        re.search(r'[А-ЯЁA-Z]', prev_line)
+                        and not re.match(r'^\d+$', prev_line)
+                        and not is_x_marker
+                        and not is_service_word
+                    ):
                         name_parts.insert(0, prev_line)
                     else:
                         break
@@ -150,7 +168,7 @@ def extract_data_from_pdf(pdf_path):
                         qty_str = qty_match.group(1).replace(' ', '')
                         try:
                             quantity = int(qty_str)
-                        except:
+                        except Exception:
                             pass
 
                 # --- 3. АНАЛИТИЧЕСКИЙ ЛИСТ ---
