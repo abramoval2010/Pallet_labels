@@ -116,22 +116,23 @@ def generate_transport_docx(data, save_dir):
 
     s_time = data.get('supply_time', data.get('loading_time', ''))
 
+    cost_val = data.get('cost', 49999990)
+    cost_formatted = f"{cost_val:,}".replace(',', ' ')
+
     rows_data = [
         ("Дата и время подачи ТС:", f"{sd} г. в {s_time} ч."),
-        ("Наименование отправителя:", "ООО «ВЕРОФАРМ»"),
-        ("Место подачи (адрес):",
-         "Владимирская область, Петушинский район, пос. Вольгинский, ул. Заводская, владение 120,"),
-        ("Контактное лицо на месте загрузки:", "тел.: +7 (492) 237-98-28, доб.: 37-12"),
-        ("Дата и время доставки получателю:", f"{dd} г. {data['delivery_time']} ч."),
-        ("Наименование получателя:", "ООО «ВЕРОФАРМ»"),
-        ("Адреса доставки:",
-         "Московская область, г/о Подольск, вблизи деревни Новогородово 2, территория технопарка «Сынково», склад №10"),
-        ("Контактное лицо на разгрузке", "Рубцова Оксана, тел: +7 (968) 874-36-08"),
-        ("Наименование груза:", "Медпрепараты"),
-        ("Количество паллет/коробов / м³ / вес", f"{data['quantity']} паллета"),
-        ("Тип требуемого ТС: тип кузова, грузоподъемность, кол-во паллет, м³:", "Рефрижератор, 20 тн."),
-        ("Температурный режим", data['temperature_mode']),
-        ("Дополнительные комментарии к поездке:", "Стоимость груза 49 999 990 руб."),
+        ("Наименование отправителя:", data.get('sender', 'ООО «ВЕРОФАРМ»')),
+        ("Место подачи (адрес):", data.get('loading_place', '')),
+        ("Контактное лицо на месте загрузки:", data.get('loading_contact', '')),
+        ("Дата и время доставки получателю:", f"{dd} г. {data.get('delivery_time', '')} ч."),
+        ("Наименование получателя:", data.get('receiver', 'ООО «ВЕРОФАРМ»')),
+        ("Адреса доставки:", data.get('delivery_address', '')),
+        ("Контактное лицо на разгрузке", data.get('unloading_contact', '')),
+        ("Наименование груза:", data.get('cargo_name', '')),
+        ("Количество паллет/коробов / м³ / вес", f"{data.get('quantity', 33)} паллета"),
+        ("Тип требуемого ТС: тип кузова, грузоподъемность, кол-во паллет, м³:", data.get('vehicle_type', '')),
+        ("Температурный режим", data.get('temperature_mode', '')),
+        ("Дополнительные комментарии к поездке:", f"Стоимость груза {cost_formatted} руб."),
         ("ФИО водителя", data.get('driver_name', '')),
         ("Данные водителя", data.get('driver_data', '')),
         ("Контактный телефон", data.get('driver_phone', '')),
@@ -169,9 +170,11 @@ def generate_transport_docx(data, save_dir):
     sig_trans_table = doc.add_table(rows=4, cols=3)
     sig_trans_table.autofit = False
     sig_trans_table.allow_autofit = False
-    sig_trans_table.columns[0].width = Cm(3.5)
-    sig_trans_table.columns[1].width = Cm(4.0)  # Чуть расширили под увеличенные точки
-    sig_trans_table.columns[2].width = Cm(10.0)
+
+    # ИСПРАВЛЕНИЕ: Перераспределили ширину колонок, чтобы третья стала шире
+    sig_trans_table.columns[0].width = Cm(3.2)
+    sig_trans_table.columns[1].width = Cm(3.3)
+    sig_trans_table.columns[2].width = Cm(11.0)
 
     # Строка 0: Передал
     c_lbl = sig_trans_table.cell(0, 0)
@@ -179,11 +182,11 @@ def generate_transport_docx(data, save_dir):
     c_lbl.paragraphs[0].runs[0].bold = True
 
     c_dots = sig_trans_table.cell(0, 1)
-    # ИСПРАВЛЕНИЕ 1: Увеличили количество точек вдвое
-    c_dots.text = "................................ ,"
+    c_dots.text = "................ ,"
 
     c_val = sig_trans_table.cell(0, 2)
-    c_val.text = f"_____________ {data['author']}"
+    # ИСПРАВЛЕНИЕ: Уменьшили количество подчеркиваний с 13 до 10
+    c_val.text = f"__________ {data['author']}"
 
     # Строка 1: м.п.
     sig_trans_table.cell(1, 0).text = ""
@@ -198,11 +201,11 @@ def generate_transport_docx(data, save_dir):
     c_lbl2.paragraphs[0].runs[0].bold = True
 
     c_dots2 = sig_trans_table.cell(2, 1)
-    # ИСПРАВЛЕНИЕ 1: Увеличили количество точек вдвое
-    c_dots2.text = "................................ ,"
+    c_dots2.text = "................ ,"
 
     c_val2 = sig_trans_table.cell(2, 2)
-    c_val2.text = "_____________ Голубков Г.И."
+    # ИСПРАВЛЕНИЕ: Уменьшили количество подчеркиваний с 13 до 10
+    c_val2.text = f"__________ Голубков Г.И."
 
     # Строка 3: м.п.
     sig_trans_table.cell(3, 0).text = ""
@@ -249,14 +252,14 @@ def generate_transport_docx(data, save_dir):
     remove_table_borders(sig_table)
 
     # --- 9. Сохранение ---
-    # ИСПРАВЛЕНИЕ 2: Форматируем дату файла в ДД.ММ.ГГГГ
     try:
         date_obj = datetime.strptime(data.get('loading_date', ''), '%Y-%m-%d')
         formatted_date = date_obj.strftime('%d.%m.%Y')
     except:
         formatted_date = data.get('loading_date', '')
 
-    filename = f"РТЭ Вольгинский - Доминанта №{data['order_number']} от {formatted_date}.docx"
+    route_name = data.get('route_name', 'РТЭ Вольгинский - Доминанта')
+    filename = f"{route_name} №{data['order_number']} от {formatted_date}.docx"
     filepath = os.path.join(save_dir, filename)
     doc.save(filepath)
 

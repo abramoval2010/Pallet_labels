@@ -5,8 +5,12 @@ import sys
 from app.utils.helpers import get_app_data_dir
 
 DEFAULT_SETTINGS = {
-    'save_path': None,  # Будет установлен при инициализации
+    'save_path': None,
     'sop_code': 'RUPD.VLG.05.04.C01',
+    'shipment_time_1': '09:00',
+    'shipment_time_2': '10:00',
+    'shipment_time_dom_materials': '11:00', # НОВОЕ ПОЛЕ
+    'transport_table_mode': 'working',
     'font_settings': {
         'header_size': 12,
         'product_size_short': 80,
@@ -25,7 +29,6 @@ DEFAULT_SETTINGS = {
     }
 }
 
-
 class SettingsManager:
     def __init__(self, settings_file, generated_labels_dir):
         self.settings_file = settings_file
@@ -34,7 +37,6 @@ class SettingsManager:
         self._load()
 
     def _load(self):
-        """Загружает настройки из файла"""
         default = DEFAULT_SETTINGS.copy()
         default['save_path'] = self.generated_labels_dir
 
@@ -43,17 +45,13 @@ class SettingsManager:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
 
-                # Восстанавливаем недостающие ключи
-                if 'save_path' not in settings:
-                    settings['save_path'] = default['save_path']
-                if 'sop_code' not in settings:
-                    settings['sop_code'] = default['sop_code']
-                if 'font_settings' not in settings:
-                    settings['font_settings'] = default['font_settings']
-                else:
-                    for key in default['font_settings']:
-                        if key not in settings['font_settings']:
-                            settings['font_settings'][key] = default['font_settings'][key]
+                for key in default:
+                    if key not in settings:
+                        settings[key] = default[key]
+                    elif key == 'font_settings':
+                        for fk in default['font_settings']:
+                            if fk not in settings[key]:
+                                settings[key][fk] = default['font_settings'][fk]
 
                 self._settings = settings
             else:
@@ -65,7 +63,6 @@ class SettingsManager:
             self._settings = default
 
     def _save(self):
-        """Сохраняет настройки в файл"""
         try:
             os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
             with open(self.settings_file, 'w', encoding='utf-8') as f:
@@ -76,13 +73,11 @@ class SettingsManager:
             return False
 
     def get(self, key=None):
-        """Получить настройку или все настройки"""
         if key is None:
             return self._settings.copy()
         return self._settings.get(key)
 
     def set(self, key, value):
-        """Установить настройку и сохранить"""
         if key == 'font_settings':
             if 'font_settings' not in self._settings:
                 self._settings['font_settings'] = {}
@@ -92,5 +87,4 @@ class SettingsManager:
         self._save()
 
     def get_font_settings(self):
-        """Получить настройки шрифтов"""
         return self._settings.get('font_settings', DEFAULT_SETTINGS['font_settings'])

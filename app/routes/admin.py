@@ -2,7 +2,7 @@
 from flask import current_app, Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from app.utils.decorators import manager_required, admin_required
 
-# ОБЯЗАТЕЛЬНО: создаем Blueprint
+# Создаем Blueprint
 admin_bp = Blueprint('admin', __name__)
 
 
@@ -36,6 +36,8 @@ def add_user():
         rights = request.form.get('rights', 'Оператор СиМ')
         status = request.form.get('status', 'active')
 
+        no_password_login = 1 if rights == 'Мастер/оператор ГП' else (1 if request.form.get('no_password_login') else 0)
+
         if session.get('user_rights') == 'Менеджер ОСЛ' and rights != 'Оператор СиМ':
             flash('Менеджер ОСЛ может создавать только "Оператор СиМ"', 'danger')
             return redirect(url_for('admin.admin_panel'))
@@ -51,7 +53,8 @@ def add_user():
         user_data = {
             'login': login, 'email': email, 'password': password,
             'fname': fname, 'lname': lname, 'enterprise': enterprise,
-            'plant': plant, 'rights': rights, 'status': status
+            'plant': plant, 'rights': rights, 'status': status,
+            'no_password_login': no_password_login
         }
 
         db = current_app.config.get('db')
@@ -121,7 +124,8 @@ def update_user(login):
         'enterprise': request.form.get('enterprise', 'ООО "Верофарм"'),
         'plant': request.form.get('plant', 'Вольгинский'),
         'rights': request.form.get('rights', 'Оператор СиМ'),
-        'status': request.form.get('status', 'active')
+        'status': request.form.get('status', 'active'),
+        'no_password_login': 1 if request.form.get('no_password_login') else 0
     }
 
     new_password = request.form.get('password', '')
@@ -151,7 +155,8 @@ def get_user_data(login):
             'enterprise': user.get('enterprise', 'ООО "Верофарм"'),
             'plant': user.get('plant', 'Вольгинский'),
             'rights': user.get('rights', 'Оператор СиМ'),
-            'status': user.get('status', 'active')
+            'status': user.get('status', 'active'),
+            'no_password_login': user.get('no_password_login', 0)
         })
     return jsonify({'success': False, 'error': 'Пользователь не найден'})
 
@@ -201,8 +206,8 @@ def transport_update(table_mode, req_id):
         'sender': request.form.get('sender'),
         'loading_place': request.form.get('loading_place'),
         'loading_contact': request.form.get('loading_contact'),
-        'supply_date': request.form.get('supply_date'), # Новое поле
-        'supply_time': request.form.get('supply_time'), # Новое поле
+        'supply_date': request.form.get('supply_date'),
+        'supply_time': request.form.get('supply_time'),
         'delivery_date': request.form.get('delivery_date'),
         'delivery_time': request.form.get('delivery_time'),
         'receiver': request.form.get('receiver'),

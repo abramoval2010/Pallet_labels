@@ -38,19 +38,20 @@ def settings_page():
         if request.method == 'POST':
             action = request.form.get('action', '')
 
-            # ОБРАБОТКА НАСТРОЕК ТРАНСПОРТА
             if action == 'transport_settings':
-                if session.get('user_rights') == 'Администратор':
+                # ИСПРАВЛЕНИЕ: Доступно и Администратору, и Менеджеру ОСЛ
+                if session.get('user_rights') in ['Администратор', 'Менеджер ОСЛ']:
                     t1 = request.form.get('shipment_time_1')
                     t2 = request.form.get('shipment_time_2')
+                    t_mat = request.form.get('shipment_time_dom_materials')
                     tmode = request.form.get('transport_table_mode')
                     settings_manager.set('shipment_time_1', t1)
                     settings_manager.set('shipment_time_2', t2)
+                    settings_manager.set('shipment_time_dom_materials', t_mat)
                     settings_manager.set('transport_table_mode', tmode)
                     flash('Настройки транспортных заявок сохранены', 'success')
                 return redirect(url_for('settings.settings_page'))
 
-            # ОБРАБОТКА ПУТИ
             selected_path = request.form.get('selected_path')
             if selected_path:
                 settings_manager.set('save_path', selected_path)
@@ -58,14 +59,12 @@ def settings_page():
                 flash('Настройки сохранены', 'success')
                 return redirect(url_for('settings.settings_page'))
 
-            # ОБРАБОТКА СОП
             sop_code = request.form.get('sop_code')
             if sop_code:
                 settings_manager.set('sop_code', sop_code.strip())
                 flash('Номер СОП обновлен', 'success')
                 return redirect(url_for('settings.settings_page'))
 
-            # ОБРАБОТКА ШРИФТОВ
             font_settings = {}
             font_keys = ['header_size', 'product_size_short', 'product_size_medium',
                          'product_size_long', 'supplier_size_short', 'supplier_size_medium',

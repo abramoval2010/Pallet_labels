@@ -3,61 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Заказ машин (РТЭ)</title>
+    <title>{{ title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <style>
-        .container {
-            max-width: 600px;
-            margin: 50px auto;
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        }
-        h1 {
-            color: #1a237e;
-            margin-bottom: 25px;
-            text-align: center;
-            font-size: 1.6em;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block;
-            font-weight: 500;
-            margin-bottom: 8px;
-            color: #333;
-        }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #2196f3;
-        }
-        .error-text {
-            color: #f44336;
-            font-size: 13px;
-            margin-top: 5px;
-            display: none;
-        }
-        .btn-submit {
-            width: 100%;
-            padding: 15px;
-            font-size: 18px;
-            margin-top: 10px;
-        }
+        .container { max-width: 600px; margin: 50px auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); }
+        h1 { color: #1a237e; margin-bottom: 25px; text-align: center; font-size: 1.6em; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 500; margin-bottom: 8px; color: #333; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #2196f3; }
+        .error-text { color: #f44336; font-size: 13px; margin-top: 5px; display: none; }
+        .btn-submit { width: 100%; padding: 15px; font-size: 18px; margin-top: 10px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>Готовая продукция Домината — Вольгинский</h1>
+    <h1>{{ title }}</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -84,16 +45,30 @@
         </div>
 
         <div class="form-group">
+            <label>Тип требуемого ТС</label>
+            <select name="vehicle_type" required>
+                <option value="Рефрижератор, 20 тн" selected>Рефрижератор, 20 тн</option>
+                <option value="Тент, 20 тн">Тент, 20 тн</option>
+                <option value="Рефрижератор, 10 тн">Рефрижератор, 10 тн</option>
+                <option value="Тент, 10 тн">Тент, 10 тн</option>
+                <option value="Рефрижератор, 5 тн">Рефрижератор, 5 тн</option>
+                <option value="Тент, 5 тн">Тент, 5 тн</option>
+            </select>
+        </div>
+
+        <div class="form-group">
             <label>Температурный режим</label>
             <select name="temp_mode" required>
-                <option value="от +15°C до +25°C. Влажность не выше 65%">от +15°C до +25°C. Влажность не выше 65%</option>
-                <option value="от +15°C до +25°C. Влажность не выше 60%">от +15°C до +25°C. Влажность не выше 60%</option>
+                <option value="от +15°C до +25°C. Влажность не выше 65%" {% if route_type == 'gp_vol_dom' %}selected{% endif %}>от +15°C до +25°C. Влажность не выше 65%</option>
+                <option value="от +15°C до +25°C. Влажность не выше 60%" {% if route_type == 'mat_dom_vol' %}selected{% endif %}>от +15°C до +25°C. Влажность не выше 60%</option>
                 <option value="от +2°C до +8°C">от +2°C до +8°C</option>
             </select>
         </div>
 
         <button type="submit" class="btn btn-primary btn-submit">Сформировать и отправить заявки</button>
-        <a href="{{ url_for('transport.menu') }}" class="btn btn-secondary" style="width: 100%; text-align: center; margin-top: 10px; box-sizing: border-box;">Отмена</a>
+
+        <!-- ИСПРАВЛЕНО: Кнопка "Отмена" теперь ведет в главное меню (main.index) -->
+        <a href="{{ url_for('main.index') }}" class="btn btn-secondary" style="width: 100%; text-align: center; margin-top: 10px; box-sizing: border-box;">Отмена</a>
     </form>
 </div>
 
@@ -102,7 +77,6 @@
         const dateInput = document.getElementById('trip_date').value;
         if (!dateInput) return false;
 
-        // Сравниваем только даты (без времени)
         const selectedDate = new Date(dateInput);
         selectedDate.setHours(0,0,0,0);
 

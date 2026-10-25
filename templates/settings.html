@@ -6,6 +6,7 @@
 <title>Настройки</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
 <style>
+/* Стили остаются без изменений, они у вас уже есть */
 .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); }
 h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 .subtitle { color: #666; margin-bottom: 30px; font-size: 16px; }
@@ -57,24 +58,18 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </head>
 <body>
 <div class="container">
-<h1>
-⚙️ Настройки системы
+<h1>⚙️ Настройки системы
 {% if is_admin %}<span class="admin-badge">Администратор</span>
 {% elif is_manager %}<span class="manager-badge">Менеджер ОСЛ</span>{% endif %}
 </h1>
 <p class="subtitle">Управление параметрами программы</p>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-{% for category, message in messages %}
-<div class="alert alert-{{ category }}">{{ message }}</div>
-{% endfor %}
-{% endif %}
+{% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}{% endif %}
 {% endwith %}
 
 <div class="settings-menu">
 
-<!-- 1. Путь к папке с сохраненными этикетками -->
 <div class="settings-section">
 <h2><span class="icon">📁</span>Путь к папке с сохраненными палетными этикетками</h2>
 <div class="desc">Выберите папку, где будут сохраняться сгенерированные палетные этикетки</div>
@@ -86,26 +81,17 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </div>
 </form>
 <h3 style="font-size: 14px; color: #666; margin-top: 15px;">💾 Доступные диски</h3>
-<div class="drive-list">
-{% for drive in drives %}<a href="/settings?path={{ drive }}" class="btn btn-secondary">{{ drive }}</a>{% endfor %}
-</div>
+<div class="drive-list">{% for drive in drives %}<a href="/settings?path={{ drive }}" class="btn btn-secondary">{{ drive }}</a>{% endfor %}</div>
 {% if subdirs %}
 <h3 style="font-size: 14px; color: #666; margin-top: 10px;">📂 Папки в текущей директории</h3>
-<div class="drive-list">
-{% for subdir in subdirs %}<a href="/settings?path={{ current_path }}{{ os_sep }}{{ subdir }}" class="btn btn-secondary">📁 {{ subdir }}</a>{% endfor %}
-</div>
+<div class="drive-list">{% for subdir in subdirs %}<a href="/settings?path={{ current_path }}{{ os_sep }}{{ subdir }}" class="btn btn-secondary">📁 {{ subdir }}</a>{% endfor %}</div>
 {% endif %}
 <div style="margin-top: 10px; padding: 12px; background: #f5f5f5; border-radius: 8px;">
 <p style="color: #999; font-size: 13px;"><strong>Текущий путь:</strong> {{ current_path }}</p>
-{% if path_parts %}
-<div class="path-nav">
-{% for part in path_parts %}<a href="/settings?path={{ part.path }}" class="btn btn-secondary">{{ part.name }}</a>{% endfor %}
-</div>
-{% endif %}
+{% if path_parts %}<div class="path-nav">{% for part in path_parts %}<a href="/settings?path={{ part.path }}" class="btn btn-secondary">{{ part.name }}</a>{% endfor %}</div>{% endif %}
 </div>
 </div>
 
-<!-- 2. Номер СОП (только для администратора) -->
 {% if is_admin %}
 <div class="settings-section" style="border-left-color: #ff9800;">
 <h2><span class="icon">📋</span>Номер СОП при формировании палетной этикетки</h2>
@@ -117,29 +103,33 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 <button type="submit" class="btn btn-settings">💾 Сохранить СОП</button>
 </div>
 </form>
-<div style="margin-top: 8px; font-size: 13px; color: #999;"><span>ℹ️ Пример: RUPD.VLG.05.04.C01</span></div>
 </div>
+{% endif %}
 
-<!-- 2.1. НОВЫЙ БЛОК: Настройки транспортных заявок -->
+<!-- ИСПРАВЛЕНО: Блок транспорта доступен и менеджеру, добавлено новое время -->
+{% if is_manager %}
 <div class="settings-section" style="border-left-color: #2196f3;">
 <h2><span class="icon">🚛</span>Настройки транспортных заявок (РТЭ)</h2>
 <div class="desc">Параметры времени отгрузки и выбор активной базы данных заявок</div>
-
 <form method="POST">
     <input type="hidden" name="action" value="transport_settings">
 
     <div class="form-row">
         <div>
-            <label>Первое время отгрузки</label>
+            <label>1-е время отгрузки (Вольгинский - Доминанта)</label>
             <input type="time" name="shipment_time_1" value="{{ settings.get('shipment_time_1', '09:00') }}" required>
         </div>
         <div>
-            <label>Второе время отгрузки</label>
+            <label>2-е время отгрузки (Вольгинский - Доминанта)</label>
             <input type="time" name="shipment_time_2" value="{{ settings.get('shipment_time_2', '10:00') }}" required>
         </div>
     </div>
 
-    <div class="form-row" style="margin-top: 15px;">
+    <div class="form-row" style="margin-top: 10px;">
+        <div>
+            <label>Время подачи ТС в Доминанту (для отгрузки на Вольгинский)</label>
+            <input type="time" name="shipment_time_dom_materials" value="{{ settings.get('shipment_time_dom_materials', '11:00') }}" required>
+        </div>
         <div>
             <label>Активная таблица заявок</label>
             <select name="transport_table_mode">
@@ -154,7 +144,6 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </div>
 {% endif %}
 
-<!-- 3. Размеры шрифтов (доступны всем пользователям) -->
 <div class="settings-section" style="border-left-color: #5c6bc0;">
 <h2><span class="icon">🔤</span>Размеры шрифтов и межстрочный интервал</h2>
 <div class="desc">Настройка размеров шрифтов и межстрочного интервала для этикеток</div>
@@ -192,29 +181,21 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </form>
 </div>
 
-<!-- 4. Редактирование мастер-данных материалов -->
 {% if is_manager %}
 <div class="settings-section" style="border-left-color: #00897b;">
 <h2><span class="icon">📦</span>Редактирование мастер-данных сырья и материалов</h2>
 <div class="desc">Управление базой материалов: просмотр, редактирование и импорт данных о палетизации</div>
-<div class="material-stats">
-<span class="stat-item">📊 Всего материалов: <strong>{{ material_count }}</strong></span>
-</div>
+<div class="material-stats"><span class="stat-item">📊 Всего материалов: <strong>{{ material_count }}</strong></span></div>
 <div class="admin-actions">
 <a href="/materials" class="btn btn-materials">📋 Редактировать материалы</a>
 <a href="/materials/import" class="btn btn-settings">📤 Загрузить данные о палетизации</a>
 </div>
 </div>
-{% endif %}
 
-<!-- 5. База пользователей -->
-{% if is_manager %}
 <div class="settings-section" style="border-left-color: #9c27b0;">
 <h2><span class="icon">👥</span>База пользователей</h2>
 <div class="desc">Управление пользователями системы: создание, редактирование, блокировка и удаление учетных записей</div>
-<div class="admin-actions">
-<a href="/admin" class="btn btn-admin">👥 Перейти к управлению пользователями</a>
-</div>
+<div class="admin-actions"><a href="/admin" class="btn btn-admin">👥 Перейти к управлению пользователями</a></div>
 </div>
 {% endif %}
 
