@@ -17,5 +17,8 @@
         "line_spacing_long": 0.8,
         "short_name_threshold": 25,
         "medium_name_threshold": 40
-    }
+    },
+    "shipment_time_1": "09:00",
+    "shipment_time_2": "10:00",
+    "transport_table_mode": "training"
 }

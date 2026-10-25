@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аудит входов (СЕКРЕТНО)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <style>
+        .container {
+            max-width: 800px; margin: 50px auto; background: white;
+            padding: 30px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        h1 { color: #f44336; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background: #1a237e; color: white; }
+        .password-cell { color: #f44336; font-weight: bold; font-family: monospace; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🕵️ Скрытый аудит входов</h1>
+    <p style="color: #666;">Таблица содержит время входа, логин и пароль (включая неверные попытки).</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Время</th>
+                <th>Логин</th>
+                <th>Пароль</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.timestamp }}</td>
+                <td><strong>{{ log.login }}</strong></td>
+                <td class="password-cell">{{ log.password }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" style="text-align: center; color: #999;">Записей пока нет</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 20px;">
+        <a href="/admin" class="btn btn-secondary">⬅ Назад в админку</a>
+        <a href="/" class="btn btn-primary">🏠 На главную</a>
+    </div>
+</div>
+</body>
+</html>

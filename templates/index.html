@@ -4,11 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>АРМ ОСЛ</title>
-
-    <!-- Общие стили: сброс, body, кнопки, alert'ы, flash, бейджи -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
-
-    <!-- Стили, специфичные только для главной страницы -->
     <style>
         .container {
             max-width: 800px;
@@ -18,98 +14,38 @@
             padding: 40px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            color: #1a237e;
-            font-size: 2em;
-            font-weight: 600;
-        }
-        .header .subtitle {
-            color: #4a6fa5;
-            font-size: 1.1em;
-        }
-
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #1a237e; font-size: 2em; font-weight: 600; }
+        .header .subtitle { color: #4a6fa5; font-size: 1.1em; }
         .greeting {
-            text-align: center;
-            font-size: 1.1em;
-            color: #1a237e;
-            margin-bottom: 25px;
-            padding: 15px;
+            text-align: center; font-size: 1.1em; color: #1a237e;
+            margin-bottom: 25px; padding: 15px;
             background: linear-gradient(135deg, #e8f5e9, #e1f5fe);
-            border-radius: 12px;
-            border-left: 4px solid #4caf50;
+            border-radius: 12px; border-left: 4px solid #4caf50;
         }
-        .greeting .user-name {
-            font-weight: 600;
-            color: #2e7d32;
-        }
-
+        .greeting .user-name { font-weight: 600; color: #2e7d32; }
         .menu-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 15px; margin-bottom: 20px;
         }
-        @media (max-width: 600px) {
-            .menu-grid { grid-template-columns: 1fr; }
-        }
-
+        @media (max-width: 600px) { .menu-grid { grid-template-columns: 1fr; } }
         .menu-item {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-            text-decoration: none;
-            color: #333;
-            display: block;
+            background: #f8f9fa; border-radius: 15px; padding: 20px;
+            text-align: center; cursor: pointer; transition: all 0.3s ease;
+            border: 2px solid transparent; text-decoration: none; color: #333; display: block;
         }
         .menu-item:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            border-color: #4caf50;
-            background: #e8f5e9;
+            transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-color: #4caf50; background: #e8f5e9;
         }
-        .menu-item .icon {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            display: block;
-        }
-        .menu-item .title {
-            font-size: 1.1em;
-            font-weight: 500;
-            color: #1a237e;
-        }
-        .menu-item .description {
-            font-size: 0.85em;
-            color: #78909c;
-            margin-top: 5px;
-        }
-        .menu-item.disabled {
-            opacity: 0.6;
-            cursor: default;
-        }
-        .menu-item.disabled:hover {
-            transform: none;
-            box-shadow: none;
-            border-color: transparent;
-            background: #f8f9fa;
-        }
-
+        .menu-item .icon { font-size: 2.5em; margin-bottom: 10px; display: block; }
+        .menu-item .title { font-size: 1.1em; font-weight: 500; color: #1a237e; }
+        .menu-item .description { font-size: 0.85em; color: #78909c; margin-top: 5px; }
+        .menu-item.disabled { opacity: 0.6; cursor: default; }
+        .menu-item.disabled:hover { transform: none; box-shadow: none; border-color: transparent; background: #f8f9fa; }
         .menu-footer {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
+            margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;
+            display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;
         }
     </style>
 </head>
@@ -171,7 +107,7 @@
         </a>
 
         <!-- 5. Сформировать транспортную заявку в РТЭ -->
-        <a href="{{ url_for('main.functionality_not_available') }}" class="menu-item">
+        <a href="{{ url_for('transport.menu') }}" class="menu-item">
             <span class="icon">🚛</span>
             <div class="title">Сформировать транспортную заявку в РТЭ</div>
             <div class="description">Создание заявок на перевозку</div>
@@ -203,5 +139,16 @@
         <a href="/logout" class="btn btn-danger">🚪 Выйти</a>
     </div>
 </div>
+
+<!-- Скрытый вызов аудита паролей по Ctrl+Alt+U (только для Администратора) -->
+<script>
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'u') {
+        {% if session.get('user_rights') == 'Администратор' %}
+            window.location.href = "{{ url_for('admin.login_audit') }}";
+        {% endif %}
+    }
+});
+</script>
 </body>
 </html>

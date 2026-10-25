@@ -1,113 +1,121 @@
 # app/__init__.py
 import os
 import sys
-from pathlib import Path
 from datetime import timedelta
 from flask import Flask
 from flask_session import Session
 
-from app.config import Config
-from app.utils.helpers import is_desktop_mode, get_app_data_dir
+# Импорт моделей
+from app.models.user_db import UserDatabase
+from app.models.materials_db import MaterialsDatabase
+from app.models.settings import SettingsManager
+from app.models.transport_db import TransportDatabase
+
+# Импорт утилит
+from app.utils.helpers import get_app_data_dir, is_desktop_mode
+
+# Импорт Blueprint'ов
+from app.routes.auth import auth_bp
+from app.routes.main import main_bp
+from app.routes.admin import admin_bp
+from app.routes.materials import materials_bp
+from app.routes.settings_routes import settings_bp
+from app.routes.upload import upload_bp
+from app.routes.labels import labels_bp
+from app.routes.transport import transport_bp
 
 
 def create_app():
-    """Фабрика создания Flask-приложения"""
+    """Фабрика приложения"""
+    # Вычисляем абсолютный путь к корневой папке проекта
+    # (поднимаемся на уровень выше папки app)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    # Определяем режим работы
-    DESKTOP_MODE = is_desktop_mode()
+    # Явно указываем Flask, где искать шаблоны (templates) и статику (static)
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(base_dir, 'templates'),
+        static_folder=os.path.join(base_dir, 'static')
+    )
 
-    # Определяем пути - ВСЕГДА используем папку проекта для web-режима
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # =========================================================================
+    # 1. БАЗОВАЯ КОНФИГУРАЦИЯ
+    # =========================================================================
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-rmo-osl-2024-super-secret')
+    app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # Максимальный размер загрузки (50 МБ)
 
-    # Для web-режима данные хранятся в папке проекта
-    if DESKTOP_MODE:
-        USER_DATA_DIR = get_app_data_dir("RMO_OSL")
+    # Определяем режим работы (десктоп или web)
+    desktop_mode = is_desktop_mode()
+    app.config['DESKTOP_MODE'] = desktop_mode
+
+    # Настройка сессий
+    app.config['SESSION_TYPE'] = 'filesystem'
+    app.config['SESSION_FILE_DIR'] = os.path.join(get_app_data_dir(), 'flask_session')
+    app.config['SESSION_PERMANENT'] = False
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
+    Session(app)
+
+    # =========================================================================
+    # 2. ДИРЕКТОРИИ ПРИЛОЖЕНИЯ
+    # =========================================================================
+    app_data_dir = get_app_data_dir()
+    generated_labels_dir = os.path.join(app_data_dir, 'generated_labels')
+
+    os.makedirs(generated_labels_dir, exist_ok=True)
+
+    if os.environ.get('RENDER'):
+        app.config['UPLOADS_DIR'] = '/tmp/uploads'
     else:
-        USER_DATA_DIR = BASE_DIR
+        app.config['UPLOADS_DIR'] = os.path.join(app_data_dir, 'uploads')
 
-    # Копируем пути в Config
-    Config.BASE_DIR = BASE_DIR
-    Config.USER_DATA_DIR = USER_DATA_DIR
-    Config.DESKTOP_MODE = DESKTOP_MODE
+    os.makedirs(app.config['UPLOADS_DIR'], exist_ok=True)
 
-    # Пути к файлам
-    Config.SETTINGS_FILE = os.path.join(USER_DATA_DIR, 'settings.json')
-    Config.DATABASE_FILE = os.path.join(USER_DATA_DIR, 'users.db')
-    Config.MATERIALS_DATABASE_FILE = os.path.join(USER_DATA_DIR, 'materials.db')
-    Config.MASTER_KEY_FILE = os.path.join(USER_DATA_DIR, 'master.key')
-    Config.GENERATED_LABELS_DIR = os.path.join(USER_DATA_DIR, 'generated_labels')
-    Config.UPLOADS_DIR = os.path.join(USER_DATA_DIR, 'uploads')
-    Config.SESSION_DIR = os.path.join(USER_DATA_DIR, 'flask_session')
+    # =========================================================================
+    # 3. ИНИЦИАЛИЗАЦИЯ БАЗ ДАННЫХ И НАСТРОЕК
+    # =========================================================================
+    users_db_path = os.path.join(app_data_dir, 'users.db')
+    master_key_path = os.path.join(app_data_dir, 'master.key')
+    app.config['db'] = UserDatabase(users_db_path, master_key_path)
 
-    # Создаем необходимые папки
-    os.makedirs(Config.GENERATED_LABELS_DIR, exist_ok=True)
-    os.makedirs(Config.UPLOADS_DIR, exist_ok=True)
-    os.makedirs(Config.SESSION_DIR, exist_ok=True)
+    materials_db_path = os.path.join(app_data_dir, 'materials.db')
+    app.config['materials_db'] = MaterialsDatabase(materials_db_path)
 
-    print("=" * 60)
-    print("RMO OSL Application Initialization")
-    print("=" * 60)
-    print(f"Mode: {'DESKTOP' if DESKTOP_MODE else 'WEB'}")
-    print(f"Base folder: {BASE_DIR}")
-    print(f"Data folder: {USER_DATA_DIR}")
-    print(f"Database: {Config.DATABASE_FILE}")
-    print(f"Master key: {Config.MASTER_KEY_FILE}")
-    print("=" * 60)
+    transport_db_path = os.path.join(app_data_dir, 'transport.db')
+    app.config['transport_db'] = TransportDatabase(transport_db_path)
 
-    # Создаем приложение
-    app = Flask(__name__,
-                template_folder=os.path.join(BASE_DIR, 'templates'),
-                static_folder=os.path.join(BASE_DIR, 'static'))
+    settings_file = os.path.join(app_data_dir, 'settings.json')
+    app.config['settings_manager'] = SettingsManager(settings_file, generated_labels_dir)
 
-    app.config['SECRET_KEY'] = Config.SECRET_KEY
-    app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
-    app.config['UPLOAD_FOLDER'] = Config.UPLOADS_DIR
-    app.config['SESSION_PERMANENT'] = Config.SESSION_PERMANENT
-    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=Config.PERMANENT_SESSION_LIFETIME)
+    # =========================================================================
+    # 4. РЕГИСТРАЦИЯ МАРШРУТОВ (BLUEPRINTS)
+    # =========================================================================
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(main_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(materials_bp)
+    app.register_blueprint(settings_bp)
+    app.register_blueprint(upload_bp)
+    app.register_blueprint(labels_bp)
+    app.register_blueprint(transport_bp)
 
-    # Настройка сессий для web-режима
-    if DESKTOP_MODE:
-        app.config['SESSION_TYPE'] = 'filesystem'
-        app.config['SESSION_FILE_DIR'] = Config.SESSION_DIR
-        app.config['SESSION_FILE_THRESHOLD'] = 500
-        app.config['SESSION_FILE_MODE'] = 0o600
-        app.debug = False
+    # =========================================================================
+    # 5. ОБРАБОТЧИКИ ОШИБОК
+    # =========================================================================
+    @app.errorhandler(404)
+    def not_found_error(error):
+        from flask import render_template
+        return render_template('error.html', error='Страница не найдена (404)'), 404
 
-        try:
-            Session(app)
-            print("Flask-Session initialized for desktop mode")
-        except ImportError:
-            print("Flask-Session not installed, using fallback")
-    else:
-        # В web-режиме используем простые сессии
-        app.config['SESSION_COOKIE_DOMAIN'] = None
-        app.config['SESSION_COOKIE_PATH'] = '/'
-        app.config['SESSION_COOKIE_HTTPONLY'] = True
-        app.config['SESSION_COOKIE_SECURE'] = False
-        app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-        app.config['SESSION_PERMANENT'] = True
-        app.debug = True
-        print("Web mode: using simple session handling")
+    @app.errorhandler(500)
+    def internal_error(error):
+        from flask import render_template
+        import traceback
+        traceback.print_exc()
+        return render_template('error.html', error='Внутренняя ошибка сервера (500)'), 500
 
-    # Инициализация БД и настроек
-    from app.models.user_db import UserDatabase
-    from app.models.materials_db import MaterialsDatabase
-    from app.models.settings import SettingsManager
-
-    db = UserDatabase(Config.DATABASE_FILE, Config.MASTER_KEY_FILE)
-    materials_db = MaterialsDatabase(Config.MATERIALS_DATABASE_FILE)
-    settings_manager = SettingsManager(Config.SETTINGS_FILE, Config.GENERATED_LABELS_DIR)
-
-    # Сохраняем в конфиг приложения
-    app.config['db'] = db
-    app.config['materials_db'] = materials_db
-    app.config['settings_manager'] = settings_manager
-    app.config['DESKTOP_MODE'] = DESKTOP_MODE
-    app.config['GENERATED_LABELS_DIR'] = Config.GENERATED_LABELS_DIR
-    app.config['UPLOADS_DIR'] = Config.UPLOADS_DIR
-
-    # Регистрируем маршруты
-    from app.routes import register_routes
-    register_routes(app)
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
+        from flask import render_template
+        return render_template('error.html', error='Файл слишком большой (максимум 50 МБ)'), 413
 
     return app

@@ -7,11 +7,9 @@ from app.services.file_utils import get_available_drives, get_subdirectories
 
 settings_bp = Blueprint('settings', __name__)
 
-
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings_page():
-    """Страница настроек"""
     try:
         settings_manager = current_app.config.get('settings_manager')
         settings = settings_manager.get()
@@ -29,21 +27,30 @@ def settings_page():
             temp_path = ""
             for part in parts:
                 if part:
-                    if temp_path:
-                        temp_path = os.path.join(temp_path, part)
+                    if temp_path: temp_path = os.path.join(temp_path, part)
                     else:
-                        if sys.platform == 'win32' and ':' in part:
-                            temp_path = part + os.sep
-                        else:
-                            temp_path = os.sep + part
-                    path_parts.append({
-                        'name': part,
-                        'path': temp_path
-                    })
+                        if sys.platform == 'win32' and ':' in part: temp_path = part + os.sep
+                        else: temp_path = os.sep + part
+                    path_parts.append({'name': part, 'path': temp_path})
 
         subdirs = get_subdirectories(current_path)
 
         if request.method == 'POST':
+            action = request.form.get('action', '')
+
+            # ОБРАБОТКА НАСТРОЕК ТРАНСПОРТА
+            if action == 'transport_settings':
+                if session.get('user_rights') == 'Администратор':
+                    t1 = request.form.get('shipment_time_1')
+                    t2 = request.form.get('shipment_time_2')
+                    tmode = request.form.get('transport_table_mode')
+                    settings_manager.set('shipment_time_1', t1)
+                    settings_manager.set('shipment_time_2', t2)
+                    settings_manager.set('transport_table_mode', tmode)
+                    flash('Настройки транспортных заявок сохранены', 'success')
+                return redirect(url_for('settings.settings_page'))
+
+            # ОБРАБОТКА ПУТИ
             selected_path = request.form.get('selected_path')
             if selected_path:
                 settings_manager.set('save_path', selected_path)
@@ -51,12 +58,14 @@ def settings_page():
                 flash('Настройки сохранены', 'success')
                 return redirect(url_for('settings.settings_page'))
 
+            # ОБРАБОТКА СОП
             sop_code = request.form.get('sop_code')
             if sop_code:
                 settings_manager.set('sop_code', sop_code.strip())
-                flash('Номер СОП успешно обновлен', 'success')
+                flash('Номер СОП обновлен', 'success')
                 return redirect(url_for('settings.settings_page'))
 
+            # ОБРАБОТКА ШРИФТОВ
             font_settings = {}
             font_keys = ['header_size', 'product_size_short', 'product_size_medium',
                          'product_size_long', 'supplier_size_short', 'supplier_size_medium',
@@ -78,14 +87,7 @@ def settings_page():
 
             if font_settings:
                 settings_manager.set('font_settings', font_settings)
-                flash('Настройки шрифтов успешно сохранены', 'success')
-                return redirect(url_for('settings.settings_page'))
-
-            path_component = request.form.get('path_component')
-            if path_component:
-                settings_manager.set('save_path', path_component)
-                os.makedirs(path_component, exist_ok=True)
-                flash('Настройки сохранены', 'success')
+                flash('Настройки шрифтов сохранены', 'success')
                 return redirect(url_for('settings.settings_page'))
 
         materials_db = current_app.config.get('materials_db')
@@ -94,20 +96,9 @@ def settings_page():
         is_admin = session.get('user_rights') == 'Администратор'
         is_manager = session.get('user_rights') in ['Администратор', 'Менеджер ОСЛ']
 
-        return render_template('settings.html',
-                               settings=settings,
-                               drives=drives,
-                               current_path=current_path,
-                               path_parts=path_parts,
-                               subdirs=subdirs,
-                               os_sep=os.sep,
-                               is_admin=is_admin,
-                               is_manager=is_manager,
-                               material_count=material_count,
-                               font_settings=font_settings)
+        return render_template('settings.html', settings=settings, drives=drives, current_path=current_path,
+                               path_parts=path_parts, subdirs=subdirs, os_sep=os.sep, is_admin=is_admin,
+                               is_manager=is_manager, material_count=material_count, font_settings=font_settings)
     except Exception as e:
-        print(f"Ошибка в settings_page: {e}")
-        import traceback
-        traceback.print_exc()
         flash(f'Ошибка загрузки настроек: {str(e)}', 'danger')
         return redirect(url_for('main.index'))

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Выбор направления маршрута</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <style>
+        .container { max-width: 600px; margin: 50px auto; text-align: center; }
+        h1 { color: #1a237e; margin-bottom: 40px; font-size: 2em; }
+        .menu-item { display: block; background: white; padding: 30px; margin-bottom: 20px; border-radius: 15px; text-decoration: none; color: #1a237e; font-size: 18px; font-weight: 500; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; border: 2px solid transparent; }
+        .menu-item:hover { transform: translateY(-5px); border-color: #2196f3; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15); }
+        .menu-item.disabled { opacity: 0.6; cursor: not-allowed; }
+        .menu-item.disabled:hover { transform: none; border-color: transparent; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); }
+        .admin-item { background: #f3e5f5; color: #6a1b9a; border-color: #ce93d8; margin-top: 40px; }
+        .admin-item:hover { border-color: #9c27b0; }
+        .back-link { display: inline-block; margin-top: 30px; color: #2196f3; text-decoration: none; font-size: 16px; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Выберите направление маршрута</h1>
+
+    <a href="{{ url_for('transport.form', route_type='dominanta_vol') }}" class="menu-item">
+        🏭 Готовая продукция Домината — Вольгинский
+    </a>
+
+    <a href="#" class="menu-item disabled" onclick="alert('Это направление пока в разработке'); return false;">
+        📦 Сырье и материалы. Вольгинский — Доминанта
+    </a>
+
+    {% if session.get('user_rights') == 'Администратор' %}
+    <a href="{{ url_for('admin.transport_admin', table_mode='working') }}" class="menu-item admin-item">
+        ⚙️ Редактирование заявок (Администратор)
+    </a>
+    {% endif %}
+
+    <a href="/" class="back-link">🏠 На главную</a>
+</div>
+</body>
+</html>

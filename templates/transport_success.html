@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Заявки сформированы</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+</head>
+<body>
+<div class="container" style="max-width: 600px; margin: 50px auto; background: white; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.15);">
+    <h1 style="color: #2e7d32; margin-bottom: 15px;">✅ Заявки успешно сформированы!</h1>
+    <p style="color: #666; margin-bottom: 20px;">Начинается автоматическое скачивание файлов...</p>
+
+    <div id="download-links" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px;">
+        {% for file in files %}
+        <a href="{{ url_for('transport.download_file', filename=file) }}" class="btn btn-secondary download-btn" data-filename="{{ file }}">
+            📥 Скачать {{ file }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <a href="/" class="btn btn-primary">🏠 На главную</a>
+</div>
+
+<script>
+    // Автоматическое скачивание всех файлов при загрузке страницы
+    window.addEventListener('DOMContentLoaded', (event) => {
+        const links = document.querySelectorAll('.download-btn');
+        links.forEach((link, index) => {
+            setTimeout(() => {
+                const a = document.createElement('a');
+                a.href = link.href;
+                a.download = link.getAttribute('data-filename');
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }, index * 800); // Задержка между скачиваниями, чтобы браузер не блокировал
+        });
+    });
+</script>
+</body>
+</html>
