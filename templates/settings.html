@@ -6,7 +6,6 @@
 <title>Настройки</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
 <style>
-/* Стили остаются без изменений, они у вас уже есть */
 .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); }
 h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 .subtitle { color: #666; margin-bottom: 30px; font-size: 16px; }
@@ -106,30 +105,18 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </div>
 {% endif %}
 
-<!-- ИСПРАВЛЕНО: Блок транспорта доступен и менеджеру, добавлено новое время -->
 {% if is_manager %}
 <div class="settings-section" style="border-left-color: #2196f3;">
 <h2><span class="icon">🚛</span>Настройки транспортных заявок (РТЭ)</h2>
 <div class="desc">Параметры времени отгрузки и выбор активной базы данных заявок</div>
 <form method="POST">
     <input type="hidden" name="action" value="transport_settings">
-
     <div class="form-row">
-        <div>
-            <label>1-е время отгрузки (Вольгинский - Доминанта)</label>
-            <input type="time" name="shipment_time_1" value="{{ settings.get('shipment_time_1', '09:00') }}" required>
-        </div>
-        <div>
-            <label>2-е время отгрузки (Вольгинский - Доминанта)</label>
-            <input type="time" name="shipment_time_2" value="{{ settings.get('shipment_time_2', '10:00') }}" required>
-        </div>
+        <div><label>1-е время отгрузки (Вольгинский - Доминанта)</label><input type="time" name="shipment_time_1" value="{{ settings.get('shipment_time_1', '09:00') }}" required></div>
+        <div><label>2-е время отгрузки (Вольгинский - Доминанта)</label><input type="time" name="shipment_time_2" value="{{ settings.get('shipment_time_2', '10:00') }}" required></div>
     </div>
-
     <div class="form-row" style="margin-top: 10px;">
-        <div>
-            <label>Время подачи ТС в Доминанту (для отгрузки на Вольгинский)</label>
-            <input type="time" name="shipment_time_dom_materials" value="{{ settings.get('shipment_time_dom_materials', '11:00') }}" required>
-        </div>
+        <div><label>Время подачи ТС в Доминанту</label><input type="time" name="shipment_time_dom_materials" value="{{ settings.get('shipment_time_dom_materials', '11:00') }}" required></div>
         <div>
             <label>Активная таблица заявок</label>
             <select name="transport_table_mode">
@@ -138,7 +125,6 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
             </select>
         </div>
     </div>
-
     <button type="submit" class="btn btn-primary" style="margin-top: 15px;">💾 Сохранить настройки ТС</button>
 </form>
 </div>
@@ -153,33 +139,45 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 <div class="font-grid">
 <div class="font-item"><label>ООО «Верофарм» (header)</label><input type="number" name="header_size" value="{{ font_settings.get('header_size', 12) }}" min="8" max="24"><span class="hint">pt (8-24)</span></div>
 <div class="font-item"><label>Название товара (короткое &lt;{{ font_settings.get('short_name_threshold', 25) }})</label><input type="number" name="product_size_short" value="{{ font_settings.get('product_size_short', 80) }}" min="30" max="120"><span class="hint">pt (30-120)</span></div>
-<div class="font-item"><label>Название товара (среднее {{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }})</label><input type="number" name="product_size_medium" value="{{ font_settings.get('product_size_medium', 72) }}" min="30" max="120"><span class="hint">pt (30-120)</span></div>
-<div class="font-item"><label>Название товара (длинное ≥{{ font_settings.get('medium_name_threshold', 40) }})</label><input type="number" name="product_size_long" value="{{ font_settings.get('product_size_long', 64) }}" min="30" max="120"><span class="hint">pt (30-120)</span></div>
-<div class="font-item"><label>Серия поставщика (короткая &lt;{{ font_settings.get('short_name_threshold', 25) }})</label><input type="number" name="supplier_size_short" value="{{ font_settings.get('supplier_size_short', 42) }}" min="16" max="60"><span class="hint">pt (16-60)</span></div>
-<div class="font-item"><label>Серия поставщика (средняя {{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }})</label><input type="number" name="supplier_size_medium" value="{{ font_settings.get('supplier_size_medium', 42) }}" min="16" max="60"><span class="hint">pt (16-60)</span></div>
-<div class="font-item"><label>Серия поставщика (длинная ≥{{ font_settings.get('medium_name_threshold', 40) }})</label><input type="number" name="supplier_size_long" value="{{ font_settings.get('supplier_size_long', 36) }}" min="16" max="60"><span class="hint">pt (16-60)</span></div>
+<div class="font-item"><label>Название товара (среднее)</label><input type="number" name="product_size_medium" value="{{ font_settings.get('product_size_medium', 72) }}" min="30" max="120"><span class="hint">pt (30-120)</span></div>
+<div class="font-item"><label>Название товара (длинное)</label><input type="number" name="product_size_long" value="{{ font_settings.get('product_size_long', 64) }}" min="30" max="120"><span class="hint">pt (30-120)</span></div>
+<div class="font-item"><label>Серия поставщика (короткая)</label><input type="number" name="supplier_size_short" value="{{ font_settings.get('supplier_size_short', 42) }}" min="16" max="60"><span class="hint">pt (16-60)</span></div>
+<div class="font-item"><label>Серия поставщика (средняя)</label><input type="number" name="supplier_size_medium" value="{{ font_settings.get('supplier_size_medium', 42) }}" min="16" max="60"><span class="hint">pt (16-60)</span></div>
+<div class="font-item"><label>Серия поставщика (длинная)</label><input type="number" name="supplier_size_long" value="{{ font_settings.get('supplier_size_long', 36) }}" min="16" max="60"><span class="hint">pt (16-60)</span></div>
 <div class="font-item"><label>Аналитический лист</label><input type="number" name="analytic_size" value="{{ font_settings.get('analytic_size', 117) }}" min="40" max="180"><span class="hint">pt (40-180)</span></div>
 <div class="font-item"><label>Код</label><input type="number" name="code_size" value="{{ font_settings.get('code_size', 14) }}" min="8" max="24"><span class="hint">pt (8-24)</span></div>
 </div>
 </div>
 <div class="font-section" style="margin-top: 15px;">
-<h3>📐 Межстрочный интервал в зависимости от длины названия</h3>
+<h3>📐 Межстрочный интервал</h3>
 <div class="font-grid">
-<div class="font-item"><label>Короткое название (&lt;{{ font_settings.get('short_name_threshold', 25) }} символов)</label><input type="number" name="line_spacing_short" value="{{ font_settings.get('line_spacing_short', 1.5) }}" step="0.1" min="0.5" max="3.0"><span class="hint">(0.5-3.0)</span></div>
-<div class="font-item"><label>Среднее название ({{ font_settings.get('short_name_threshold', 25) }}-{{ font_settings.get('medium_name_threshold', 40) }} символов)</label><input type="number" name="line_spacing_medium" value="{{ font_settings.get('line_spacing_medium', 1.0) }}" step="0.1" min="0.5" max="3.0"><span class="hint">(0.5-3.0)</span></div>
-<div class="font-item"><label>Длинное название (≥{{ font_settings.get('medium_name_threshold', 40) }} символов)</label><input type="number" name="line_spacing_long" value="{{ font_settings.get('line_spacing_long', 0.8) }}" step="0.1" min="0.5" max="3.0"><span class="hint">(0.5-3.0)</span></div>
+<div class="font-item"><label>Короткое название</label><input type="number" name="line_spacing_short" value="{{ font_settings.get('line_spacing_short', 1.5) }}" step="0.1" min="0.5" max="3.0"><span class="hint">(0.5-3.0)</span></div>
+<div class="font-item"><label>Среднее название</label><input type="number" name="line_spacing_medium" value="{{ font_settings.get('line_spacing_medium', 1.0) }}" step="0.1" min="0.5" max="3.0"><span class="hint">(0.5-3.0)</span></div>
+<div class="font-item"><label>Длинное название</label><input type="number" name="line_spacing_long" value="{{ font_settings.get('line_spacing_long', 0.8) }}" step="0.1" min="0.5" max="3.0"><span class="hint">(0.5-3.0)</span></div>
 </div>
 </div>
 <div class="font-section" style="margin-top: 15px; background: #fff3cd;">
 <h3>⚙️ Границы длины названия</h3>
 <div class="font-grid">
-<div class="font-item"><label>Максимальная длина короткого названия</label><input type="number" name="short_name_threshold" value="{{ font_settings.get('short_name_threshold', 25) }}" min="10" max="35"><span class="hint">символов (10-35)</span></div>
-<div class="font-item"><label>Минимальная длина длинного названия</label><input type="number" name="medium_name_threshold" value="{{ font_settings.get('medium_name_threshold', 40) }}" min="30" max="55"><span class="hint">символов (30-55)</span></div>
+<div class="font-item"><label>Макс. длина короткого</label><input type="number" name="short_name_threshold" value="{{ font_settings.get('short_name_threshold', 25) }}" min="10" max="35"><span class="hint">(10-35)</span></div>
+<div class="font-item"><label>Мин. длина длинного</label><input type="number" name="medium_name_threshold" value="{{ font_settings.get('medium_name_threshold', 40) }}" min="30" max="55"><span class="hint">(30-55)</span></div>
 </div>
 </div>
 <div style="margin-top: 15px;"><button type="submit" class="btn btn-font">💾 Сохранить настройки шрифтов</button></div>
 </form>
 </div>
+
+{% if is_admin %}
+<div class="settings-section" style="border-left-color: #f44336;">
+    <h2><span class="icon">⚠️</span>Управление учебной базой данных</h2>
+    <div class="desc">Копирование всех текущих заявок из рабочей таблицы в учебную. Все текущие записи в учебной таблице будут безвозвратно удалены.</div>
+
+    <form method="POST" onsubmit="return confirm('Вы уверены? Все данные в учебной базе будут перезаписаны!');">
+        <input type="hidden" name="action" value="copy_transport_db">
+        <button type="submit" class="btn btn-danger">📋 Сформировать учебную базу на основе рабочей</button>
+    </form>
+</div>
+{% endif %}
 
 {% if is_manager %}
 <div class="settings-section" style="border-left-color: #00897b;">

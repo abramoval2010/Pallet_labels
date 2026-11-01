@@ -1,7 +1,8 @@
 # app/routes/materials.py
 import os
 import json
-from flask import current_app,  Blueprint, render_template, request, redirect, url_for, session, flash, send_file, jsonify
+from flask import current_app, Blueprint, render_template, request, redirect, url_for, session, flash, send_file, \
+    jsonify
 from werkzeug.utils import secure_filename
 from app.utils.decorators import manager_required
 
@@ -18,10 +19,56 @@ def materials_page():
         return render_template('materials.html', materials=materials)
     except Exception as e:
         print(f"Ошибка в materials_page: {e}")
-        import traceback
-        traceback.print_exc()
         flash('Ошибка загрузки данных материалов', 'danger')
         return redirect(url_for('settings.settings_page'))
+
+
+@materials_bp.route('/materials/add', methods=['POST'])
+@manager_required
+def add_material():
+    """Добавление нового материала вручную"""
+    try:
+        sap_code_str = request.form.get('sap_code', '').strip()
+        material_name = request.form.get('material_name', '').strip()
+        palletization_str = request.form.get('palletization', '0').strip()
+        box_quantity_str = request.form.get('box_quantity', '0').strip()
+
+        if not sap_code_str or not material_name:
+            flash('SAP код и Наименование обязательны для заполнения', 'warning')
+            return redirect(url_for('materials.materials_page'))
+
+        if len(sap_code_str) != 8 or not sap_code_str.isdigit():
+            flash('SAP код должен состоять ровно из 8 цифр', 'danger')
+            return redirect(url_for('materials.materials_page'))
+
+        try:
+            sap_code = int(sap_code_str)
+            palletization = int(palletization_str) if palletization_str else 0
+            box_quantity = int(box_quantity_str) if box_quantity_str else 0
+        except ValueError:
+            flash('Палетизация и вложение в короб должны быть целыми числами', 'danger')
+            return redirect(url_for('materials.materials_page'))
+
+        new_data = {
+            'sap_code': sap_code,
+            'material_name': material_name,
+            'palletization': palletization,
+            'box_quantity': box_quantity
+        }
+
+        materials_db = current_app.config.get('materials_db')
+        success, message = materials_db.add_material(new_data)
+
+        if success:
+            flash(message, 'success')
+        else:
+            flash(message, 'danger')
+
+        return redirect(url_for('materials.materials_page'))
+    except Exception as e:
+        print(f"Ошибка в add_material: {e}")
+        flash(f'Ошибка добавления материала: {str(e)}', 'danger')
+        return redirect(url_for('materials.materials_page'))
 
 
 @materials_bp.route('/materials/update', methods=['POST'])
@@ -89,9 +136,6 @@ def update_materials():
 
         return redirect(url_for('materials.materials_page'))
     except Exception as e:
-        print(f"Ошибка в update_materials: {e}")
-        import traceback
-        traceback.print_exc()
         flash(f'Ошибка при сохранении данных: {str(e)}', 'danger')
         return redirect(url_for('materials.materials_page'))
 
@@ -106,9 +150,6 @@ def delete_material(sap_code):
         flash(message, 'success' if success else 'danger')
         return redirect(url_for('materials.materials_page'))
     except Exception as e:
-        print(f"Ошибка в delete_material: {e}")
-        import traceback
-        traceback.print_exc()
         flash(f'Ошибка при удалении материала: {str(e)}', 'danger')
         return redirect(url_for('materials.materials_page'))
 
@@ -153,9 +194,6 @@ def import_materials():
 
         return redirect(url_for('materials.materials_page'))
     except Exception as e:
-        print(f"Ошибка в import_materials: {e}")
-        import traceback
-        traceback.print_exc()
         flash(f'Ошибка при импорте: {str(e)}', 'danger')
         return redirect(url_for('materials.import_materials'))
 
@@ -173,9 +211,6 @@ def export_materials():
             flash('Ошибка при экспорте данных', 'danger')
             return redirect(url_for('materials.materials_page'))
     except Exception as e:
-        print(f"Ошибка в export_materials: {e}")
-        import traceback
-        traceback.print_exc()
         flash(f'Ошибка при экспорте: {str(e)}', 'danger')
         return redirect(url_for('materials.materials_page'))
 
@@ -225,8 +260,5 @@ def search_materials():
                                sort_by=sort_by,
                                sort_order=sort_order)
     except Exception as e:
-        print(f"Ошибка в search_materials: {e}")
-        import traceback
-        traceback.print_exc()
         flash(f'Ошибка при поиске: {str(e)}', 'danger')
         return redirect(url_for('materials.materials_page'))

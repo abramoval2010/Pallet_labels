@@ -20,5 +20,6 @@
     },
     "shipment_time_1": "09:00",
     "shipment_time_2": "10:00",
-    "transport_table_mode": "training"
+    "transport_table_mode": "training",
+    "shipment_time_dom_materials": "11:00"
 }

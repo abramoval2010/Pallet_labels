@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <style>
         body { padding: 10px; height: 100vh; overflow: hidden; }
-        .admin-layout { display: flex; gap: 20px; height: calc(100vh - 20px); }
+        .admin-layout { display: flex; gap: 15px; height: calc(100vh - 20px); }
 
-        .left-panel { width: 40%; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow-y: auto; display: flex; flex-direction: column; }
+        /* Изменение пропорций: левая стала уже, правая шире */
+        .left-panel { width: 32%; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow-y: auto; display: flex; flex-direction: column; }
         .left-panel h2 { color: #1a237e; margin-bottom: 15px; font-size: 1.2em; }
         .form-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
         .form-group { display: flex; flex-direction: column; }
@@ -18,13 +19,13 @@
         .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #2196f3; box-shadow: 0 0 5px rgba(33, 150, 243, 0.3); }
         .form-actions { margin-top: 20px; display: flex; gap: 10px; position: sticky; bottom: 0; background: white; padding-top: 15px; border-top: 1px solid #eee; }
 
-        .right-panel { width: 60%; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+        .right-panel { width: 68%; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
         .right-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .right-header h2 { color: #1a237e; margin: 0; font-size: 1.2em; }
         .table-container { flex: 1; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 10px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #1a237e; color: white; position: sticky; top: 0; z-index: 10; font-weight: 500; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #1a237e; color: white; position: sticky; top: 0; z-index: 10; font-weight: 500; white-space: nowrap;}
         tr { cursor: pointer; transition: background 0.2s; }
         tr:hover { background: #f5f5f5; }
         tr.selected { background: #e3f2fd; border-left: 4px solid #2196f3; }
@@ -34,109 +35,38 @@
 <body>
 
 <div class="admin-layout">
-    <!-- ЛЕВАЯ ПАНЕЛЬ: Форма редактирования -->
+    <!-- ЛЕВАЯ ПАНЕЛЬ -->
     <div class="left-panel">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>✏️ Редактирование заявки</h2>
-            <a href="/transport/menu" class="btn btn-secondary" style="padding: 5px 15px; font-size: 12px;">⬅ Меню</a>
+            <h2>✏️ Редактирование</h2>
+            <a href="/transport/menu" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">⬅ Меню</a>
         </div>
-        <p class="keyboard-hint">Используйте <b>↑</b>, <b>↓</b>, <b>Home</b>, <b>End</b> для перемещения по списку</p>
+        <p class="keyboard-hint">Используйте <b>↑</b>, <b>↓</b>, <b>Home</b>, <b>End</b></p>
 
         <form id="editForm" method="POST" class="form-grid" style="margin-top: 10px;">
-            <div class="form-group">
-                <label>Номер поручения</label>
-                <input type="text" name="order_number" id="f_order_number">
-            </div>
-            <div class="form-group">
-                <label>Дата поручения</label>
-                <input type="date" name="order_date" id="f_order_date">
-            </div>
-            <div class="form-group">
-                <label>Наименование отправителя</label>
-                <textarea name="sender" id="f_sender" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Место подачи</label>
-                <textarea name="loading_place" id="f_loading_place" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Контактное лицо (загрузка)</label>
-                <textarea name="loading_contact" id="f_loading_contact" rows="2"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>Дата подачи ТС</label>
-                <input type="date" name="supply_date" id="f_supply_date">
-            </div>
-            <div class="form-group">
-                <label>Время подачи ТС</label>
-                <input type="text" name="supply_time" id="f_supply_time">
-            </div>
-
-            <div class="form-group">
-                <label>Дата доставки</label>
-                <input type="date" name="delivery_date" id="f_delivery_date">
-            </div>
-            <div class="form-group">
-                <label>Время доставки</label>
-                <input type="text" name="delivery_time" id="f_delivery_time">
-            </div>
-            <div class="form-group">
-                <label>Наименование получателя</label>
-                <textarea name="receiver" id="f_receiver" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Адрес доставки</label>
-                <textarea name="delivery_address" id="f_delivery_address" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Контактное лицо (разгрузка)</label>
-                <textarea name="unloading_contact" id="f_unloading_contact" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Наименование груза</label>
-                <input type="text" name="cargo_name" id="f_cargo_name">
-            </div>
-            <div class="form-group">
-                <label>Количество паллет</label>
-                <input type="number" name="quantity" id="f_quantity">
-            </div>
-            <div class="form-group">
-                <label>Тип требуемого ТС</label>
-                <textarea name="vehicle_type" id="f_vehicle_type" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Температурный режим</label>
-                <textarea name="temperature_mode" id="f_temperature_mode" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Комментарии</label>
-                <textarea name="comments" id="f_comments" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>ФИО водителя</label>
-                <input type="text" name="driver_name" id="f_driver_name">
-            </div>
-            <div class="form-group">
-                <label>Данные водителя</label>
-                <textarea name="driver_data" id="f_driver_data" rows="2"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Контактный телефон</label>
-                <input type="text" name="driver_phone" id="f_driver_phone">
-            </div>
-            <div class="form-group">
-                <label>Номер ТС</label>
-                <input type="text" name="vehicle_number" id="f_vehicle_number">
-            </div>
-            <div class="form-group">
-                <label>Автор заявки</label>
-                <input type="text" name="author" id="f_author">
-            </div>
-            <div class="form-group">
-                <label>PO</label>
-                <input type="number" name="po" id="f_po">
-            </div>
+            <div class="form-group"><label>Номер поручения</label><input type="text" name="order_number" id="f_order_number"></div>
+            <div class="form-group"><label>Дата поручения</label><input type="date" name="order_date" id="f_order_date"></div>
+            <div class="form-group"><label>Наименование отправителя</label><textarea name="sender" id="f_sender" rows="2"></textarea></div>
+            <div class="form-group"><label>Место подачи</label><textarea name="loading_place" id="f_loading_place" rows="2"></textarea></div>
+            <div class="form-group"><label>Контактное лицо (загрузка)</label><textarea name="loading_contact" id="f_loading_contact" rows="2"></textarea></div>
+            <div class="form-group"><label>Дата подачи ТС</label><input type="date" name="supply_date" id="f_supply_date"></div>
+            <div class="form-group"><label>Время подачи ТС</label><input type="text" name="supply_time" id="f_supply_time"></div>
+            <div class="form-group"><label>Дата доставки</label><input type="date" name="delivery_date" id="f_delivery_date"></div>
+            <div class="form-group"><label>Время доставки</label><input type="text" name="delivery_time" id="f_delivery_time"></div>
+            <div class="form-group"><label>Наименование получателя</label><textarea name="receiver" id="f_receiver" rows="2"></textarea></div>
+            <div class="form-group"><label>Адрес доставки</label><textarea name="delivery_address" id="f_delivery_address" rows="2"></textarea></div>
+            <div class="form-group"><label>Контактное лицо (разгрузка)</label><textarea name="unloading_contact" id="f_unloading_contact" rows="2"></textarea></div>
+            <div class="form-group"><label>Наименование груза</label><input type="text" name="cargo_name" id="f_cargo_name"></div>
+            <div class="form-group"><label>Количество паллет</label><input type="number" name="quantity" id="f_quantity"></div>
+            <div class="form-group"><label>Тип требуемого ТС</label><textarea name="vehicle_type" id="f_vehicle_type" rows="2"></textarea></div>
+            <div class="form-group"><label>Температурный режим</label><textarea name="temperature_mode" id="f_temperature_mode" rows="2"></textarea></div>
+            <div class="form-group"><label>Комментарии</label><textarea name="comments" id="f_comments" rows="2"></textarea></div>
+            <div class="form-group"><label>ФИО водителя</label><input type="text" name="driver_name" id="f_driver_name"></div>
+            <div class="form-group"><label>Данные водителя</label><textarea name="driver_data" id="f_driver_data" rows="2"></textarea></div>
+            <div class="form-group"><label>Контактный телефон</label><input type="text" name="driver_phone" id="f_driver_phone"></div>
+            <div class="form-group"><label>Номер ТС</label><input type="text" name="vehicle_number" id="f_vehicle_number"></div>
+            <div class="form-group"><label>Автор заявки</label><input type="text" name="author" id="f_author"></div>
+            <div class="form-group"><label>PO</label><input type="number" name="po" id="f_po"></div>
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-success" style="flex: 1;">💾 Сохранить</button>
@@ -145,7 +75,7 @@
         </form>
     </div>
 
-    <!-- ПРАВАЯ ПАНЕЛЬ: Список записей -->
+    <!-- ПРАВАЯ ПАНЕЛЬ (СПИСОК) -->
     <div class="right-panel">
         <div class="right-header">
             <h2>📋 Список заявок ({{ 'Рабочая' if table_mode == 'working' else 'Учебная' }})</h2>
@@ -160,6 +90,7 @@
                         <th>Дата поручения</th>
                         <th>Дата подачи ТС</th>
                         <th>Время подачи ТС</th>
+                        <th>Наименование отправителя</th>
                         <th>Место подачи</th>
                         <th>Адрес доставки</th>
                         <th>Водитель</th>
@@ -185,17 +116,26 @@
 
     const fieldIds = [
         'order_number', 'order_date', 'sender', 'loading_place', 'loading_contact',
-        'supply_date', 'supply_time',
-        'delivery_date', 'delivery_time', 'receiver', 'delivery_address',
-        'unloading_contact', 'cargo_name', 'quantity', 'vehicle_type',
+        'supply_date', 'supply_time', 'delivery_date', 'delivery_time', 'receiver',
+        'delivery_address', 'unloading_contact', 'cargo_name', 'quantity', 'vehicle_type',
         'temperature_mode', 'comments', 'driver_name', 'driver_data',
         'driver_phone', 'vehicle_number', 'author', 'po'
     ];
 
+    // Функция для форматирования даты из ГГГГ-ММ-ДД в ДД.ММ.ГГГГ
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+        return dateStr;
+    }
+
     function renderTable() {
         tbody.innerHTML = '';
         if (requestsData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#999;">Записей нет</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px; color:#999;">Записей нет</td></tr>';
             return;
         }
 
@@ -204,12 +144,12 @@
             tr.onclick = () => selectRecord(index);
             tr.dataset.index = index;
 
-            // Обновленные столбцы правой панели
             tr.innerHTML = `
                 <td><strong>${req.order_number || ''}</strong></td>
-                <td>${req.order_date || ''}</td>
-                <td>${req.supply_date || ''}</td>
+                <td>${formatDate(req.order_date)}</td>
+                <td>${formatDate(req.supply_date)}</td>
                 <td>${req.supply_time || ''}</td>
+                <td>${req.sender || ''}</td>
                 <td>${req.loading_place || ''}</td>
                 <td>${req.delivery_address || ''}</td>
                 <td>${req.driver_name || '-'}</td>
@@ -274,6 +214,5 @@
         if (requestsData.length > 0) selectRecord(0);
     });
 </script>
-
 </body>
 </html>

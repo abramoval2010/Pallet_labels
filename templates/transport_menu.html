@@ -17,6 +17,11 @@
     </style>
 </head>
 <body>
+{% if is_training %}
+<div style="background-color: #fff3cd; color: #856404; text-align: center; padding: 15px; font-weight: bold; border-bottom: 2px solid #ffeeba; font-size: 18px;">
+    ⚠️ Учебная база данных. Не для реальных заявок
+</div>
+{% endif %}
 <div class="container">
     <h1>Выберите направление маршрута</h1>
 

@@ -17,13 +17,16 @@ transport_bp = Blueprint('transport', __name__)
 @transport_bp.route('/transport/menu')
 @login_required
 def menu():
+    settings_manager = current_app.config.get('settings_manager')
+    is_training = settings_manager.get('transport_table_mode') == 'training'
+
     rights = session.get('user_rights')
     if rights == 'Мастер/оператор ГП':
         return redirect(url_for('transport.form', route_type='gp_vol_dom'))
     elif rights in ['Оператор СиМ', 'Мастер СиМ']:
         return redirect(url_for('transport.form', route_type='mat_dom_vol'))
 
-    return render_template('transport_menu.html')
+    return render_template('transport_menu.html', is_training=is_training)
 
 
 @transport_bp.route('/transport/form/<route_type>', methods=['GET', 'POST'])
@@ -34,6 +37,7 @@ def form(route_type):
         return redirect(url_for('main.index'))
 
     settings_manager = current_app.config.get('settings_manager')
+    is_training = settings_manager.get('transport_table_mode') == 'training'
 
     if route_type == 'gp_vol_dom':
         title = "Готовая продукция Вольгинский - Домината"
@@ -41,7 +45,6 @@ def form(route_type):
         time2 = settings_manager.get('shipment_time_2') or '10:00'
         route_name = "РТЭ Вольгинский - Доминанта"
 
-        # Данные для ГП (Вольгинский -> Доминанта)
         loading_place = 'Владимирская область, Петушинский район, пос. Вольгинский, ул. Заводская, владение 120,'
         loading_contact = 'Мастер склада. тел.: +7 (492) 237-98-28, доб.: 37-12'
         delivery_address = 'Московская область, г/о Подольск, вблизи деревни Новогородово 2, территория технопарка «Сынково», склад №10'
@@ -54,9 +57,7 @@ def form(route_type):
         time_mat = settings_manager.get('shipment_time_dom_materials') or '11:00'
         route_name = "РТЭ Доминанта - Вольгинский"
 
-        # Данные для Материалов (Доминанта -> Вольгинский)
         loading_place = 'Московская область, г/о Подольск, вблизи деревни Новогородово 2, территория технопарка «Сынково», склад №10'
-        # ИСПРАВЛЕНИЕ: Здесь контактное лицо на загрузке - Рубцова Оксана
         loading_contact = 'Рубцова Оксана, тел: +7 (968) 874-36-08'
         delivery_address = 'Владимирская область, Петушинский район, пос. Вольгинский, ул. Заводская, владение 120. Завод Верофарм (Abbott)'
         unloading_contact = 'Юдашкина Анастасия. Тел.: +7 (903)645 0839'
@@ -82,7 +83,8 @@ def form(route_type):
                                default_date=default_date.strftime('%Y-%m-%d'),
                                max_cars=max_cars,
                                title=title,
-                               route_type=route_type)
+                               route_type=route_type,
+                               is_training=is_training)
 
     try:
         trip_date_str = request.form.get('trip_date')
@@ -105,11 +107,8 @@ def form(route_type):
         table_mode = settings_manager.get('transport_table_mode') or 'working'
         table_name = f"transport_{table_mode}"
 
-        last_num_str = transport_db.get_last_order_number(table_name)
-        if last_num_str and re.match(r'^(\d+)', str(last_num_str)):
-            base_num = int(re.match(r'^(\d+)', str(last_num_str)).group(1))
-        else:
-            base_num = 0
+        # ИСПОЛЬЗУЕМ НОВЫЙ МЕТОД ДЛЯ ПОИСКА МАКСИМАЛЬНОГО НОМЕРА
+        base_num = transport_db.get_max_order_number(table_name)
 
         order_date_str = today.strftime('%Y-%m-%d')
 
@@ -151,7 +150,7 @@ def form(route_type):
                 'order_date': order_date_str,
                 'sender': 'ООО «ВЕРОФАРМ»',
                 'loading_place': loading_place,
-                'loading_contact': loading_contact,  # Теперь подставляется правильный контакт
+                'loading_contact': loading_contact,
                 'delivery_date': trip_date.strftime('%Y-%m-%d'),
                 'delivery_time': del_time,
                 'receiver': 'ООО «ВЕРОФАРМ»',

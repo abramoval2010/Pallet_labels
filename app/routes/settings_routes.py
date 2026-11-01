@@ -39,7 +39,6 @@ def settings_page():
             action = request.form.get('action', '')
 
             if action == 'transport_settings':
-                # ИСПРАВЛЕНИЕ: Доступно и Администратору, и Менеджеру ОСЛ
                 if session.get('user_rights') in ['Администратор', 'Менеджер ОСЛ']:
                     t1 = request.form.get('shipment_time_1')
                     t2 = request.form.get('shipment_time_2')
@@ -50,6 +49,14 @@ def settings_page():
                     settings_manager.set('shipment_time_dom_materials', t_mat)
                     settings_manager.set('transport_table_mode', tmode)
                     flash('Настройки транспортных заявок сохранены', 'success')
+                return redirect(url_for('settings.settings_page'))
+
+            # НОВОЕ ДЕЙСТВИЕ: Копирование рабочей БД в учебную
+            if action == 'copy_transport_db':
+                if session.get('user_rights') == 'Администратор':
+                    transport_db = current_app.config.get('transport_db')
+                    transport_db.copy_working_to_training()
+                    flash('Учебная база данных успешно перезаписана данными из рабочей', 'success')
                 return redirect(url_for('settings.settings_page'))
 
             selected_path = request.form.get('selected_path')

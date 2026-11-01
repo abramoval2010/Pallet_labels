@@ -24,7 +24,6 @@ class TransportDatabase:
     def init_database(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-
             for table in ['transport_working', 'transport_training']:
                 cursor.execute(f'''
                     CREATE TABLE IF NOT EXISTS {table} (
@@ -57,23 +56,60 @@ class TransportDatabase:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
-
-                # Миграция для существующих таблиц (добавляем новые колонки, если их нет)
                 cursor.execute(f"PRAGMA table_info({table})")
                 columns = [col[1] for col in cursor.fetchall()]
                 if 'supply_date' not in columns:
                     cursor.execute(f"ALTER TABLE {table} ADD COLUMN supply_date TEXT")
                 if 'supply_time' not in columns:
                     cursor.execute(f"ALTER TABLE {table} ADD COLUMN supply_time TEXT")
-
             conn.commit()
 
-    def get_last_order_number(self, table_name):
+    def copy_working_to_training(self):
+        """Копирует все записи из рабочей таблицы в учебную (предварительно очищая учебную)"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(f"SELECT order_number FROM {table_name} ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            return row['order_number'] if row else None
+            cursor.execute("DELETE FROM transport_training")
+            cursor.execute('''
+                INSERT INTO transport_training (
+                    order_number, order_date, sender, loading_place, loading_contact,
+                    delivery_date, delivery_time, receiver, delivery_address,
+                    unloading_contact, cargo_name, quantity, vehicle_type,
+                    temperature_mode, comments, driver_name, driver_data,
+                    driver_phone, vehicle_number, author, po, loading_date, loading_time,
+                    supply_date, supply_time
+                )
+                SELECT 
+                    order_number, order_date, sender, loading_place, loading_contact,
+                    delivery_date, delivery_time, receiver, delivery_address,
+                    unloading_contact, cargo_name, quantity, vehicle_type,
+                    temperature_mode, comments, driver_name, driver_data,
+                    driver_phone, vehicle_number, author, po, loading_date, loading_time,
+                    supply_date, supply_time
+                FROM transport_working
+            ''')
+            conn.commit()
+            return True
+
+    def get_max_order_number(self, table_name):
+        """
+        Возвращает максимальный числовой номер заявки в таблице.
+        Вместо того чтобы полагаться на дату создания (ID), мы сканируем
+        все номера и извлекаем из них числа (например, из "139/1" берется 139).
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT order_number FROM {table_name}")
+            rows = cursor.fetchall()
+
+            max_num = 0
+            for row in rows:
+                num_str = str(row['order_number'])
+                match = re.match(r'^(\d+)', num_str)
+                if match:
+                    num = int(match.group(1))
+                    if num > max_num:
+                        max_num = num
+            return max_num
 
     def add_request(self, table_name, data):
         with self.get_connection() as conn:
@@ -128,7 +164,6 @@ class TransportDatabase:
                     fields.append(f"{key} = ?")
                     values.append(data[key])
             values.append(req_id)
-
             query = f"UPDATE {table_name} SET {', '.join(fields)} WHERE id = ?"
             cursor.execute(query, values)
             conn.commit()
