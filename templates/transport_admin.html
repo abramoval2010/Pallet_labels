@@ -79,7 +79,10 @@
     <div class="right-panel">
         <div class="right-header">
             <h2>📋 Список заявок ({{ 'Рабочая' if table_mode == 'working' else 'Учебная' }})</h2>
-            <a href="{{ url_for('admin.transport_admin', table_mode='working' if table_mode == 'training' else 'training') }}" class="btn btn-secondary" style="padding: 5px 15px; font-size: 12px;">🔄 Сменить таблицу</a>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('admin.transport_export', table_mode=table_mode) }}" class="btn btn-success" style="padding: 5px 15px; font-size: 12px;">📊 В Excel</a>
+                <a href="{{ url_for('admin.transport_admin', table_mode='working' if table_mode == 'training' else 'training') }}" class="btn btn-secondary" style="padding: 5px 15px; font-size: 12px;">🔄 Сменить таблицу</a>
+            </div>
         </div>
 
         <div class="table-container">

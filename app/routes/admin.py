@@ -1,5 +1,9 @@
 # app/routes/admin.py
-from flask import current_app, Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
+import os
+import tempfile
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
+from flask import current_app, Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from app.utils.decorators import manager_required, admin_required
 
 # Создаем Blueprint
@@ -245,3 +249,64 @@ def transport_delete(table_mode, req_id):
     transport_db.delete_request(table_name, req_id)
     flash('Заявка удалена', 'danger')
     return redirect(url_for('admin.transport_admin', table_mode=table_mode))
+
+
+@admin_bp.route('/admin/transport/export/<table_mode>')
+@admin_required
+def transport_export(table_mode):
+    """Выгрузка транспортных заявок в Excel"""
+    if table_mode not in ['working', 'training']:
+        flash('Неверный тип таблицы', 'danger')
+        return redirect(url_for('admin.admin_panel'))
+
+    transport_db = current_app.config.get('transport_db')
+    table_name = f"transport_{table_mode}"
+    requests = transport_db.get_all_requests(table_name)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Заявки ({table_mode})"
+
+    # Заголовки
+    headers = [
+        ('id', 'ID'), ('order_number', 'Номер поручения'), ('order_date', 'Дата поручения'),
+        ('sender', 'Отправитель'), ('loading_place', 'Место подачи'), ('loading_contact', 'Контакт на загрузке'),
+        ('supply_date', 'Дата подачи ТС'), ('supply_time', 'Время подачи ТС'), ('delivery_date', 'Дата доставки'),
+        ('delivery_time', 'Время доставки'), ('receiver', 'Получатель'), ('delivery_address', 'Адрес доставки'),
+        ('unloading_contact', 'Контакт на разгрузке'), ('cargo_name', 'Наименование груза'), ('quantity', 'Кол-во паллет'),
+        ('vehicle_type', 'Тип ТС'), ('temperature_mode', 'Температурный режим'), ('comments', 'Комментарии'),
+        ('driver_name', 'ФИО водителя'), ('driver_data', 'Данные водителя'), ('driver_phone', 'Телефон водителя'),
+        ('vehicle_number', 'Номер ТС'), ('author', 'Автор'), ('po', 'PO'), ('created_at', 'Создана')
+    ]
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1a237e", end_color="1a237e", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+
+    for col_num, (_, title) in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=title)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+
+    # Данные
+    for row_idx, req in enumerate(requests, 2):
+        for col_num, (key, _) in enumerate(headers, 1):
+            val = req.get(key, '')
+            # Если это дата в формате YYYY-MM-DD, переворачиваем в DD.MM.YYYY
+            if key in ['order_date', 'supply_date', 'delivery_date'] and val:
+                parts = str(val).split('-')
+                if len(parts) == 3:
+                    val = f"{parts[2]}.{parts[1]}.{parts[0]}"
+            ws.cell(row=row_idx, column=col_num, value=val)
+
+    # Автоширина колонок
+    for col in ws.columns:
+        max_length = max(len(str(cell.value or '')) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = min(max_length + 2, 50)
+
+    filename = f"Транспортные_заявки_{table_mode}.xlsx"
+    filepath = os.path.join(tempfile.gettempdir(), filename)
+    wb.save(filepath)
+
+    return send_file(filepath, as_attachment=True, download_name=filename)

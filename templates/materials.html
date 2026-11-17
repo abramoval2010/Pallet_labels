@@ -118,9 +118,7 @@ tr:hover { background: #f5f5f5; }
                         <td><input type="number" class="editable-input" name="palletization[]" value="{{ material.palletization }}" min="0" step="1"></td>
                         <td><input type="number" class="editable-input" name="box_quantity[]" value="{{ material.box_quantity }}" min="0" step="1"></td>
                         <td>
-                            <form action="/materials/delete/{{ material.sap_code }}" method="POST" onsubmit="return confirm('Удалить материал с SAP-кодом {{ material.sap_code }}?')">
-                                <button type="submit" class="delete-btn" title="Удалить материал">🗑️</button>
-                            </form>
+                            <button type="button" class="delete-btn" title="Удалить материал" onclick="deleteMaterial('{{ material.sap_code }}')">🗑️</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -306,6 +304,17 @@ document.addEventListener('DOMContentLoaded', function() {
 function openAddModal() { document.getElementById('addModal').classList.add('active'); }
 function closeAddModal() { document.getElementById('addModal').classList.remove('active'); }
 document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) closeAddModal(); });
+
+// Функция удаления материала
+function deleteMaterial(sapCode) {
+    if (confirm('Вы уверены, что хотите удалить запись о материале с SAP-кодом ' + sapCode + '?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/materials/delete/' + sapCode;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
 </script>
 </body>
 </html>

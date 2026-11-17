@@ -101,8 +101,12 @@ class UserDatabase:
 
     def _create_default_users(self):
         default_users = [
-            {'login': 'admin', 'email': 'admin@example.com', 'password': 'admin123', 'fname': 'Администратор', 'lname': 'Системы', 'enterprise': 'ООО "Верофарм"', 'plant': 'Вольгинский', 'rights': 'Администратор', 'status': 'active'},
-            {'login': 'operator', 'email': 'operator@example.com', 'password': 'operator123', 'fname': 'Оператор', 'lname': 'СиМ', 'enterprise': 'ООО "Верофарм"', 'plant': 'Вольгинский', 'rights': 'Оператор СиМ', 'status': 'active'}
+            {'login': 'admin', 'email': 'admin@example.com', 'password': 'admin123', 'fname': 'Администратор',
+             'lname': 'Системы', 'enterprise': 'ООО "Верофарм"', 'plant': 'Вольгинский', 'rights': 'Администратор',
+             'status': 'active'},
+            {'login': 'operator', 'email': 'operator@example.com', 'password': 'operator123', 'fname': 'Оператор',
+             'lname': 'СиМ', 'enterprise': 'ООО "Верофарм"', 'plant': 'Вольгинский', 'rights': 'Оператор СиМ',
+             'status': 'active'}
         ]
         for user in default_users:
             self.add_user(user)
@@ -173,7 +177,8 @@ class UserDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 password_hash = generate_password_hash(new_password)
-                cursor.execute("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?", (password_hash, login))
+                cursor.execute("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?",
+                               (password_hash, login))
                 conn.commit()
                 self.log_action(login, 'UPDATE_PASSWORD', "Пароль изменен")
                 return True
@@ -184,7 +189,8 @@ class UserDatabase:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE users SET folder_path = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?", (folder_path or '', login))
+                cursor.execute("UPDATE users SET folder_path = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?",
+                               (folder_path or '', login))
                 conn.commit()
                 return True
         except Exception:
@@ -195,13 +201,21 @@ class UserDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 fields, values = [], []
-                for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status', 'folder_path', 'no_password_login']:
+
+                # Обновляем стандартные поля
+                for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status', 'folder_path',
+                            'no_password_login']:
                     if key in new_data:
                         fields.append(f"{key} = ?")
                         values.append(new_data[key])
-                if 'password' in new_data and new_data['password']:
+
+                # Если передан непустой пароль — обновляем хэш
+                if new_data.get('password'):
                     fields.append("password_hash = ?")
                     values.append(generate_password_hash(new_data['password']))
+
+                if not fields:
+                    return True, "Нет данных для обновления"
 
                 values.append(login)
                 fields.append("updated_at = CURRENT_TIMESTAMP")
@@ -221,7 +235,8 @@ class UserDatabase:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE users SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE login = ?", (login,))
+                cursor.execute("UPDATE users SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE login = ?",
+                               (login,))
                 conn.commit()
                 self.log_action(login, 'DELETE_USER', "Пользователь удален")
                 return True, "Пользователь удален"
@@ -232,7 +247,8 @@ class UserDatabase:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE users SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE login = ?", (login,))
+                cursor.execute("UPDATE users SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE login = ?",
+                               (login,))
                 conn.commit()
                 self.log_action(login, 'BLOCK_USER', "Пользователь заблокирован")
                 return True, "Пользователь заблокирован"
@@ -243,7 +259,8 @@ class UserDatabase:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE users SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE login = ?", (login,))
+                cursor.execute("UPDATE users SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE login = ?",
+                               (login,))
                 conn.commit()
                 self.log_action(login, 'UNBLOCK_USER', "Пользователь разблокирован")
                 return True, "Пользователь разблокирован"
@@ -253,7 +270,8 @@ class UserDatabase:
     def get_all_users(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, login, email, fname, lname, enterprise, plant, rights, status, folder_path, no_password_login, created_at FROM users ORDER BY login")
+            cursor.execute(
+                "SELECT id, login, email, fname, lname, enterprise, plant, rights, status, folder_path, no_password_login, created_at FROM users ORDER BY login")
             return [dict(row) for row in cursor.fetchall()]
 
     def get_users_by_rights(self, rights):
@@ -266,7 +284,8 @@ class UserDatabase:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO audit_log (user_login, action, details) VALUES (?, ?, ?)", (user_login, action, details))
+                cursor.execute("INSERT INTO audit_log (user_login, action, details) VALUES (?, ?, ?)",
+                               (user_login, action, details))
                 conn.commit()
         except Exception as e:
             print(f"Ошибка логирования: {e}")
