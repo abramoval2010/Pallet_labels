@@ -129,7 +129,6 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </form>
 </div>
 
-<!-- НОВОЕ: Настройки Серий ГП -->
 <div class="settings-section" style="border-left-color: #4caf50;">
 <h2><span class="icon">🏭</span>Настройки базы Серий ГП</h2>
 <div class="desc">Выбор активной базы данных для импорта и отображения серий ГП</div>
@@ -147,7 +146,6 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
     <button type="submit" class="btn btn-primary" style="margin-top: 15px; background: linear-gradient(135deg, #4caf50, #66bb6a);">💾 Сохранить настройки Серий ГП</button>
 </form>
 
-<!-- НОВОЕ (Задача 3): Кнопка очистки -->
 <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #ddd;">
     <h3 style="color: #f44336; font-size: 16px; margin-bottom: 10px;">⚠️ Очистка базы данных Серий ГП</h3>
     <p style="font-size: 13px; color: #666; margin-bottom: 10px;">
@@ -235,17 +233,14 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </div>
 
 <script>
-async function clearGpDatabase() {
-    if (!confirm('Вы уверены, что хотите очистить базу данных Серий ГП?')) {
+// Выносим в глобальную область, чтобы кнопка точно нашла функцию
+window.clearGpDatabase = async function() {
+    if (!confirm('Вы уверены, что хотите очистить базу данных Серий ГП? Это действие необратимо.')) {
         return;
     }
-
     try {
-        const response = await fetch('/gp/clear_db', {
-            method: 'POST'
-        });
+        const response = await fetch('/gp/clear_db', { method: 'POST' });
         const data = await response.json();
-
         if (data.success) {
             alert('База успешно очищена. ' + data.message);
             window.location.reload();
@@ -253,7 +248,7 @@ async function clearGpDatabase() {
             alert('Ошибка: ' + data.error);
         }
     } catch (e) {
-        alert('Ошибка сети при очистке базы.');
+        alert('Ошибка сети при очистке базы. Проверьте консоль браузера.');
     }
 }
 </script>

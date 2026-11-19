@@ -15,17 +15,13 @@ MANAGER_ROLES = ['Администратор', 'Менеджер ОСЛ']
 @gp_series_bp.route('/gp/toggle_db', methods=['POST'])
 @login_required
 def toggle_db():
-    """Переключение между рабочей и учебной базой"""
     if session.get('user_rights') not in MANAGER_ROLES:
         flash('Доступ запрещён.', 'danger')
         return redirect(url_for('gp_series.list_gp'))
-
     settings_manager = current_app.config.get('settings_manager')
     current_mode = settings_manager.get('gp_table_mode') or 'working'
     new_mode = 'training' if current_mode == 'working' else 'working'
-
     settings_manager.set('gp_table_mode', new_mode)
-
     mode_name = "Учебная" if new_mode == 'training' else "Рабочая"
     flash(f'База данных переключена на: {mode_name}', 'success')
     return redirect(url_for('gp_series.list_gp'))
@@ -34,21 +30,14 @@ def toggle_db():
 @gp_series_bp.route('/gp/clear_db', methods=['POST'])
 @login_required
 def clear_db():
-    """Очистка базы данных серий ГП"""
     if session.get('user_rights') not in MANAGER_ROLES:
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
-
     try:
         settings_manager = current_app.config.get('settings_manager')
         is_training = settings_manager.get('gp_table_mode') == 'training'
         table_name = 'gp_series_training' if is_training else 'gp_series'
-
         gp_db = current_app.config.get('gp_series_db')
-
-        # Если база не учебная - удаляем только отгруженные (shipped=1)
-        # Если учебная - удаляем всё
         success, message = gp_db.clear_series(table_name, only_shipped=not is_training)
-
         if success:
             db = current_app.config.get('db')
             db.log_action(session['user'], 'CLEAR_GP_DB', f"Очистка {table_name}: {message}")
@@ -77,23 +66,6 @@ def import_gp():
             return jsonify({'success': False, 'error': 'Файл не передан'}), 400
 
         file = request.files['file']
-
-        # --- ОТЛАДОЧНЫЙ БЛОК ---
-        # Читаем первые несколько байт файла, чтобы понять, что это на самом деле
-        file.seek(0)
-        header_bytes = file.read(10)
-        file.seek(0)
-
-        # Проверяем, является ли файл ZIP-архивом (все xlsx - это ZIP)
-        is_zip = header_bytes.startswith(b'PK')
-
-        if not is_zip:
-            # Если это не ZIP, значит, браузер прислал не Excel-файл
-            error_msg = f"Загруженный файл не является Excel-файлом (.xlsx). Первые байты файла: {header_bytes}. "
-            error_msg += "Возможно, вы выбрали неправильный файл или браузер отправил HTML-страницу."
-            return jsonify({'success': False, 'error': error_msg}), 400
-        # --- КОНЕЦ ОТЛАДОЧНОГО БЛОКА ---
-
         if not file.filename or not file.filename.lower().endswith(('.xls', '.xlsx')):
             return jsonify({'success': False, 'error': 'Неверный формат. Проверьте правильность выбора файла'}), 400
 
@@ -106,29 +78,28 @@ def import_gp():
         filepath = os.path.join(uploads_dir, filename)
         file.save(filepath)
 
-        # --- НАЧАЛО ИСПРАВЛЕНИЯ: ПРИНУДИТЕЛЬНОЕ ПЕРЕСОЗДАНИЕ ЧЕРЕЗ PANDAS ---
         fixed_filepath = os.path.join(uploads_dir, "fixed_" + filename)
 
         try:
-            # Пытаемся прочитать файл (pandas сам определит движок)
-            df = pd.read_excel(filepath)
-            # Записываем в новый файл с гарантированно правильным форматом .xlsx
+            df = pd.read_excel(filepath, engine='openpyxl')
             df.to_excel(fixed_filepath, index=False, engine='openpyxl')
-            # Заменяем исходный файл на пересозданный
             if os.path.exists(fixed_filepath):
                 os.remove(filepath)
                 filepath = fixed_filepath
-        except Exception as e:
-            # Если pandas не смог прочитать даже так, возвращаем ошибку
-            return jsonify({'success': False, 'error': f'Ошибка при чтении через pandas: {str(e)}'}), 400
-        # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+        except Exception:
+            try:
+                df = pd.read_excel(filepath, engine='xlrd')
+                df.to_excel(fixed_filepath, index=False, engine='openpyxl')
+                if os.path.exists(fixed_filepath):
+                    os.remove(filepath)
+                    filepath = fixed_filepath
+            except Exception as e2:
+                return jsonify({'success': False, 'error': f'Не удалось прочитать файл. Ошибка: {str(e2)}'}), 400
 
         try:
             gp_db = current_app.config.get('gp_series_db')
             materials_db = current_app.config.get('materials_db')
-
             table_name = 'gp_series_training' if is_training else 'gp_series'
-
             success, message = gp_db.import_from_excel(filepath, table_name, materials_db)
         finally:
             if os.path.exists(filepath):
@@ -175,19 +146,15 @@ def list_gp():
 def update_pallet(series_id):
     if session.get('user_rights') not in GP_ACCESS_ROLES:
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
-
     try:
         pallets = request.form.get('pallets', type=int)
         if pallets is None or pallets < 0 or pallets > 500:
             return jsonify({'success': False, 'error': 'Значение должно быть целым числом от 0 до 500'}), 400
-
         settings_manager = current_app.config.get('settings_manager')
         is_training = settings_manager.get('gp_table_mode') == 'training'
         table_name = 'gp_series_training' if is_training else 'gp_series'
-
         gp_db = current_app.config.get('gp_series_db')
         gp_db.update_series(table_name, series_id, {'pallets': pallets})
-
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -198,7 +165,6 @@ def update_pallet(series_id):
 def update_all(series_id):
     if session.get('user_rights') != 'Администратор':
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
-
     try:
         settings_manager = current_app.config.get('settings_manager')
         is_training = settings_manager.get('gp_table_mode') == 'training'
@@ -223,10 +189,8 @@ def update_all(series_id):
             'shipped': 1 if request.form.get('shipped') else 0,
             'comments': request.form.get('comments')
         }
-
         gp_db = current_app.config.get('gp_series_db')
         gp_db.update_series(table_name, series_id, data)
-
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
