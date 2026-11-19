@@ -128,6 +128,34 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
     <button type="submit" class="btn btn-primary" style="margin-top: 15px;">💾 Сохранить настройки ТС</button>
 </form>
 </div>
+
+<!-- НОВОЕ: Настройки Серий ГП -->
+<div class="settings-section" style="border-left-color: #4caf50;">
+<h2><span class="icon">🏭</span>Настройки базы Серий ГП</h2>
+<div class="desc">Выбор активной базы данных для импорта и отображения серий ГП</div>
+<form method="POST">
+    <input type="hidden" name="action" value="gp_settings">
+    <div class="form-row" style="margin-top: 10px;">
+        <div>
+            <label>Активная таблица Серий ГП</label>
+            <select name="gp_table_mode">
+                <option value="working" {% if settings.get('gp_table_mode') == 'working' %}selected{% endif %}>Серии ГП (Рабочая)</option>
+                <option value="training" {% if settings.get('gp_table_mode') == 'training' %}selected{% endif %}>Серии ГП (Учебная)</option>
+            </select>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary" style="margin-top: 15px; background: linear-gradient(135deg, #4caf50, #66bb6a);">💾 Сохранить настройки Серий ГП</button>
+</form>
+
+<!-- НОВОЕ (Задача 3): Кнопка очистки -->
+<div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #ddd;">
+    <h3 style="color: #f44336; font-size: 16px; margin-bottom: 10px;">⚠️ Очистка базы данных Серий ГП</h3>
+    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">
+        Полностью удаляет все записи, если активна учебная база. Если активна рабочая база — удаляет только отгруженные записи (Отгружено = ДА).
+    </p>
+    <button type="button" class="btn btn-danger" onclick="clearGpDatabase()">🗑️ Очистить серии на ГП</button>
+</div>
+</div>
 {% endif %}
 
 <div class="settings-section" style="border-left-color: #5c6bc0;">
@@ -205,5 +233,29 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 <a href="/logout" class="btn btn-danger">🚪 Выйти</a>
 </div>
 </div>
+
+<script>
+async function clearGpDatabase() {
+    if (!confirm('Вы уверены, что хотите очистить базу данных Серий ГП?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/gp/clear_db', {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            alert('База успешно очищена. ' + data.message);
+            window.location.reload();
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    } catch (e) {
+        alert('Ошибка сети при очистке базы.');
+    }
+}
+</script>
 </body>
 </html>

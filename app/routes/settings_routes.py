@@ -51,7 +51,13 @@ def settings_page():
                     flash('Настройки транспортных заявок сохранены', 'success')
                 return redirect(url_for('settings.settings_page'))
 
-            # НОВОЕ ДЕЙСТВИЕ: Копирование рабочей БД в учебную
+            if action == 'gp_settings':
+                if session.get('user_rights') in ['Администратор', 'Менеджер ОСЛ']:
+                    gmode = request.form.get('gp_table_mode')
+                    settings_manager.set('gp_table_mode', gmode)
+                    flash('Настройки базы Серий ГП сохранены', 'success')
+                return redirect(url_for('settings.settings_page'))
+
             if action == 'copy_transport_db':
                 if session.get('user_rights') == 'Администратор':
                     transport_db = current_app.config.get('transport_db')

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Загрузка партий ГП</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <style>
+        .container { background: white; border-radius: 20px; padding: 40px; max-width: 700px; margin: 50px auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); text-align: center; }
+        .icon { font-size: 60px; margin-bottom: 15px; }
+        h1 { color: #1a237e; margin-bottom: 20px; }
+        #status { padding: 20px; border-radius: 12px; background: #f5f5f5; color: #333; font-size: 16px; margin: 20px 0; word-break: break-word; }
+        #status.ok { background: #e8f5e9; color: #2e7d32; }
+        #status.err { background: #f8d7da; color: #721c24; }
+        #status.warn { background: #fff3cd; color: #856404; }
+        .btn { padding: 12px 30px; border: none; border-radius: 50px; font-size: 15px; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-block; transition: all 0.3s ease; margin: 5px; }
+        .btn-primary { background: linear-gradient(135deg, #4caf50, #66bb6a); color: white; }
+        .btn-secondary { background: linear-gradient(135deg, #2196f3, #64b5f6); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #f44336, #ef5350); color: white; }
+    </style>
+</head>
+<body>
+{% if is_training %}
+<div style="background-color: #fff3cd; color: #856404; text-align: center; padding: 15px; font-weight: bold; border-bottom: 2px solid #ffeeba; font-size: 18px; position: sticky; top: 0; z-index: 100;">
+    ⚠️ Учебная база данных. Не для реальных заявок
+</div>
+{% endif %}
+<div class="container">
+    <div class="icon">📤</div>
+    <h1>Загрузка партий ГП</h1>
+    <div id="status">Выберите файл Excel (.xlsx или .xls) с данными из SAP</div>
+
+    <div>
+        <button id="pickBtn" class="btn btn-primary" onclick="pickFile()">📁 Выбрать файл Excel</button>
+        <a href="/" class="btn btn-secondary">🏠 На главную</a>
+    </div>
+</div>
+
+<script>
+    async function pickFile() {
+        if (!window.showOpenFilePicker) {
+            document.getElementById('status').className = 'err';
+            document.getElementById('status').innerText = 'Ваш браузер не поддерживает выбор файлов через API. Используйте Chrome, Edge или Яндекс.Браузер.';
+            return;
+        }
+
+        try {
+            const [fileHandle] = await window.showOpenFilePicker({
+                types: [{
+                    description: 'Excel Files',
+                    accept: {
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+                        'application/vnd.ms-excel': ['.xls']
+                    }
+                }]
+            });
+
+            const file = await fileHandle.getFile();
+            await uploadFile(file);
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                document.getElementById('status').className = 'err';
+                document.getElementById('status').innerText = 'Ошибка при выборе файла: ' + e.message;
+            }
+        }
+    }
+
+    async function uploadFile(file) {
+        const statusEl = document.getElementById('status');
+        statusEl.className = 'warn';
+        statusEl.innerHTML = '⏳ Проверка формата и загрузка файла...';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Если учебная база, запрашиваем подтверждение
+        {% if is_training %}
+        const confirmed = confirm('Все выбранные серии будут скачены в учебно-тренировочную базу, не связанную с рабочей базой. Вы согласны?');
+        if (!confirmed) {
+            statusEl.className = 'warn';
+            statusEl.innerText = 'Загрузка отменена пользователем.';
+            return;
+        }
+        formData.append('confirm_training', 'yes');
+        {% endif %}
+
+        try {
+            const response = await fetch('/gp/import', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                statusEl.className = 'ok';
+                statusEl.innerHTML = '✅ ' + result.message;
+            } else {
+                statusEl.className = 'err';
+                statusEl.innerText = '❌ ' + (result.error || 'Ошибка загрузки');
+            }
+        } catch (e) {
+            statusEl.className = 'err';
+            statusEl.innerText = '❌ Ошибка сети: ' + e.message;
+        }
+    }
+</script>
+</body>
+</html>

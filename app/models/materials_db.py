@@ -18,7 +18,6 @@ class MaterialsDatabase:
 
     @contextmanager
     def get_connection(self):
-        """Получает соединение с базой данных"""
         conn = sqlite3.connect(self.db_file)
         conn.row_factory = sqlite3.Row
         try:
@@ -27,7 +26,6 @@ class MaterialsDatabase:
             conn.close()
 
     def init_database(self):
-        """Инициализирует базу данных и создает таблицу материалов"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
@@ -38,12 +36,23 @@ class MaterialsDatabase:
                     material_name TEXT UNIQUE NOT NULL,
                     palletization INTEGER DEFAULT 0,
                     box_quantity INTEGER DEFAULT 0,
+                    storage_temp TEXT DEFAULT '+15;+25',
+                    humidity TEXT DEFAULT '0-65%',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
-            conn.commit()
+            # Миграции для добавления новых колонок
+            cursor.execute("PRAGMA table_info(materials)")
+            columns = [col[1] for col in cursor.fetchall()]
+
+            if 'storage_temp' not in columns:
+                cursor.execute("ALTER TABLE materials ADD COLUMN storage_temp TEXT DEFAULT '+15;+25'")
+                conn.commit()
+            if 'humidity' not in columns:
+                cursor.execute("ALTER TABLE materials ADD COLUMN humidity TEXT DEFAULT '0-65%'")
+                conn.commit()
 
             cursor.execute("SELECT COUNT(*) FROM materials")
             count = cursor.fetchone()[0]
@@ -52,7 +61,6 @@ class MaterialsDatabase:
                 self._create_default_materials()
 
     def _create_default_materials(self):
-        """Создает тестовые материалы"""
         default_materials = [
             {'sap_code': 10000001, 'material_name': 'Тестовый материал 1', 'palletization': 100, 'box_quantity': 10},
             {'sap_code': 10000002, 'material_name': 'Тестовый материал 2', 'palletization': 200, 'box_quantity': 20},
@@ -62,18 +70,19 @@ class MaterialsDatabase:
             self.add_material(material)
 
     def add_material(self, material_data):
-        """Добавляет новый материал в базу"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    INSERT INTO materials (sap_code, material_name, palletization, box_quantity)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO materials (sap_code, material_name, palletization, box_quantity, storage_temp, humidity)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ''', (
                     material_data['sap_code'],
                     material_data['material_name'],
                     material_data.get('palletization', 0),
-                    material_data.get('box_quantity', 0)
+                    material_data.get('box_quantity', 0),
+                    material_data.get('storage_temp', '+15;+25'),
+                    material_data.get('humidity', '0-65%')
                 ))
                 conn.commit()
                 return True, "Материал успешно добавлен"
@@ -87,7 +96,6 @@ class MaterialsDatabase:
             return False, f"Ошибка при добавлении материала: {str(e)}"
 
     def get_material_by_sap(self, sap_code):
-        """Находит материал по SAP-коду"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM materials WHERE sap_code = ?", (sap_code,))
@@ -97,7 +105,6 @@ class MaterialsDatabase:
             return None
 
     def get_material_by_name(self, material_name):
-        """Находит материал по названию"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM materials WHERE material_name = ?", (material_name,))
@@ -107,7 +114,6 @@ class MaterialsDatabase:
             return None
 
     def update_material(self, sap_code, new_data):
-        """Обновляет данные материала"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -115,7 +121,7 @@ class MaterialsDatabase:
                 fields = []
                 values = []
 
-                for key in ['material_name', 'palletization', 'box_quantity']:
+                for key in ['material_name', 'palletization', 'box_quantity', 'storage_temp', 'humidity']:
                     if key in new_data:
                         fields.append(f"{key} = ?")
                         values.append(new_data[key])
@@ -135,7 +141,6 @@ class MaterialsDatabase:
             return False, f"Ошибка при обновлении: {str(e)}"
 
     def delete_material(self, sap_code):
-        """Удаляет материал"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -146,7 +151,6 @@ class MaterialsDatabase:
             return False, f"Ошибка при удалении: {str(e)}"
 
     def get_all_materials(self):
-        """Возвращает список всех материалов"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM materials ORDER BY sap_code")
@@ -154,20 +158,16 @@ class MaterialsDatabase:
             return [dict(row) for row in rows]
 
     def get_materials_count(self):
-        """Возвращает количество материалов в базе"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM materials")
             return cursor.fetchone()[0]
 
     def validate_and_import_from_excel(self, filepath):
-        """Проверяет и импортирует данные из Excel файла"""
-        print(f"Importing Excel file: {filepath}")
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
 
-            # Определяем, есть ли заголовок
             is_header = False
             first_row = [cell.value for cell in ws[1]]
             if first_row:
@@ -234,13 +234,10 @@ class MaterialsDatabase:
                                 box_quantity = int(float(box_quantity_str))
 
                         if box_quantity is not None and box_quantity < 0:
-                            errors.append(f"Row {row_idx}: Box quantity cannot be negative (current: {box_quantity})")
+                            errors.append(f"Row {row_idx}: Box quantity cannot be negative")
                             box_quantity = None
                     except (ValueError, TypeError):
-                        errors.append(f"Row {row_idx}: Box quantity must be a number (current: {box_quantity_value})")
-                        box_quantity = None
-                elif has_box_quantity and box_quantity_value is None:
-                    skipped_empty_box += 1
+                        pass
 
                 existing = self.get_material_by_sap(sap_code)
                 if existing:
@@ -257,20 +254,20 @@ class MaterialsDatabase:
                 else:
                     existing_name = self.get_material_by_name(material_name)
                     if existing_name:
-                        errors.append(
-                            f"Row {row_idx}: Material with name '{material_name}' already exists (SAP: {existing_name['sap_code']})")
+                        errors.append(f"Row {row_idx}: Material with name '{material_name}' already exists")
                         continue
 
                     materials_to_add.append({
                         'sap_code': sap_code,
                         'material_name': material_name,
                         'palletization': palletization,
-                        'box_quantity': box_quantity if box_quantity is not None else 0
+                        'box_quantity': box_quantity if box_quantity is not None else 0,
+                        'storage_temp': '+15;+25',
+                        'humidity': '0-65%'
                     })
 
             if errors:
-                return False, "Errors in file:\n" + "\n".join(errors[:20]) + (
-                    f"\n... and {len(errors) - 20} more errors" if len(errors) > 20 else "")
+                return False, "Errors in file:\n" + "\n".join(errors[:20])
 
             updated_count = 0
             for material in materials_to_update:
@@ -288,30 +285,20 @@ class MaterialsDatabase:
                 else:
                     errors.append(f"SAP {material['sap_code']}: {message}")
 
-            result_message = f"Processed: {added_count} added, {updated_count} updated"
-            if skipped_empty_box > 0:
-                result_message += f", {skipped_empty_box} box quantity updates skipped (empty cells)"
-            if errors:
-                result_message += f"\nErrors: " + "\n".join(errors[:5]) + (
-                    f"\n... and {len(errors) - 5} more errors" if len(errors) > 5 else "")
-                return False, result_message
-
+            result_message = f"Обработано: {added_count} добавлено, {updated_count} обновлено"
             return True, result_message
         except Exception as e:
-            print(f"Error importing: {e}")
-            import traceback
-            traceback.print_exc()
             return False, f"Error processing file: {str(e)}"
 
     def export_to_excel(self):
-        """Экспортирует данные материалов в Excel файл"""
         try:
             materials = self.get_all_materials()
             wb = Workbook()
             ws = wb.active
             ws.title = "Реестр сырья и материалов"
 
-            headers = ['Номер SAP', 'Наименование', 'Палетизация', 'Вложение в короб']
+            headers = ['Номер SAP', 'Наименование', 'Палетизация', 'Вложение в короб', 'Температура хранения',
+                       'Влажность']
             header_font = Font(bold=True, color="FFFFFF")
             header_fill = PatternFill(start_color="1a237e", end_color="1a237e", fill_type="solid")
             header_alignment = Alignment(horizontal="center", vertical="center")
@@ -327,11 +314,15 @@ class MaterialsDatabase:
                 ws.cell(row=row_idx, column=2, value=material['material_name'])
                 ws.cell(row=row_idx, column=3, value=material['palletization'])
                 ws.cell(row=row_idx, column=4, value=material['box_quantity'])
+                ws.cell(row=row_idx, column=5, value=material.get('storage_temp', '+15;+25'))
+                ws.cell(row=row_idx, column=6, value=material.get('humidity', '0-65%'))
 
             ws.column_dimensions['A'].width = 15
             ws.column_dimensions['B'].width = 40
             ws.column_dimensions['C'].width = 15
             ws.column_dimensions['D'].width = 20
+            ws.column_dimensions['E'].width = 20
+            ws.column_dimensions['F'].width = 15
 
             filename = f"Реестр_сырья_и_материалов_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
             filepath = os.path.join(os.path.dirname(self.db_file), filename)

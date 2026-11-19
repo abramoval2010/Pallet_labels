@@ -86,6 +86,8 @@ tr:hover { background: #f5f5f5; }
                 {% if user_rights == 'Администратор' %}
                     <option value="Администратор">Администратор</option>
                     <option value="Менеджер ОСЛ">Менеджер ОСЛ</option>
+                    <option value="Контрольный мастер">Контрольный мастер</option>
+                    <option value="Уполномоченное лицо">Уполномоченное лицо</option>
                 {% endif %}
                 <option value="Оператор СиМ" selected>Оператор СиМ</option>
                 <option value="Мастер СиМ">Мастер СиМ</option>
@@ -256,6 +258,8 @@ tr:hover { background: #f5f5f5; }
         {% if user_rights == 'Администратор' %}
         <option value="Администратор">Администратор</option>
         <option value="Менеджер ОСЛ">Менеджер ОСЛ</option>
+        <option value="Контрольный мастер">Контрольный мастер</option>
+        <option value="Уполномоченное лицо">Уполномоченное лицо</option>
         {% endif %}
         <option value="Оператор СиМ">Оператор СиМ</option>
         <option value="Мастер СиМ">Мастер СиМ</option>
@@ -297,14 +301,13 @@ document.getElementById('editPlant').value = data.plant || 'Вольгински
 document.getElementById('editRights').value = data.rights || 'Оператор СиМ';
 document.getElementById('editStatus').value = data.status || 'active';
 document.getElementById('editNoPassword').checked = (data.no_password_login == 1);
-document.getElementById('editPassword').value = ''; // Очищаем поле пароля при открытии
+document.getElementById('editPassword').value = '';
 }
 });
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('active'); }
 document.getElementById('editModal').addEventListener('click', function(e) { if (e.target === this) closeEditModal(); });
 
-// Автоматическая установка галочки при выборе роли "Мастер/оператор ГП"
 const rightsSelect = document.getElementById('rightsSelect');
 if (rightsSelect) {
     rightsSelect.addEventListener('change', function() {
@@ -317,7 +320,6 @@ if (rightsSelect) {
     });
 }
 
-// При вводе нового пароля автоматически снимаем галочку "Войти без пароля"
 document.getElementById('editPassword').addEventListener('input', function() {
     if (this.value.length > 0) {
         document.getElementById('editNoPassword').checked = false;

@@ -9,8 +9,9 @@ DEFAULT_SETTINGS = {
     'sop_code': 'RUPD.VLG.05.04.C01',
     'shipment_time_1': '09:00',
     'shipment_time_2': '10:00',
-    'shipment_time_dom_materials': '11:00', # НОВОЕ ПОЛЕ
+    'shipment_time_dom_materials': '11:00',
     'transport_table_mode': 'working',
+    'gp_table_mode': 'working', # НОВОЕ
     'font_settings': {
         'header_size': 12,
         'product_size_short': 80,

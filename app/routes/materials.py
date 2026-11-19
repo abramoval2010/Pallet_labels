@@ -12,7 +12,6 @@ materials_bp = Blueprint('materials', __name__)
 @materials_bp.route('/materials')
 @manager_required
 def materials_page():
-    """Страница управления материалами"""
     try:
         materials_db = current_app.config.get('materials_db')
         materials = materials_db.get_all_materials()
@@ -26,12 +25,13 @@ def materials_page():
 @materials_bp.route('/materials/add', methods=['POST'])
 @manager_required
 def add_material():
-    """Добавление нового материала вручную"""
     try:
         sap_code_str = request.form.get('sap_code', '').strip()
         material_name = request.form.get('material_name', '').strip()
         palletization_str = request.form.get('palletization', '0').strip()
         box_quantity_str = request.form.get('box_quantity', '0').strip()
+        storage_temp = request.form.get('storage_temp', '+15;+25')
+        humidity = request.form.get('humidity', '0-65%')
 
         if not sap_code_str or not material_name:
             flash('SAP код и Наименование обязательны для заполнения', 'warning')
@@ -53,7 +53,9 @@ def add_material():
             'sap_code': sap_code,
             'material_name': material_name,
             'palletization': palletization,
-            'box_quantity': box_quantity
+            'box_quantity': box_quantity,
+            'storage_temp': storage_temp,
+            'humidity': humidity
         }
 
         materials_db = current_app.config.get('materials_db')
@@ -74,12 +76,13 @@ def add_material():
 @materials_bp.route('/materials/update', methods=['POST'])
 @manager_required
 def update_materials():
-    """Обновление материалов"""
     try:
         sap_codes = request.form.getlist('sap_code[]')
         material_names = request.form.getlist('material_name[]')
         palletizations = request.form.getlist('palletization[]')
         box_quantities = request.form.getlist('box_quantity[]')
+        storage_temps = request.form.getlist('storage_temp[]')
+        humidities = request.form.getlist('humidity[]')
 
         if not sap_codes:
             flash('Нет данных для сохранения', 'danger')
@@ -101,6 +104,9 @@ def update_materials():
             except:
                 box_quantity = 0
 
+            storage_temp = storage_temps[i] if i < len(storage_temps) else '+15;+25'
+            humidity = humidities[i] if i < len(humidities) else '0-65%'
+
             if not material_name:
                 errors.append(f"SAP {sap_code}: Название материала не может быть пустым")
                 continue
@@ -121,7 +127,9 @@ def update_materials():
             new_data = {
                 'material_name': material_name,
                 'palletization': palletization,
-                'box_quantity': box_quantity
+                'box_quantity': box_quantity,
+                'storage_temp': storage_temp,
+                'humidity': humidity
             }
             success, message = materials_db.update_material(int(sap_code), new_data)
             if success:
@@ -143,7 +151,6 @@ def update_materials():
 @materials_bp.route('/materials/delete/<int:sap_code>', methods=['POST'])
 @manager_required
 def delete_material(sap_code):
-    """Удаление материала"""
     try:
         materials_db = current_app.config.get('materials_db')
         success, message = materials_db.delete_material(sap_code)
@@ -157,7 +164,6 @@ def delete_material(sap_code):
 @materials_bp.route('/materials/import', methods=['GET', 'POST'])
 @manager_required
 def import_materials():
-    """Импорт материалов из Excel"""
     if request.method == 'GET':
         return render_template('import_materials.html')
 
@@ -201,7 +207,6 @@ def import_materials():
 @materials_bp.route('/materials/export')
 @manager_required
 def export_materials():
-    """Экспорт материалов в Excel"""
     try:
         materials_db = current_app.config.get('materials_db')
         filepath = materials_db.export_to_excel()
@@ -218,7 +223,6 @@ def export_materials():
 @materials_bp.route('/materials/search', methods=['POST'])
 @manager_required
 def search_materials():
-    """Поиск материалов"""
     try:
         query = request.form.get('query', '').strip()
         search_type = request.form.get('search_type', 'both')

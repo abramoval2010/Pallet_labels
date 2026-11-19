@@ -21,5 +21,6 @@
     "shipment_time_1": "09:00",
     "shipment_time_2": "10:00",
     "transport_table_mode": "working",
-    "shipment_time_dom_materials": "11:00"
+    "shipment_time_dom_materials": "11:00",
+    "gp_table_mode": "working"
 }

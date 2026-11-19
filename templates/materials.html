@@ -16,7 +16,7 @@ th { background: #1a237e; color: white; position: sticky; top: 0; z-index: 10; c
 th:hover { background: #283593; }
 th .sort-icon { display: inline-block; margin-left: 5px; font-size: 12px; }
 tr:hover { background: #f5f5f5; }
-.editable-input { width: 100%; padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: border-color 0.3s; }
+.editable-input { width: 100%; padding: 8px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: border-color 0.3s; box-sizing: border-box;}
 .editable-input:focus { outline: none; border-color: #00897b; }
 .editable-input.input-error { border-color: #f44336; background: #ffebee; }
 .editable-input.input-success { border-color: #4caf50; background: #e8f5e9; }
@@ -44,8 +44,8 @@ tr:hover { background: #f5f5f5; }
 .close:hover { color: #333; }
 .form-group { margin-bottom: 15px; }
 .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #333; }
-.form-group input { width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
-.form-group input:focus { outline: none; border-color: #00897b; }
+.form-group input, .form-group select { width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #00897b; }
 @media (max-width: 768px) {
     .container { padding: 20px; }
     .header { flex-direction: column; align-items: stretch; }
@@ -103,10 +103,17 @@ tr:hover { background: #f5f5f5; }
             <table>
                 <thead>
                     <tr>
-                        <th onclick="sortTable('sap_code')" style="min-width: 120px;">SAP код материала <span class="sort-icon" id="sort-sap_code">↕</span></th>
+                        <!-- 4.1 Ширину SAP сократили на 40% (было 120px -> стало 70px) -->
+                        <th onclick="sortTable('sap_code')" style="min-width: 70px;">SAP код <span class="sort-icon" id="sort-sap_code">↕</span></th>
                         <th onclick="sortTable('material_name')" style="min-width: 250px;">Наименование <span class="sort-icon" id="sort-material_name">↕</span></th>
-                        <th onclick="sortTable('palletization')" style="min-width: 150px;">Палетизация <span class="sort-icon" id="sort-palletization">↕</span></th>
-                        <th onclick="sortTable('box_quantity')" style="min-width: 150px;">Вложение в короб <span class="sort-icon" id="sort-box_quantity">↕</span></th>
+                        <!-- 4.2 Ширину Палетизации сократили на 60% (было 150px -> стало 60px) -->
+                        <th onclick="sortTable('palletization')" style="min-width: 60px;">Палетизация <span class="sort-icon" id="sort-palletization">↕</span></th>
+                        <!-- 4.3 Ширину (Вложение в короб) сократили на 70% (было 150px -> стало 45px) -->
+                        <th onclick="sortTable('box_quantity')" style="min-width: 45px;">Вложение в короб <span class="sort-icon" id="sort-box_quantity">↕</span></th>
+                        <!-- 4.4 Новые поля -->
+                        <th style="min-width: 100px;">Темп. хранения</th>
+                        <th style="min-width: 100px;">Влажность</th>
+
                         <th style="min-width: 80px;">Действие</th>
                     </tr>
                 </thead>
@@ -117,6 +124,23 @@ tr:hover { background: #f5f5f5; }
                         <td><input type="text" class="editable-input" name="material_name[]" value="{{ material.material_name }}" required></td>
                         <td><input type="number" class="editable-input" name="palletization[]" value="{{ material.palletization }}" min="0" step="1"></td>
                         <td><input type="number" class="editable-input" name="box_quantity[]" value="{{ material.box_quantity }}" min="0" step="1"></td>
+
+                        <!-- Выпадающий список для температуры -->
+                        <td>
+                            <select class="editable-input" name="storage_temp[]">
+                                <option value="+15;+25" {% if material.storage_temp == '+15;+25' %}selected{% endif %}>+15;+25</option>
+                                <option value="+2;+8" {% if material.storage_temp == '+2;+8' %}selected{% endif %}>+2;+8</option>
+                            </select>
+                        </td>
+                        <!-- Выпадающий список для влажности -->
+                        <td>
+                            <select class="editable-input" name="humidity[]">
+                                <option value="0-65%" {% if material.humidity == '0-65%' %}selected{% endif %}>0-65%</option>
+                                <option value="0-60%" {% if material.humidity == '0-60%' %}selected{% endif %}>0-60%</option>
+                                <option value="40-60%" {% if material.humidity == '40-60%' %}selected{% endif %}>40-60%</option>
+                            </select>
+                        </td>
+
                         <td>
                             <button type="button" class="delete-btn" title="Удалить материал" onclick="deleteMaterial('{{ material.sap_code }}')">🗑️</button>
                         </td>
@@ -160,6 +184,21 @@ tr:hover { background: #f5f5f5; }
                 <div class="form-group">
                     <label>Вложение в короб (шт)</label>
                     <input type="number" name="box_quantity" value="0" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Температура хранения</label>
+                    <select name="storage_temp">
+                        <option value="+15;+25" selected>+15;+25</option>
+                        <option value="+2;+8">+2;+8</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Влажность</label>
+                    <select name="humidity">
+                        <option value="0-65%" selected>0-65%</option>
+                        <option value="0-60%">0-60%</option>
+                        <option value="40-60%">40-60%</option>
+                    </select>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">💾 Сохранить</button>
             </form>
@@ -305,7 +344,6 @@ function openAddModal() { document.getElementById('addModal').classList.add('act
 function closeAddModal() { document.getElementById('addModal').classList.remove('active'); }
 document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) closeAddModal(); });
 
-// Функция удаления материала
 function deleteMaterial(sapCode) {
     if (confirm('Вы уверены, что хотите удалить запись о материале с SAP-кодом ' + sapCode + '?')) {
         const form = document.createElement('form');
