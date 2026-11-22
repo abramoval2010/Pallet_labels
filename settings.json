@@ -22,5 +22,5 @@
     "shipment_time_2": "10:00",
     "transport_table_mode": "working",
     "shipment_time_dom_materials": "11:00",
-    "gp_table_mode": "working"
+    "gp_table_mode": "training"
 }

@@ -6,22 +6,47 @@
     <title>АРМ ОСЛ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <style>
-        .container { max-width: 800px; margin: 0 auto; background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
         .header { text-align: center; margin-bottom: 30px; }
         .header h1 { color: #1a237e; font-size: 2em; font-weight: 600; }
         .header .subtitle { color: #4a6fa5; font-size: 1.1em; }
-        .greeting { text-align: center; font-size: 1.1em; color: #1a237e; margin-bottom: 25px; padding: 15px; background: linear-gradient(135deg, #e8f5e9, #e1f5fe); border-radius: 12px; border-left: 4px solid #4caf50; }
+        .greeting {
+            text-align: center; font-size: 1.1em; color: #1a237e;
+            margin-bottom: 25px; padding: 15px;
+            background: linear-gradient(135deg, #e8f5e9, #e1f5fe);
+            border-radius: 12px; border-left: 4px solid #4caf50;
+        }
         .greeting .user-name { font-weight: 600; color: #2e7d32; }
-        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .menu-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 15px; margin-bottom: 20px;
+        }
         @media (max-width: 600px) { .menu-grid { grid-template-columns: 1fr; } }
-        .menu-item { background: #f8f9fa; border-radius: 15px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; border: 2px solid transparent; text-decoration: none; color: #333; display: block; }
-        .menu-item:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); border-color: #4caf50; background: #e8f5e9; }
+        .menu-item {
+            background: #f8f9fa; border-radius: 15px; padding: 20px;
+            text-align: center; cursor: pointer; transition: all 0.3s ease;
+            border: 2px solid transparent; text-decoration: none; color: #333; display: block;
+        }
+        .menu-item:hover {
+            transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-color: #4caf50; background: #e8f5e9;
+        }
         .menu-item .icon { font-size: 2.5em; margin-bottom: 10px; display: block; }
         .menu-item .title { font-size: 1.1em; font-weight: 500; color: #1a237e; }
         .menu-item .description { font-size: 0.85em; color: #78909c; margin-top: 5px; }
         .menu-item.disabled { opacity: 0.6; cursor: default; }
         .menu-item.disabled:hover { transform: none; box-shadow: none; border-color: transparent; background: #f8f9fa; }
-        .menu-footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
+        .menu-footer {
+            margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;
+            display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
@@ -51,71 +76,78 @@
     <div class="menu-grid">
         {% set has_labels_access = session.user_rights in ['Администратор', 'Оператор СиМ', 'Мастер СиМ', 'Менеджер ОСЛ'] and session.user_plant == 'Вольгинский' %}
 
-        <!-- Палетные этикетки -->
+        <!-- ПАЛЕТНЫЕ ЭТИКЕТКИ -->
         <a href="{{ url_for('upload.upload_form') if has_labels_access else url_for('main.functionality_not_available') }}" class="menu-item {% if not has_labels_access %}disabled{% endif %}">
             <span class="icon">📦</span>
             <div class="title">Сформировать палетные этикетки (СиМ)</div>
             <div class="description">Загрузка приходного ордера в PDF</div>
         </a>
 
-        <!-- Последний ордер -->
+        <!-- ПОСЛЕДНИЙ ОРДЕР -->
         <a href="{{ url_for('labels.last_order') if has_labels_access else url_for('main.functionality_not_available') }}" class="menu-item {% if not has_labels_access %}disabled{% endif %}">
             <span class="icon">⚡</span>
             <div class="title">Последний ордер</div>
             <div class="description">Быстрое формирование с последнего прихода</div>
         </a>
 
-        <!-- Личная папка -->
+        <!-- ЛИЧНАЯ ПАПКА -->
         <a href="{{ url_for('main.personal_folder') if has_labels_access else url_for('main.functionality_not_available') }}" class="menu-item {% if not has_labels_access %}disabled{% endif %}">
             <span class="icon">📂</span>
             <div class="title">Личная папка с приходными ордерами</div>
             <div class="description">Выбор папки для кнопки «Последний ордер»</div>
         </a>
 
-        <!-- Стеллажная карта -->
+        <!-- СТЕЛЛАЖНАЯ КАРТА (Заглушка) -->
         <a href="{{ url_for('main.functionality_not_available') }}" class="menu-item">
             <span class="icon">🏷️</span>
             <div class="title">Сформировать стеллажную карту (СиМ)</div>
             <div class="description">Формирование стеллажных карт</div>
         </a>
 
-        <!-- Транспортные заявки -->
+        <!-- ТРАНСПОРТНАЯ ЗАЯВКА -->
         <a href="{{ url_for('transport.menu') }}" class="menu-item">
             <span class="icon">🚛</span>
             <div class="title">Сформировать транспортную заявку в РТЭ</div>
             <div class="description">Создание заявок на перевозку</div>
         </a>
 
-        <!-- ТТН -->
+        <!-- ТТН (Заглушка) -->
         <a href="{{ url_for('main.functionality_not_available')}}" class="menu-item">
             <span class="icon">📄</span>
             <div class="title">Сформировать ТТН (наем и собств)</div>
             <div class="description">Товарно-транспортные накладные</div>
         </a>
 
-        <!-- НОВОЕ: Загрузка партий ГП -->
+        <!-- ========================================== -->
+        <!-- НОВОЕ: БЛОК ГП СКРЫТ ДЛЯ ТЕХ, У КОГО НЕТ ПРАВ -->
+        <!-- ========================================== -->
         {% set has_gp_access = session.user_rights in ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП'] %}
-        <a href="{{ url_for('gp_series.import_gp') if has_gp_access else url_for('main.functionality_not_available') }}" class="menu-item {% if not has_gp_access %}disabled{% endif %}">
-            <span class="icon">📥</span>
-            <div class="title">Загрузить партии ГП</div>
-            <div class="description">Импорт новых серий из Excel (SAP)</div>
-        </a>
 
-        <!-- НОВОЕ: Серии ГП на складе -->
-        <a href="{{ url_for('gp_series.list_gp') if has_gp_access else url_for('main.functionality_not_available') }}" class="menu-item {% if not has_gp_access %}disabled{% endif %}">
-            <span class="icon">🏭</span>
-            <div class="title">Серии ГП на складе</div>
-            <div class="description">Список серий для отгрузки</div>
-        </a>
+        {% if has_gp_access %}
+            <!-- ЗАГРУЗИТЬ ПАРТИИ ГП -->
+            <a href="{{ url_for('gp_series.import_gp') }}" class="menu-item">
+                <span class="icon">📥</span>
+                <div class="title">Загрузить партии ГП</div>
+                <div class="description">Импорт новых серий из Excel (SAP)</div>
+            </a>
 
-        <!-- Настройки -->
+            <!-- СЕРИИ ГП НА СКЛАДЕ -->
+            <a href="{{ url_for('gp_series.list_gp') }}" class="menu-item">
+                <span class="icon">🏭</span>
+                <div class="title">Серии ГП на складе</div>
+                <div class="description">Список серий для отгрузки</div>
+            </a>
+        {% endif %}
+        <!-- ========================================== -->
+
+        <!-- НАСТРОЙКИ -->
         <a href="{{ url_for('settings.settings_page')}}" class="menu-item">
             <span class="icon">⚙️</span>
             <div class="title">Настройки</div>
             <div class="description">Параметры системы и управление</div>
         </a>
 
-        <!-- Смена пароля -->
+        <!-- СМЕНА ПАРОЛЯ -->
         <a href="{{ url_for('auth.change_password') }}" class="menu-item">
             <span class="icon">🔑</span>
             <div class="title">Смена пароля</div>

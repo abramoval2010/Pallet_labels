@@ -91,7 +91,7 @@ class GpSeriesDatabase:
             return False, f"Ошибка очистки: {str(e)}"
 
     def import_from_excel(self, filepath, table_name, materials_db):
-        """Парсинг и импорт Excel файла с сериями ГП (с максимально подробной валидацией)"""
+        """Парсинг и импорт Excel файла с сериями ГП (с подробной валидацией)"""
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
@@ -106,7 +106,6 @@ class GpSeriesDatabase:
                     clean_name = str(cell.value).strip().lower()
                     headers_map[clean_name] = cell.column
 
-            # Ожидаемые колонки по ТЗ
             required_cols = {
                 'материал': 'product_code',
                 'партия': 'batch',
