@@ -77,16 +77,24 @@ class GpSeriesDatabase:
             conn.commit()
             return True
 
-    def clear_series(self, table_name, only_shipped=False):
+    def clear_series(self, table_name):
+        """Полностью очищает указанную таблицу (удаляет все записи без исключения)"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                if only_shipped:
-                    cursor.execute(f"DELETE FROM {table_name} WHERE shipped = 1")
-                else:
-                    cursor.execute(f"DELETE FROM {table_name}")
+
+                # Считаем, сколько записей есть сейчас
+                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                count = cursor.fetchone()[0]
+
+                if count == 0:
+                    return False, "База уже пуста. Удалять нечего."
+
+                # Удаляем абсолютно все записи
+                cursor.execute(f"DELETE FROM {table_name}")
                 conn.commit()
-                return True, f"Удалено записей: {cursor.rowcount}"
+                return True, f"База полностью очищена. Удалено записей: {count}"
+
         except Exception as e:
             return False, f"Ошибка очистки: {str(e)}"
 

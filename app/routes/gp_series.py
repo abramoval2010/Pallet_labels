@@ -9,6 +9,7 @@ gp_series_bp = Blueprint('gp_series', __name__)
 
 GP_ACCESS_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП']
 MANAGER_ROLES = ['Администратор', 'Менеджер ОСЛ']
+PALLETS_EDIT_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП']
 
 
 @gp_series_bp.route('/gp/toggle_db', methods=['POST'])
@@ -33,7 +34,7 @@ def toggle_db():
 @gp_series_bp.route('/gp/clear_db', methods=['POST'])
 @login_required
 def clear_db():
-    """Очистка базы данных серий ГП"""
+    """Очистка базы данных серий ГП (удаляет ВСЕ записи)"""
     if session.get('user_rights') not in MANAGER_ROLES:
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
 
@@ -44,9 +45,7 @@ def clear_db():
 
         gp_db = current_app.config.get('gp_series_db')
 
-        # Если база не учебная - удаляем только отгруженные (shipped=1)
-        # Если учебная - удаляем всё
-        success, message = gp_db.clear_series(table_name, only_shipped=not is_training)
+        success, message = gp_db.clear_series(table_name)
 
         if success:
             db = current_app.config.get('db')
@@ -94,7 +93,6 @@ def import_gp():
 
             table_name = 'gp_series_training' if is_training else 'gp_series'
 
-            # Напрямую передаем файл в нашу функцию, которая использует openpyxl
             success, message = gp_db.import_from_excel(filepath, table_name, materials_db)
         finally:
             if os.path.exists(filepath):
@@ -133,18 +131,22 @@ def list_gp():
                            series=series,
                            is_training=is_training,
                            user_rights=session.get('user_rights'),
-                           is_manager=session.get('user_rights') in MANAGER_ROLES)
+                           is_manager=session.get('user_rights') in MANAGER_ROLES,
+                           can_edit_pallets=session.get('user_rights') in PALLETS_EDIT_ROLES)
 
 
-@gp_series_bp.route('/gp/update_pallet/<int:series_id>', methods=['POST'])
+@gp_series_bp.route('/gp/update_pallets/<int:series_id>', methods=['POST'])
 @login_required
-def update_pallet(series_id):
-    if session.get('user_rights') not in GP_ACCESS_ROLES:
+def update_pallets(series_id):
+    """Обновление поля 'Палет' (доступно Мастер/оператор ГП и Менеджер ОСЛ)"""
+    if session.get('user_rights') not in PALLETS_EDIT_ROLES:
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
 
     try:
         pallets = request.form.get('pallets', type=int)
-        if pallets is None or pallets < 0 or pallets > 500:
+
+        # Проверка: integer, >= 0, <= 500
+        if pallets is None or not isinstance(pallets, int) or pallets < 0 or pallets > 500:
             return jsonify({'success': False, 'error': 'Значение должно быть целым числом от 0 до 500'}), 400
 
         settings_manager = current_app.config.get('settings_manager')
