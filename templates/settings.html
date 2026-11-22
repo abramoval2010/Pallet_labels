@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
 <style>
 .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); }
-h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap;}
 .subtitle { color: #666; margin-bottom: 30px; font-size: 16px; }
 .settings-menu { display: flex; flex-direction: column; gap: 20px; }
 .settings-section { background: #f8f9fa; border-radius: 15px; padding: 25px; border-left: 4px solid #9c27b0; transition: all 0.3s ease; }
@@ -57,9 +57,12 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </head>
 <body>
 <div class="container">
-<h1>⚙️ Настройки системы
-{% if is_admin %}<span class="admin-badge">Администратор</span>
-{% elif is_manager %}<span class="manager-badge">Менеджер ОСЛ</span>{% endif %}
+<h1 style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+    <span>⚙️ Настройки системы
+    {% if is_admin %}<span class="admin-badge">Администратор</span>
+    {% elif is_manager %}<span class="manager-badge">Менеджер ОСЛ</span>{% endif %}
+    </span>
+    <a href="{{ url_for('main.view_logs') }}" class="btn btn-secondary" style="font-size: 14px;">📋 Журнал аудита</a>
 </h1>
 <p class="subtitle">Управление параметрами программы</p>
 
@@ -233,7 +236,6 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </div>
 
 <script>
-// Выносим в глобальную область, чтобы кнопка точно нашла функцию
 window.clearGpDatabase = async function() {
     if (!confirm('Вы уверены, что хотите очистить базу данных Серий ГП? Это действие необратимо.')) {
         return;

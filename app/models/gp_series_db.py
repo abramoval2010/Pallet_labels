@@ -45,16 +45,84 @@ class GpSeriesDatabase:
                         sap_writeoff_done INTEGER DEFAULT 0,
                         ul_status TEXT DEFAULT 'На контроле',
                         shipped INTEGER DEFAULT 0,
-                        comments TEXT
+                        comments TEXT,
+                        shipped_by TEXT,
+                        shipped_date TEXT,
+                        shipped_time TEXT
                     )
                 ''')
+                # Миграция для существующих баз
+                cursor.execute(f"PRAGMA table_info({table})")
+                columns = [col[1] for col in cursor.fetchall()]
+                if 'shipped_by' not in columns:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN shipped_by TEXT")
+                if 'shipped_date' not in columns:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN shipped_date TEXT")
+                if 'shipped_time' not in columns:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN shipped_time TEXT")
             conn.commit()
 
-    def get_all(self, table_name):
+    def get_filtered(self, table_name, filter_type='available', sort_by='id', sort_order='desc'):
+        allowed_sort_columns = {
+            'product_code': 'product_code',
+            'name': 'name',
+            'manufacture_date': 'manufacture_date',
+            'expiry_date': 'expiry_date',
+            'storage_temp': 'storage_temp',
+            'palletization': 'palletization',
+            'ul_status': 'ul_status',
+            'sampling_done': 'sampling_done',
+            'sap_writeoff_done': 'sap_writeoff_done',
+            'id': 'id'
+        }
+        sort_column = allowed_sort_columns.get(sort_by, 'id')
+        order = 'ASC' if sort_order.lower() == 'asc' else 'DESC'
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {table_name} WHERE shipped = 0 ORDER BY id DESC")
+            if filter_type == 'can_ship':
+                cursor.execute(f"""
+                    SELECT * FROM {table_name} 
+                    WHERE shipped = 0 
+                      AND ul_status IN ('Ограниченное использование', 'Свободное использование')
+                    ORDER BY {sort_column} {order}
+                """)
+            elif filter_type == 'shipped':
+                cursor.execute(f"SELECT * FROM {table_name} WHERE shipped = 1 ORDER BY {sort_column} {order}")
+            else:
+                cursor.execute(f"SELECT * FROM {table_name} WHERE shipped = 0 ORDER BY {sort_column} {order}")
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_statistics(self, table_name, filter_type='available'):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            where_clause = ""
+            if filter_type == 'can_ship':
+                where_clause = "AND ul_status IN ('Ограниченное использование', 'Свободное использование')"
+            elif filter_type == 'shipped':
+                where_clause = "AND shipped = 1"
+            else:
+                where_clause = "AND shipped = 0"
+
+            cursor.execute(f"""
+                SELECT COUNT(*) as count, SUM(pallets) as total_pallets 
+                FROM {table_name} 
+                WHERE storage_temp = '+15;+25' {where_clause}
+            """)
+            warm = cursor.fetchone()
+
+            cursor.execute(f"""
+                SELECT COUNT(*) as count, SUM(pallets) as total_pallets 
+                FROM {table_name} 
+                WHERE storage_temp = '+2;+8' {where_clause}
+            """)
+            cold = cursor.fetchone()
+
+            return {
+                'warm': {'count': warm['count'] or 0, 'pallets': warm['total_pallets'] or 0},
+                'cold': {'count': cold['count'] or 0, 'pallets': cold['total_pallets'] or 0}
+            }
 
     def get_by_product_and_batch(self, table_name, product_code, batch):
         with self.get_connection() as conn:
@@ -78,36 +146,54 @@ class GpSeriesDatabase:
             return True
 
     def clear_series(self, table_name):
-        """Полностью очищает указанную таблицу (удаляет все записи без исключения)"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-
-                # Считаем, сколько записей есть сейчас
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
                 count = cursor.fetchone()[0]
-
                 if count == 0:
                     return False, "База уже пуста. Удалять нечего."
-
-                # Удаляем абсолютно все записи
                 cursor.execute(f"DELETE FROM {table_name}")
                 conn.commit()
                 return True, f"База полностью очищена. Удалено записей: {count}"
-
         except Exception as e:
             return False, f"Ошибка очистки: {str(e)}"
 
+    def ship_series(self, table_name, series_ids, user_name):
+        if not series_ids:
+            return False, "Не выбрано ни одной серии для отгрузки.", 0, 0
+
+        now = datetime.now()
+        date_str = now.strftime('%Y-%m-%d')
+        time_str = now.strftime('%H:%M:%S')
+
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                placeholders = ','.join('?' for _ in series_ids)
+                cursor.execute(f"SELECT SUM(pallets) FROM {table_name} WHERE id IN ({placeholders})", series_ids)
+                total_pallets = cursor.fetchone()[0] or 0
+
+                cursor.execute(f"""
+                    UPDATE {table_name} 
+                    SET shipped = 1, shipped_by = ?, shipped_date = ?, shipped_time = ?
+                    WHERE id IN ({placeholders})
+                """, [user_name, date_str, time_str] + series_ids)
+
+                conn.commit()
+                return True, f"Успешно отгружено {len(series_ids)} серий ({total_pallets} паллет).", len(
+                    series_ids), total_pallets
+        except Exception as e:
+            return False, f"Ошибка при отгрузке: {str(e)}", 0, 0
+
     def import_from_excel(self, filepath, table_name, materials_db):
-        """Парсинг и импорт Excel файла с сериями ГП (с подробной валидацией)"""
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
 
             if ws.max_row < 2:
-                return False, "Файл пуст или не содержит данных."
+                return False, "Файл пуст или не содержит данных.", 0, 0
 
-            # 1. Поиск заголовков по названиям
             headers_map = {}
             for cell in ws[1]:
                 if cell.value:
@@ -139,9 +225,8 @@ class GpSeriesDatabase:
                     found_errors.append(f"❌ Не найдена колонка: '{search_name}'")
 
             if found_errors:
-                return False, "Неверный формат файла:\n" + "\n".join(found_errors)
+                return False, "Неверный формат файла:\n" + "\n".join(found_errors), 0, 0
 
-            # 2. Проверка данных в строках
             row_errors = []
             max_rows_to_check = min(ws.max_row, 100)
 
@@ -178,9 +263,8 @@ class GpSeriesDatabase:
                     break
 
             if row_errors:
-                return False, "Неверный формат файла:\n" + "\n".join(row_errors)
+                return False, "Неверный формат файла:\n" + "\n".join(row_errors), 0, 0
 
-            # 3. Импорт данных
             imported_count = 0
             updated_count = 0
 
@@ -278,10 +362,10 @@ class GpSeriesDatabase:
                         conn.commit()
                         imported_count += 1
 
-            return True, f"Успешно загружено: {imported_count} новых, обновлено: {updated_count}."
+            return True, f"Успешно загружено: {imported_count} новых, обновлено: {updated_count}.", imported_count, updated_count
 
         except Exception as e:
             print(f"Ошибка импорта: {e}")
             import traceback
             traceback.print_exc()
-            return False, f"Ошибка при чтении файла: {str(e)}"
+            return False, f"Ошибка при чтении файла: {str(e)}", 0, 0

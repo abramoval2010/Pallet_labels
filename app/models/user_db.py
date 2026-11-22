@@ -57,7 +57,6 @@ class UserDatabase:
                 )
             ''')
 
-            # Миграции
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
 
@@ -71,18 +70,43 @@ class UserDatabase:
                 cursor.execute("ALTER TABLE users ADD COLUMN no_password_login INTEGER DEFAULT 0")
                 conn.commit()
 
-            # Переименование роли
             cursor.execute("UPDATE users SET rights = 'Мастер/оператор ГП' WHERE rights = 'Оператор ГП'")
 
+            # Таблица логов
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_login TEXT,
                     action TEXT,
                     details TEXT,
+                    category TEXT DEFAULT 'other',
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+
+            # Миграция для колонки category
+            cursor.execute("PRAGMA table_info(audit_log)")
+            audit_cols = [col[1] for col in cursor.fetchall()]
+            if 'category' not in audit_cols:
+                cursor.execute("ALTER TABLE audit_log ADD COLUMN category TEXT DEFAULT 'other'")
+                conn.commit()
+
+            # АВТОМАТИЧЕСКАЯ МИГРАЦИЯ СТАРЫХ ЛОГОВ
+            # Ищем записи, где категория 'other', но текст содержит подсказки о ГП
+            # Это исправит старые логи, которые были созданы до внедрения категорий.
+            cursor.execute("""
+                UPDATE audit_log 
+                SET category = 'gp_training' 
+                WHERE category = 'other' 
+                  AND (details LIKE '%УЧЕБНУЮ базу%' OR details LIKE '%учебной базы%' OR details LIKE '%gp_series_training%')
+            """)
+            cursor.execute("""
+                UPDATE audit_log 
+                SET category = 'gp_working' 
+                WHERE category = 'other' 
+                  AND (details LIKE '%РАБОЧУЮ базу%' OR details LIKE '%рабочей базы%')
+            """)
+            conn.commit()
 
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS login_audit (
@@ -159,7 +183,6 @@ class UserDatabase:
                 self.log_action(login, 'LOGIN_FAILED', "Попытка входа удаленного пользователя")
                 return None, 'deleted'
 
-            # Если стоит галочка "Входить без пароля" и введен любой пароль
             if user.get('no_password_login') and password:
                 self.log_action(login, 'LOGIN_SUCCESS', "Успешный вход (без пароля)")
                 return user, 'success'
@@ -202,14 +225,12 @@ class UserDatabase:
                 cursor = conn.cursor()
                 fields, values = [], []
 
-                # Обновляем стандартные поля
                 for key in ['email', 'fname', 'lname', 'enterprise', 'plant', 'rights', 'status', 'folder_path',
                             'no_password_login']:
                     if key in new_data:
                         fields.append(f"{key} = ?")
                         values.append(new_data[key])
 
-                # Если передан непустой пароль — обновляем хэш
                 if new_data.get('password'):
                     fields.append("password_hash = ?")
                     values.append(generate_password_hash(new_data['password']))
@@ -280,20 +301,28 @@ class UserDatabase:
             cursor.execute("SELECT * FROM users WHERE rights = ? AND status = 'active'", (rights,))
             return [dict(row) for row in cursor.fetchall()]
 
-    def log_action(self, user_login, action, details):
+    def log_action(self, user_login, action, details, category='other'):
+        """Логирование действия. category: 'other', 'gp_working', 'gp_training'"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO audit_log (user_login, action, details) VALUES (?, ?, ?)",
-                               (user_login, action, details))
+                cursor.execute(
+                    "INSERT INTO audit_log (user_login, action, details, category) VALUES (?, ?, ?, ?)",
+                    (user_login, action, details, category)
+                )
                 conn.commit()
         except Exception as e:
             print(f"Ошибка логирования: {e}")
 
-    def get_audit_log(self, limit=100):
+    def get_audit_log(self, limit=100, category_filter=None):
+        """Получение логов. Если category_filter передан, возвращает только эту категорию"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?", (limit,))
+            if category_filter:
+                cursor.execute("SELECT * FROM audit_log WHERE category = ? ORDER BY timestamp DESC LIMIT ?",
+                               (category_filter, limit))
+            else:
+                cursor.execute("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?", (limit,))
             return [dict(row) for row in cursor.fetchall()]
 
     def get_login_audit(self, limit=100):
@@ -301,3 +330,13 @@ class UserDatabase:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM login_audit ORDER BY timestamp DESC LIMIT ?", (limit,))
             return [dict(row) for row in cursor.fetchall()]
+
+    def delete_audit_log(self, log_id):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM audit_log WHERE id = ?", (log_id,))
+                conn.commit()
+                return True, "Запись удалена"
+        except Exception as e:
+            return False, f"Ошибка при удалении записи: {str(e)}"

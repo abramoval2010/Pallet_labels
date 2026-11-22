@@ -97,7 +97,7 @@
             <div class="description">Выбор папки для кнопки «Последний ордер»</div>
         </a>
 
-        <!-- СТЕЛЛАЖНАЯ КАРТА (Заглушка) -->
+        <!-- СТЕЛЛАЖНАЯ КАРТА -->
         <a href="{{ url_for('main.functionality_not_available') }}" class="menu-item">
             <span class="icon">🏷️</span>
             <div class="title">Сформировать стеллажную карту (СиМ)</div>
@@ -111,34 +111,38 @@
             <div class="description">Создание заявок на перевозку</div>
         </a>
 
-        <!-- ТТН (Заглушка) -->
+        <!-- ТТН -->
         <a href="{{ url_for('main.functionality_not_available')}}" class="menu-item">
             <span class="icon">📄</span>
             <div class="title">Сформировать ТТН (наем и собств)</div>
             <div class="description">Товарно-транспортные накладные</div>
         </a>
 
-        <!-- ========================================== -->
-        <!-- НОВОЕ: БЛОК ГП СКРЫТ ДЛЯ ТЕХ, У КОГО НЕТ ПРАВ -->
-        <!-- ========================================== -->
+        <!-- ЗАГРУЗИТЬ ПАРТИИ ГП (только для ролей) -->
         {% set has_gp_access = session.user_rights in ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП'] %}
-
         {% if has_gp_access %}
-            <!-- ЗАГРУЗИТЬ ПАРТИИ ГП -->
-            <a href="{{ url_for('gp_series.import_gp') }}" class="menu-item">
-                <span class="icon">📥</span>
-                <div class="title">Загрузить партии ГП</div>
-                <div class="description">Импорт новых серий из Excel (SAP)</div>
-            </a>
-
-            <!-- СЕРИИ ГП НА СКЛАДЕ -->
-            <a href="{{ url_for('gp_series.list_gp') }}" class="menu-item">
-                <span class="icon">🏭</span>
-                <div class="title">Серии ГП на складе</div>
-                <div class="description">Список серий для отгрузки</div>
-            </a>
+        <a href="{{ url_for('gp_series.import_gp') }}" class="menu-item">
+            <span class="icon">📥</span>
+            <div class="title">Загрузить партии ГП</div>
+            <div class="description">Импорт новых серий из Excel (SAP)</div>
+        </a>
         {% endif %}
-        <!-- ========================================== -->
+
+        <!-- СЕРИИ ГП НА СКЛАДЕ (только для ролей) -->
+        {% if has_gp_access %}
+        <a href="{{ url_for('gp_series.list_gp') }}" class="menu-item">
+            <span class="icon">🏭</span>
+            <div class="title">Серии ГП на складе</div>
+            <div class="description">Список серий для отгрузки</div>
+        </a>
+        {% endif %}
+
+        <!-- ЖУРНАЛ АУДИТА (доступен всем) -->
+        <a href="{{ url_for('main.view_logs') }}" class="menu-item">
+            <span class="icon">📋</span>
+            <div class="title">Журнал аудита</div>
+            <div class="description">Просмотр истории действий</div>
+        </a>
 
         <!-- НАСТРОЙКИ -->
         <a href="{{ url_for('settings.settings_page')}}" class="menu-item">

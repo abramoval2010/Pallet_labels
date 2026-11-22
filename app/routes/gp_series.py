@@ -15,17 +15,13 @@ PALLETS_EDIT_ROLES = ['Администратор', 'Менеджер ОСЛ', '
 @gp_series_bp.route('/gp/toggle_db', methods=['POST'])
 @login_required
 def toggle_db():
-    """Переключение между рабочей и учебной базой"""
     if session.get('user_rights') not in MANAGER_ROLES:
         flash('Доступ запрещён.', 'danger')
         return redirect(url_for('gp_series.list_gp'))
-
     settings_manager = current_app.config.get('settings_manager')
     current_mode = settings_manager.get('gp_table_mode') or 'working'
     new_mode = 'training' if current_mode == 'working' else 'working'
-
     settings_manager.set('gp_table_mode', new_mode)
-
     mode_name = "Учебная" if new_mode == 'training' else "Рабочая"
     flash(f'База данных переключена на: {mode_name}', 'success')
     return redirect(url_for('gp_series.list_gp'))
@@ -34,22 +30,19 @@ def toggle_db():
 @gp_series_bp.route('/gp/clear_db', methods=['POST'])
 @login_required
 def clear_db():
-    """Очистка базы данных серий ГП (удаляет ВСЕ записи)"""
     if session.get('user_rights') not in MANAGER_ROLES:
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
-
     try:
         settings_manager = current_app.config.get('settings_manager')
         is_training = settings_manager.get('gp_table_mode') == 'training'
         table_name = 'gp_series_training' if is_training else 'gp_series'
-
         gp_db = current_app.config.get('gp_series_db')
-
         success, message = gp_db.clear_series(table_name)
-
         if success:
             db = current_app.config.get('db')
-            db.log_action(session['user'], 'CLEAR_GP_DB', f"Очистка {table_name}: {message}")
+            # Логируем в любом случае, с указанием типа базы
+            db_type = "учебную" if is_training else "рабочую"
+            db.log_action(session['user'], 'CLEAR_GP_DB', f"Очистка {db_type} базы {table_name}: {message}")
             return jsonify({'success': True, 'message': message})
         else:
             return jsonify({'success': False, 'error': message}), 400
@@ -73,11 +66,9 @@ def import_gp():
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'Файл не передан'}), 400
-
         file = request.files['file']
         if not file.filename or not file.filename.lower().endswith(('.xls', '.xlsx')):
             return jsonify({'success': False, 'error': 'Неверный формат. Проверьте правильность выбора файла'}), 400
-
         confirm_training = request.form.get('confirm_training')
         if is_training and confirm_training != 'yes':
             return jsonify({'success': False, 'error': 'Требуется подтверждение для загрузки в учебную базу'}), 400
@@ -90,10 +81,8 @@ def import_gp():
         try:
             gp_db = current_app.config.get('gp_series_db')
             materials_db = current_app.config.get('materials_db')
-
             table_name = 'gp_series_training' if is_training else 'gp_series'
-
-            success, message = gp_db.import_from_excel(filepath, table_name, materials_db)
+            success, message, new_count, upd_count = gp_db.import_from_excel(filepath, table_name, materials_db)
         finally:
             if os.path.exists(filepath):
                 try:
@@ -102,10 +91,17 @@ def import_gp():
                     pass
 
         if success:
+            # ЛОГИРУЕМ ВСЕГДА (и для рабочей, и для учебной)
+            db = current_app.config.get('db')
+            user = db.find_user(session['user'])
+            user_name = f"{user['lname']} {user['fname']}" if user else session['user']
+            db_type = "УЧЕБНУЮ" if is_training else "РАБОЧУЮ"
+            db.log_action(session['user'], 'IMPORT_GP_SERIES',
+                          f"Загрузка в {db_type} базу: {new_count} новых, {upd_count} обновлено. Пользователь: {user_name}")
+
             return jsonify({'success': True, 'message': message})
         else:
             return jsonify({'success': False, 'error': message}), 400
-
     except Exception as e:
         print(f"Ошибка в import_gp: {e}")
         import traceback
@@ -124,38 +120,94 @@ def list_gp():
     is_training = settings_manager.get('gp_table_mode') == 'training'
     table_name = 'gp_series_training' if is_training else 'gp_series'
 
+    filter_type = request.args.get('filter', 'available')
+    if filter_type not in ['available', 'can_ship', 'shipped']:
+        filter_type = 'available'
+
+    sort_by = request.args.get('sort_by', 'id')
+    sort_order = request.args.get('sort_order', 'desc')
+
     gp_db = current_app.config.get('gp_series_db')
-    series = gp_db.get_all(table_name)
+    series = gp_db.get_filtered(table_name, filter_type, sort_by, sort_order)
+    stats = gp_db.get_statistics(table_name, filter_type)
 
     return render_template('gp_list.html',
                            series=series,
+                           stats=stats,
                            is_training=is_training,
                            user_rights=session.get('user_rights'),
                            is_manager=session.get('user_rights') in MANAGER_ROLES,
-                           can_edit_pallets=session.get('user_rights') in PALLETS_EDIT_ROLES)
+                           can_edit_pallets=session.get('user_rights') in PALLETS_EDIT_ROLES,
+                           current_filter=filter_type,
+                           current_sort_by=sort_by,
+                           current_sort_order=sort_order)
+
+
+@gp_series_bp.route('/gp/ship', methods=['POST'])
+@login_required
+def ship():
+    if session.get('user_rights') not in GP_ACCESS_ROLES:
+        return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
+
+    try:
+        series_ids = request.json.get('ids', [])
+        if not series_ids:
+            return jsonify({'success': False, 'error': 'Не выбрано ни одной серии'}), 400
+
+        settings_manager = current_app.config.get('settings_manager')
+        is_training = settings_manager.get('gp_table_mode') == 'training'
+        table_name = 'gp_series_training' if is_training else 'gp_series'
+
+        db = current_app.config.get('db')
+        user = db.find_user(session['user'])
+        user_name = f"{user['lname']} {user['fname']}" if user else session['user']
+
+        gp_db = current_app.config.get('gp_series_db')
+        success, message, count, pallets = gp_db.ship_series(table_name, series_ids, user_name)
+
+        if success:
+            db_type = "учебной" if is_training else "рабочей"
+            db.log_action(session['user'], 'SHIP_GP_SERIES',
+                          f"Отгрузка ({db_type}): {user_name}, {count} серий, {pallets} паллет.")
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'success': False, 'error': message}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @gp_series_bp.route('/gp/update_pallets/<int:series_id>', methods=['POST'])
 @login_required
 def update_pallets(series_id):
-    """Обновление поля 'Палет' (доступно Мастер/оператор ГП и Менеджер ОСЛ)"""
     if session.get('user_rights') not in PALLETS_EDIT_ROLES:
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
-
     try:
         pallets = request.form.get('pallets', type=int)
-
-        # Проверка: integer, >= 0, <= 500
         if pallets is None or not isinstance(pallets, int) or pallets < 0 or pallets > 500:
             return jsonify({'success': False, 'error': 'Значение должно быть целым числом от 0 до 500'}), 400
 
         settings_manager = current_app.config.get('settings_manager')
         is_training = settings_manager.get('gp_table_mode') == 'training'
         table_name = 'gp_series_training' if is_training else 'gp_series'
-
         gp_db = current_app.config.get('gp_series_db')
         gp_db.update_series(table_name, series_id, {'pallets': pallets})
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@gp_series_bp.route('/gp/update_comment/<int:series_id>', methods=['POST'])
+@login_required
+def update_comment(series_id):
+    if session.get('user_rights') != 'Администратор':
+        return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
+    try:
+        comment = request.form.get('comments', '')
+        settings_manager = current_app.config.get('settings_manager')
+        is_training = settings_manager.get('gp_table_mode') == 'training'
+        table_name = 'gp_series_training' if is_training else 'gp_series'
+        gp_db = current_app.config.get('gp_series_db')
+        gp_db.update_series(table_name, series_id, {'comments': comment})
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -166,7 +218,6 @@ def update_pallets(series_id):
 def update_all(series_id):
     if session.get('user_rights') != 'Администратор':
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
-
     try:
         settings_manager = current_app.config.get('settings_manager')
         is_training = settings_manager.get('gp_table_mode') == 'training'
@@ -191,10 +242,25 @@ def update_all(series_id):
             'shipped': 1 if request.form.get('shipped') else 0,
             'comments': request.form.get('comments')
         }
-
         gp_db = current_app.config.get('gp_series_db')
         gp_db.update_series(table_name, series_id, data)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@gp_series_bp.route('/gp/return_to_warehouse/<int:series_id>', methods=['POST'])
+@login_required
+def return_to_warehouse(series_id):
+    if session.get('user_rights') != 'Администратор':
+        return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
+    try:
+        settings_manager = current_app.config.get('settings_manager')
+        is_training = settings_manager.get('gp_table_mode') == 'training'
+        table_name = 'gp_series_training' if is_training else 'gp_series'
+        gp_db = current_app.config.get('gp_series_db')
+        gp_db.update_series(table_name, series_id,
+                            {'shipped': 0, 'shipped_by': None, 'shipped_date': None, 'shipped_time': None})
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
