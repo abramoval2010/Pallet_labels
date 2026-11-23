@@ -79,7 +79,16 @@ class GpSeriesDatabase:
 
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            if filter_type == 'can_ship':
+
+            if filter_type == 'qc_pending':
+                # Специальный фильтр для "Контрольного мастера"
+                cursor.execute(f"""
+                    SELECT * FROM {table_name} 
+                    WHERE ul_status = 'На контроле' 
+                      AND (sampling_done = 0 OR sap_writeoff_done = 0)
+                    ORDER BY {sort_column} {order}
+                """)
+            elif filter_type == 'can_ship':
                 cursor.execute(f"""
                     SELECT * FROM {table_name} 
                     WHERE shipped = 0 
@@ -90,6 +99,7 @@ class GpSeriesDatabase:
                 cursor.execute(f"SELECT * FROM {table_name} WHERE shipped = 1 ORDER BY {sort_column} {order}")
             else:
                 cursor.execute(f"SELECT * FROM {table_name} WHERE shipped = 0 ORDER BY {sort_column} {order}")
+
             return [dict(row) for row in cursor.fetchall()]
 
     def get_statistics(self, table_name, filter_type='available'):
@@ -97,7 +107,9 @@ class GpSeriesDatabase:
             cursor = conn.cursor()
 
             where_clause = ""
-            if filter_type == 'can_ship':
+            if filter_type == 'qc_pending':
+                where_clause = "AND ul_status = 'На контроле' AND (sampling_done = 0 OR sap_writeoff_done = 0)"
+            elif filter_type == 'can_ship':
                 where_clause = "AND ul_status IN ('Ограниченное использование', 'Свободное использование')"
             elif filter_type == 'shipped':
                 where_clause = "AND shipped = 1"
@@ -159,10 +171,8 @@ class GpSeriesDatabase:
             return False, f"Ошибка очистки: {str(e)}"
 
     def ship_series(self, table_name, series_ids, user_name, current_time_str):
-        """Массовая отгрузка выбранных серий с логированием времени"""
         if not series_ids:
             return False, "Не выбрано ни одной серии для отгрузки.", 0, 0
-
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -170,7 +180,6 @@ class GpSeriesDatabase:
                 cursor.execute(f"SELECT SUM(pallets) FROM {table_name} WHERE id IN ({placeholders})", series_ids)
                 total_pallets = cursor.fetchone()[0] or 0
 
-                # current_time_str должен быть в формате "YYYY-MM-DD HH:MM:SS"
                 date_part = current_time_str.split(' ')[0]
                 time_part = current_time_str.split(' ')[1] if ' ' in current_time_str else ''
 
@@ -187,7 +196,7 @@ class GpSeriesDatabase:
             return False, f"Ошибка при отгрузке: {str(e)}", 0, 0
 
     def import_from_excel(self, filepath, table_name, materials_db):
-        # (код метода import_from_excel остаётся без изменений, так как он не влияет на время)
+        # (код метода import_from_excel остаётся без изменений)
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active

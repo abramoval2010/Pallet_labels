@@ -7,7 +7,7 @@ from app.utils.decorators import login_required
 
 gp_series_bp = Blueprint('gp_series', __name__)
 
-GP_ACCESS_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП']
+GP_ACCESS_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП', 'Контрольный мастер']
 MANAGER_ROLES = ['Администратор', 'Менеджер ОСЛ']
 PALLETS_EDIT_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП']
 
@@ -58,7 +58,7 @@ def clear_db():
 @gp_series_bp.route('/gp/import', methods=['GET', 'POST'])
 @login_required
 def import_gp():
-    if session.get('user_rights') not in GP_ACCESS_ROLES:
+    if session.get('user_rights') not in GP_ACCESS_ROLES or session.get('user_rights') == 'Контрольный мастер':
         flash('Доступ запрещён.', 'danger')
         return redirect(url_for('main.index'))
 
@@ -127,9 +127,12 @@ def list_gp():
     is_training = settings_manager.get('gp_table_mode') == 'training'
     table_name = 'gp_series_training' if is_training else 'gp_series'
 
-    filter_type = request.args.get('filter', 'available')
-    if filter_type not in ['available', 'can_ship', 'shipped']:
-        filter_type = 'available'
+    if session.get('user_rights') == 'Контрольный мастер':
+        filter_type = 'qc_pending'
+    else:
+        filter_type = request.args.get('filter', 'available')
+        if filter_type not in ['available', 'can_ship', 'shipped', 'qc_pending']:
+            filter_type = 'available'
 
     sort_by = request.args.get('sort_by', 'id')
     sort_order = request.args.get('sort_order', 'desc')
@@ -148,6 +151,48 @@ def list_gp():
                            current_filter=filter_type,
                            current_sort_by=sort_by,
                            current_sort_order=sort_order)
+
+
+@gp_series_bp.route('/gp/save_qc_changes', methods=['POST'])
+@login_required
+def save_qc_changes():
+    """Сохранение изменений Отбора и Списания SAP (для Контрольного мастера)"""
+    if session.get('user_rights') != 'Контрольный мастер':
+        return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
+
+    try:
+        changes = request.json.get('changes', [])
+        if not changes:
+            return jsonify({'success': False, 'error': 'Нет данных для сохранения'}), 400
+
+        settings_manager = current_app.config.get('settings_manager')
+        is_training = settings_manager.get('gp_table_mode') == 'training'
+        table_name = 'gp_series_training' if is_training else 'gp_series'
+
+        gp_db = current_app.config.get('gp_series_db')
+
+        for change in changes:
+            series_id = change.get('id')
+            sampling_done = 1 if change.get('sampling_done') else 0
+            sap_writeoff_done = 1 if change.get('sap_writeoff_done') else 0
+
+            gp_db.update_series(table_name, series_id, {
+                'sampling_done': sampling_done,
+                'sap_writeoff_done': sap_writeoff_done
+            })
+
+        db = current_app.config.get('db')
+        user = db.find_user(session['user'])
+        user_name = f"{user['lname']} {user['fname']}" if user else session['user']
+        category = 'gp_training' if is_training else 'gp_working'
+
+        db.log_action(session['user'], 'UPDATE_QC_CHANGES',
+                      f"Контрольный мастер {user_name} обновил {len(changes)} записей (Отбор/Списание).",
+                      category=category)
+
+        return jsonify({'success': True, 'message': 'Изменения сохранены'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @gp_series_bp.route('/gp/ship', methods=['POST'])
@@ -169,7 +214,6 @@ def ship():
         user = db.find_user(session['user'])
         user_name = f"{user['lname']} {user['fname']}" if user else session['user']
 
-        # Получаем текущее время с учётом смещения
         current_time_str = settings_manager.get_now().strftime('%Y-%m-%d %H:%M:%S')
 
         gp_db = current_app.config.get('gp_series_db')

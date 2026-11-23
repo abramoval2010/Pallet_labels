@@ -54,7 +54,9 @@ def labels_access_required(f):
         user_plant = session.get('user_plant')
 
         has_access = False
-        if user_rights in ['Администратор', 'Оператор СиМ', 'Мастер СиМ', 'Менеджер ОСЛ'] and user_plant == 'Вольгинский':
+        # Роль 'Контрольный мастер' добавлена для совместимости,
+        # хотя этот функционал ему не предназначен.
+        if user_rights in ['Администратор', 'Оператор СиМ', 'Мастер СиМ', 'Менеджер ОСЛ', 'Контрольный мастер'] and user_plant == 'Вольгинский':
             has_access = True
 
         if not has_access:
