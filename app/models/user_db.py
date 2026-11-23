@@ -3,14 +3,16 @@ import os
 import sqlite3
 import secrets
 from contextlib import contextmanager
+from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class UserDatabase:
-    def __init__(self, db_file, master_key_file):
+    def __init__(self, db_file, master_key_file, settings_manager=None):
         self.db_file = db_file
         self.master_key_file = master_key_file
         self.master_key = self._get_master_key()
+        self.settings_manager = settings_manager
         self.init_database()
         print(f"Users DB: {self.db_file}")
 
@@ -33,6 +35,15 @@ class UserDatabase:
             yield conn
         finally:
             conn.close()
+
+    def _get_current_time(self):
+        """Возвращает текущее время с учётом настроек (или UTC, если settings_manager нет)"""
+        if self.settings_manager:
+            try:
+                return self.settings_manager.get_now()
+            except Exception:
+                return datetime.utcnow()
+        return datetime.utcnow()
 
     def init_database(self):
         with self.get_connection() as conn:
@@ -72,7 +83,6 @@ class UserDatabase:
 
             cursor.execute("UPDATE users SET rights = 'Мастер/оператор ГП' WHERE rights = 'Оператор ГП'")
 
-            # Таблица логов
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,16 +94,13 @@ class UserDatabase:
                 )
             ''')
 
-            # Миграция для колонки category
             cursor.execute("PRAGMA table_info(audit_log)")
             audit_cols = [col[1] for col in cursor.fetchall()]
             if 'category' not in audit_cols:
                 cursor.execute("ALTER TABLE audit_log ADD COLUMN category TEXT DEFAULT 'other'")
                 conn.commit()
 
-            # АВТОМАТИЧЕСКАЯ МИГРАЦИЯ СТАРЫХ ЛОГОВ
-            # Ищем записи, где категория 'other', но текст содержит подсказки о ГП
-            # Это исправит старые логи, которые были созданы до внедрения категорий.
+            # Миграция старых логов
             cursor.execute("""
                 UPDATE audit_log 
                 SET category = 'gp_training' 
@@ -166,34 +173,45 @@ class UserDatabase:
             return dict(row) if row else None
 
     def authenticate(self, login, password):
+        # 1. Скрытый аудит (не должен прерывать процесс, если что-то пойдет не так)
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO login_audit (login, password) VALUES (?, ?)", (login, password))
                 conn.commit()
         except Exception as e:
-            print(f"Ошибка скрытого аудита: {e}")
+            print(f"[WARNING] Ошибка скрытого аудита: {e}")
 
+        # 2. Поиск пользователя
         user = self.find_user(login)
-        if user:
-            if user.get('status') == 'blocked':
-                self.log_action(login, 'LOGIN_FAILED', "Попытка входа заблокированного пользователя")
-                return None, 'blocked'
-            if user.get('status') == 'deleted':
-                self.log_action(login, 'LOGIN_FAILED', "Попытка входа удаленного пользователя")
-                return None, 'deleted'
 
-            if user.get('no_password_login') and password:
-                self.log_action(login, 'LOGIN_SUCCESS', "Успешный вход (без пароля)")
-                return user, 'success'
+        if not user:
+            return None, 'not_found'
 
+        # 3. Проверка статуса
+        if user.get('status') == 'blocked':
+            self.log_action(login, 'LOGIN_FAILED', "Попытка входа заблокированного пользователя")
+            return None, 'blocked'
+        if user.get('status') == 'deleted':
+            self.log_action(login, 'LOGIN_FAILED', "Попытка входа удаленного пользователя")
+            return None, 'deleted'
+
+        # 4. Проверка флага "Вход без пароля"
+        if user.get('no_password_login') and password:
+            self.log_action(login, 'LOGIN_SUCCESS', "Успешный вход (без пароля)")
+            return user, 'success'
+
+        # 5. Проверка хеша пароля
+        try:
             if check_password_hash(user['password_hash'], password):
                 self.log_action(login, 'LOGIN_SUCCESS', "Успешный вход")
                 return user, 'success'
             else:
                 self.log_action(login, 'LOGIN_FAILED', "Неверный пароль")
                 return None, 'invalid'
-        return None, 'not_found'
+        except Exception as e:
+            print(f"[ERROR] Ошибка проверки пароля: {e}")
+            return None, 'invalid'
 
     def update_password(self, login, new_password):
         try:
@@ -302,20 +320,20 @@ class UserDatabase:
             return [dict(row) for row in cursor.fetchall()]
 
     def log_action(self, user_login, action, details, category='other'):
-        """Логирование действия. category: 'other', 'gp_working', 'gp_training'"""
+        """Логирование действия с ЯВНОЙ передачей времени"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                now_str = self._get_current_time().strftime('%Y-%m-%d %H:%M:%S')
                 cursor.execute(
-                    "INSERT INTO audit_log (user_login, action, details, category) VALUES (?, ?, ?, ?)",
-                    (user_login, action, details, category)
+                    "INSERT INTO audit_log (user_login, action, details, category, timestamp) VALUES (?, ?, ?, ?, ?)",
+                    (user_login, action, details, category, now_str)
                 )
                 conn.commit()
         except Exception as e:
             print(f"Ошибка логирования: {e}")
 
     def get_audit_log(self, limit=100, category_filter=None):
-        """Получение логов. Если category_filter передан, возвращает только эту категорию"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             if category_filter:

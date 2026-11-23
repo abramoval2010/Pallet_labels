@@ -40,9 +40,14 @@ def clear_db():
         success, message = gp_db.clear_series(table_name)
         if success:
             db = current_app.config.get('db')
-            # Логируем в любом случае, с указанием типа базы
             db_type = "учебную" if is_training else "рабочую"
-            db.log_action(session['user'], 'CLEAR_GP_DB', f"Очистка {db_type} базы {table_name}: {message}")
+            category = 'gp_training' if is_training else 'gp_working'
+            user = db.find_user(session['user'])
+            user_name = f"{user['lname']} {user['fname']}" if user else session['user']
+
+            db.log_action(session['user'], 'CLEAR_GP_DB',
+                          f"Очистка {db_type} базы {table_name}: {message}. Пользователь: {user_name}",
+                          category=category)
             return jsonify({'success': True, 'message': message})
         else:
             return jsonify({'success': False, 'error': message}), 400
@@ -91,13 +96,15 @@ def import_gp():
                     pass
 
         if success:
-            # ЛОГИРУЕМ ВСЕГДА (и для рабочей, и для учебной)
             db = current_app.config.get('db')
             user = db.find_user(session['user'])
             user_name = f"{user['lname']} {user['fname']}" if user else session['user']
             db_type = "УЧЕБНУЮ" if is_training else "РАБОЧУЮ"
+            category = 'gp_training' if is_training else 'gp_working'
+
             db.log_action(session['user'], 'IMPORT_GP_SERIES',
-                          f"Загрузка в {db_type} базу: {new_count} новых, {upd_count} обновлено. Пользователь: {user_name}")
+                          f"Загрузка в {db_type} базу: {new_count} новых, {upd_count} обновлено. ФИО: {user_name}",
+                          category=category)
 
             return jsonify({'success': True, 'message': message})
         else:
@@ -162,13 +169,18 @@ def ship():
         user = db.find_user(session['user'])
         user_name = f"{user['lname']} {user['fname']}" if user else session['user']
 
+        # Получаем текущее время с учётом смещения
+        current_time_str = settings_manager.get_now().strftime('%Y-%m-%d %H:%M:%S')
+
         gp_db = current_app.config.get('gp_series_db')
-        success, message, count, pallets = gp_db.ship_series(table_name, series_ids, user_name)
+        success, message, count, pallets = gp_db.ship_series(table_name, series_ids, user_name, current_time_str)
 
         if success:
             db_type = "учебной" if is_training else "рабочей"
+            category = 'gp_training' if is_training else 'gp_working'
             db.log_action(session['user'], 'SHIP_GP_SERIES',
-                          f"Отгрузка ({db_type}): {user_name}, {count} серий, {pallets} паллет.")
+                          f"Отгрузка ({db_type}): {user_name}, {count} серий, {pallets} паллет.",
+                          category=category)
             return jsonify({'success': True, 'message': message})
         else:
             return jsonify({'success': False, 'error': message}), 400

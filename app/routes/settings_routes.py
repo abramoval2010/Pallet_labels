@@ -58,6 +58,16 @@ def settings_page():
                     flash('Настройки базы Серий ГП сохранены', 'success')
                 return redirect(url_for('settings.settings_page'))
 
+            if action == 'timezone_settings':
+                if session.get('user_rights') == 'Администратор':
+                    try:
+                        offset = int(request.form.get('timezone_offset', 3))
+                        settings_manager.set('timezone_offset', offset)
+                        flash(f'Часовой пояс обновлён (UTC + {offset} ч.)', 'success')
+                    except ValueError:
+                        flash('Неверное значение часового пояса', 'danger')
+                return redirect(url_for('settings.settings_page'))
+
             if action == 'copy_transport_db':
                 if session.get('user_rights') == 'Администратор':
                     transport_db = current_app.config.get('transport_db')

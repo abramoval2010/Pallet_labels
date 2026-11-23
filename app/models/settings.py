@@ -1,7 +1,7 @@
 # app/models/settings.py
 import os
 import json
-import sys
+from datetime import datetime, timedelta
 from app.utils.helpers import get_app_data_dir
 
 DEFAULT_SETTINGS = {
@@ -11,7 +11,8 @@ DEFAULT_SETTINGS = {
     'shipment_time_2': '10:00',
     'shipment_time_dom_materials': '11:00',
     'transport_table_mode': 'working',
-    'gp_table_mode': 'working', # НОВОЕ
+    'gp_table_mode': 'working',
+    'timezone_offset': 3,  # Смещение от UTC в часах (по умолчанию +3)
     'font_settings': {
         'header_size': 12,
         'product_size_short': 80,
@@ -46,6 +47,7 @@ class SettingsManager:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
 
+                # Дополняем недостающие ключи значениями по умолчанию
                 for key in default:
                     if key not in settings:
                         settings[key] = default[key]
@@ -89,3 +91,8 @@ class SettingsManager:
 
     def get_font_settings(self):
         return self._settings.get('font_settings', DEFAULT_SETTINGS['font_settings'])
+
+    def get_now(self):
+        """Возвращает текущее время с учётом настроенного смещения (UTC + offset)"""
+        offset_hours = self._settings.get('timezone_offset', 3)
+        return datetime.utcnow() + timedelta(hours=offset_hours)

@@ -106,6 +106,23 @@ h1 { color: #1a237e; margin-bottom: 10px; display: flex; align-items: center; ga
 </div>
 </form>
 </div>
+
+<!-- НОВОЕ: Управление временем -->
+<div class="settings-section" style="border-left-color: #607d8b;">
+<h2><span class="icon">⏰</span>Управление временем (Часовой пояс)</h2>
+<div class="desc">Настройка смещения времени от UTC для корректного отображения дат в журналах и при отгрузке</div>
+<form method="POST">
+    <input type="hidden" name="action" value="timezone_settings">
+    <div class="form-row">
+        <div>
+            <label>Смещение от UTC (часов)</label>
+            <input type="number" name="timezone_offset" value="{{ settings.get('timezone_offset', 3) }}" min="-12" max="14" required>
+            <span class="hint">По умолчанию: 3 (Московское время, UTC+3)</span>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary" style="margin-top: 15px; background: linear-gradient(135deg, #607d8b, #78909c);">💾 Сохранить часовой пояс</button>
+</form>
+</div>
 {% endif %}
 
 {% if is_manager %}

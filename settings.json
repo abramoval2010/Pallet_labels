@@ -1,6 +1,11 @@
 {
-    "save_path": "C:\\Users\\Александр\\Documents\\Палетные этикетки",
+    "save_path": "C:\\Users\\Александр\\PycharmProjects\\Pallet_labels_initial\\generated_labels",
     "sop_code": "RUPD.VLG.05.04.C01",
+    "shipment_time_1": "09:00",
+    "shipment_time_2": "10:00",
+    "shipment_time_dom_materials": "11:00",
+    "transport_table_mode": "working",
+    "gp_table_mode": "training",
     "font_settings": {
         "header_size": 12,
         "product_size_short": 80,
@@ -11,16 +16,10 @@
         "supplier_size_long": 36,
         "analytic_size": 117,
         "code_size": 14,
-        "line_spacing": 0.8,
         "line_spacing_short": 1.5,
         "line_spacing_medium": 1.0,
         "line_spacing_long": 0.8,
         "short_name_threshold": 25,
         "medium_name_threshold": 40
-    },
-    "shipment_time_1": "09:00",
-    "shipment_time_2": "10:00",
-    "transport_table_mode": "working",
-    "shipment_time_dom_materials": "11:00",
-    "gp_table_mode": "training"
+    }
 }

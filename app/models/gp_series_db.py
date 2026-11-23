@@ -51,7 +51,6 @@ class GpSeriesDatabase:
                         shipped_time TEXT
                     )
                 ''')
-                # Миграция для существующих баз
                 cursor.execute(f"PRAGMA table_info({table})")
                 columns = [col[1] for col in cursor.fetchall()]
                 if 'shipped_by' not in columns:
@@ -159,13 +158,10 @@ class GpSeriesDatabase:
         except Exception as e:
             return False, f"Ошибка очистки: {str(e)}"
 
-    def ship_series(self, table_name, series_ids, user_name):
+    def ship_series(self, table_name, series_ids, user_name, current_time_str):
+        """Массовая отгрузка выбранных серий с логированием времени"""
         if not series_ids:
             return False, "Не выбрано ни одной серии для отгрузки.", 0, 0
-
-        now = datetime.now()
-        date_str = now.strftime('%Y-%m-%d')
-        time_str = now.strftime('%H:%M:%S')
 
         try:
             with self.get_connection() as conn:
@@ -174,11 +170,15 @@ class GpSeriesDatabase:
                 cursor.execute(f"SELECT SUM(pallets) FROM {table_name} WHERE id IN ({placeholders})", series_ids)
                 total_pallets = cursor.fetchone()[0] or 0
 
+                # current_time_str должен быть в формате "YYYY-MM-DD HH:MM:SS"
+                date_part = current_time_str.split(' ')[0]
+                time_part = current_time_str.split(' ')[1] if ' ' in current_time_str else ''
+
                 cursor.execute(f"""
                     UPDATE {table_name} 
                     SET shipped = 1, shipped_by = ?, shipped_date = ?, shipped_time = ?
                     WHERE id IN ({placeholders})
-                """, [user_name, date_str, time_str] + series_ids)
+                """, [user_name, date_part, time_part] + series_ids)
 
                 conn.commit()
                 return True, f"Успешно отгружено {len(series_ids)} серий ({total_pallets} паллет).", len(
@@ -187,6 +187,7 @@ class GpSeriesDatabase:
             return False, f"Ошибка при отгрузке: {str(e)}", 0, 0
 
     def import_from_excel(self, filepath, table_name, materials_db):
+        # (код метода import_from_excel остаётся без изменений, так как он не влияет на время)
         try:
             wb = load_workbook(filepath, data_only=True)
             ws = wb.active
