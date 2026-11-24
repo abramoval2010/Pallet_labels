@@ -53,10 +53,13 @@ tr.row-green { background-color: #a5d6a7 !important; }
 .modal.active { display: flex; }
 .modal-content { background: white; padding: 20px; border-radius: 10px; max-width: 500px; width: 90%; }
 
-/* Стиль для кликабельных ячеек Контрольного мастера */
 .qc-toggle { cursor: pointer; display: inline-block; padding: 2px 8px; border-radius: 4px; transition: background 0.2s; }
 .qc-toggle:hover { background: rgba(0,0,0,0.05); }
 .qc-changed { font-weight: bold; color: #d84315; }
+.qc-disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Стили для верхней панели действий */
+.top-actions { display: flex; gap: 10px; align-items: center; }
 </style>
 </head>
 <body>
@@ -76,18 +79,24 @@ tr.row-green { background-color: #a5d6a7 !important; }
         {% else %}
             📦 Серии ГП на складе
         {% endif %}
-        <div style="display: flex; gap: 10px;">
+        <div class="top-actions">
             {% if is_manager and current_filter != 'shipped' and session.user_rights != 'Контрольный мастер' %}
             <form action="{{ url_for('gp_series.toggle_db') }}" method="POST" style="margin: 0;">
                 <button type="submit" class="btn btn-secondary" style="font-size: 12px; background: linear-gradient(135deg, #9c27b0, #ab47bc);">🔄 Сменить базу</button>
             </form>
             {% endif %}
+
+            {% if session.user_rights == 'Контрольный мастер' %}
+            <button type="button" class="btn btn-success" style="font-size: 14px;" onclick="saveQcChanges()">
+                💾 Записать выбор
+            </button>
+            {% endif %}
+
             <a href="/" class="btn btn-primary" style="font-size: 12px;">🏠 На главную</a>
         </div>
     </h1>
 
-    <!-- СТАТИСТИКА (для Контрольного мастера скрыта, так как это не его зона ответственности) -->
-    {% if session.user_rights != 'Контрольный мастер' %}
+    <!-- СТАТИСТИКА (показывается всем, включая Контрольного мастера) -->
     <div class="stats-bar">
         <div class="stats-block warm" id="stats-warm">
             <h3>☀️ Теплые (+15;+25)</h3>
@@ -114,7 +123,6 @@ tr.row-green { background-color: #a5d6a7 !important; }
             {% endif %}
         </div>
     </div>
-    {% endif %}
 
     <!-- ФИЛЬТРЫ + КНОПКА ОТГРУЗКИ (для Контрольного мастера фильтры скрыты) -->
     {% if session.user_rights != 'Контрольный мастер' %}
@@ -268,7 +276,6 @@ tr.row-green { background-color: #a5d6a7 !important; }
                         {% endif %}
                     </td>
 
-                    <!-- ЯЧЕЙКИ ОТБОРА И СПИСАНИЯ (для Контрольного мастера - кликабельные) -->
                     {% if session.user_rights == 'Контрольный мастер' %}
                         <td class="col-mid">
                             <span class="qc-toggle {% if item.sampling_done %}qc-changed{% endif %}"
@@ -306,23 +313,13 @@ tr.row-green { background-color: #a5d6a7 !important; }
             </tbody>
         </table>
     </div>
-
-    <!-- КНОПКА СОХРАНЕНИЯ ДЛЯ КОНТРОЛЬНОГО МАСТЕРА -->
-    {% if session.user_rights == 'Контрольный мастер' %}
-    <div style="margin-top: 20px; text-align: center;">
-        <button type="button" class="btn btn-success" style="font-size: 16px; padding: 12px 30px;" onclick="saveQcChanges()">
-            💾 Записать выбор
-        </button>
-    </div>
-    {% endif %}
 </div>
 
-<!-- Модальное окно для Администратора (без изменений) -->
+<!-- Модальное окно для Администратора -->
 <div class="modal" id="editModal">
     <div class="modal-content">
         <h3 style="margin-bottom: 15px;">✏️ Редактирование записи</h3>
         <form id="editForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <!-- ... форма без изменений ... -->
             <input type="hidden" name="id" id="e_id">
             <div><label>Материал</label><input type="number" name="product_code" id="e_product_code" class="form-control"></div>
             <div><label>Партия</label><input type="number" name="batch" id="e_batch" class="form-control"></div>
@@ -374,24 +371,44 @@ let pendingChanges = {}; // { id: { sampling_done: bool, sap_writeoff_done: bool
 
 function toggleQcCell(el) {
     const id = el.dataset.id;
-    const field = el.dataset.field; // 'sampling_done' или 'sap_writeoff_done'
+    const field = el.dataset.field;
 
     // Текущее значение (1/0)
     let currentVal = parseInt(el.dataset.value) || 0;
     let newVal = currentVal === 1 ? 0 : 1;
 
+    // Находим соседнюю ячейку для проверки логики
+    const row = el.closest('tr');
+    const samplingEl = row.querySelector('[data-field="sampling_done"]');
+    const sapEl = row.querySelector('[data-field="sap_writeoff_done"]');
+
+    if (field === 'sap_writeoff_done' && newVal === 1) {
+        // Проверяем, что Отбор тоже True
+        if (samplingEl && parseInt(samplingEl.dataset.value) !== 1) {
+            alert('Нельзя поставить "Списание SAP" = ДА, пока "Отбор" = НЕТ.');
+            return;
+        }
+    }
+
+    if (field === 'sampling_done' && newVal === 0) {
+        // Проверяем, что Списание SAP тоже False
+        if (sapEl && parseInt(sapEl.dataset.value) === 1) {
+            alert('Нельзя снять "Отбор", пока "Списание SAP" = ДА. Сначала снимите "Списание SAP".');
+            return;
+        }
+    }
+
     // Обновляем текст и стиль
     el.innerText = newVal === 1 ? 'ДА' : 'НЕТ';
     el.dataset.value = newVal;
 
-    // Добавляем/убираем жирный шрифт (класс qc-changed)
     if (newVal === 1) {
         el.classList.add('qc-changed');
     } else {
         el.classList.remove('qc-changed');
     }
 
-    // Запоминаем изменение в объекте
+    // Запоминаем изменение
     if (!pendingChanges[id]) {
         pendingChanges[id] = {};
     }
@@ -433,7 +450,6 @@ function saveQcChanges() {
 
 // --- Логика для общих ролей (Палет, Отгрузка, Статистика) ---
 function updateStats() {
-    // ... (код без изменений) ...
     const checkboxes = document.querySelectorAll('.ship-checkbox:checked');
     let warmCount = 0, warmPallets = 0;
     let coldCount = 0, coldPallets = 0;
@@ -465,7 +481,6 @@ function updateStats() {
 }
 
 async function shipSelected() {
-    // ... (код без изменений) ...
     const checkboxes = document.querySelectorAll('.ship-checkbox:checked');
     if (checkboxes.length === 0) {
         alert('Не выбрано ни одной серии для отгрузки.');
@@ -489,7 +504,6 @@ async function shipSelected() {
 }
 
 document.querySelectorAll('.pallet-input').forEach(input => {
-    // ... (код без изменений) ...
     input.addEventListener('change', async function() {
         const id = this.dataset.id;
         const oldValue = this.dataset.default;
@@ -528,10 +542,102 @@ document.querySelectorAll('.pallet-input').forEach(input => {
     });
 });
 
-// ... остальные функции (editFullRow, closeModal) без изменений ...
-window.editFullRow = function(item) { /* ... */ };
-window.closeModal = function() { /* ... */ };
-document.getElementById('editForm').addEventListener('submit', async function(e) { /* ... */ });
+// Обработка комментариев (только для Администратора)
+document.querySelectorAll('.comment-input').forEach(input => {
+    input.addEventListener('change', async function() {
+        const id = this.dataset.id;
+        const oldValue = this.dataset.default;
+        const newValue = this.value.trim();
+        const formData = new FormData();
+        formData.append('comments', newValue);
+        try {
+            const res = await fetch('/gp/update_comment/' + id, { method: 'POST', body: formData });
+            const data = await res.json();
+            if (!data.success) {
+                alert('Ошибка сервера: ' + data.error);
+                this.value = oldValue;
+            } else {
+                this.dataset.default = newValue;
+            }
+        } catch (e) {
+            alert('Ошибка сети при сохранении');
+            this.value = oldValue;
+        }
+    });
+});
+
+// Переключение статуса отгрузки (Администратор)
+async function toggleShipStatus(checkbox) {
+    const id = checkbox.dataset.id;
+    const isShipped = checkbox.checked;
+
+    if (!confirm(`Изменить статус на "${isShipped ? 'Отгружено' : 'На складе'}"?`)) {
+        checkbox.checked = !isShipped;
+        return;
+    }
+    try {
+        const formData = new FormData();
+        formData.append('shipped', isShipped ? '1' : '0');
+        const res = await fetch('/gp/update_all/' + id, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Ошибка: ' + data.error);
+            checkbox.checked = !isShipped;
+        }
+    } catch (e) {
+        alert('Ошибка сети');
+        checkbox.checked = !isShipped;
+    }
+}
+
+window.editFullRow = function(item) {
+    document.getElementById('editModal').style.display = 'flex';
+    document.getElementById('e_id').value = item.id;
+    document.getElementById('e_product_code').value = item.product_code;
+    document.getElementById('e_batch').value = item.batch;
+    document.getElementById('e_name').value = item.name;
+    document.getElementById('e_manufacture_date').value = item.manufacture_date;
+    document.getElementById('e_expiry_date').value = item.expiry_date;
+    document.getElementById('e_free_stock').value = item.free_stock;
+    document.getElementById('e_qc_stock').value = item.qc_stock;
+    document.getElementById('e_blocked_stock').value = item.blocked_stock;
+    document.getElementById('e_palletization').value = item.palletization;
+    document.getElementById('e_pallets').value = item.pallets;
+    document.getElementById('e_sampling_done').checked = item.sampling_done === 1;
+    document.getElementById('e_sap_writeoff_done').checked = item.sap_writeoff_done === 1;
+    document.getElementById('e_shipped').checked = item.shipped === 1;
+    document.getElementById('e_ul_status').value = item.ul_status;
+    document.getElementById('e_storage_temp').value = item.storage_temp;
+    document.getElementById('e_humidity').value = item.humidity;
+    document.getElementById('e_comments').value = item.comments || '';
+};
+
+window.closeModal = function() {
+    document.getElementById('editModal').style.display = 'none';
+};
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('e_id').value;
+    const formData = new FormData(this);
+    if (!document.getElementById('e_sampling_done').checked) formData.delete('sampling_done');
+    if (!document.getElementById('e_sap_writeoff_done').checked) formData.delete('sap_writeoff_done');
+    if (!document.getElementById('e_shipped').checked) formData.delete('shipped');
+
+    try {
+        const res = await fetch('/gp/update_all/' + id, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    } catch (e) {
+        alert('Ошибка сети');
+    }
+});
 </script>
 </body>
 </html>
