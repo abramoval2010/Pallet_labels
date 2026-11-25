@@ -51,8 +51,8 @@
     <div class="menu-grid">
         {% set has_labels_access = session.user_rights in ['Администратор', 'Оператор СиМ', 'Мастер СиМ', 'Менеджер ОСЛ'] and session.user_plant == 'Вольгинский' %}
 
-        <!-- БЛОК ДЛЯ ВСЕХ, КРОМЕ КОНТРОЛЬНОГО МАСТЕРА -->
-        {% if session.user_rights != 'Контрольный мастер' %}
+        <!-- БЛОК ДЛЯ ВСЕХ, КРОМЕ КОНТРОЛЬНОГО МАСТЕРА И УПОЛНОМОЧЕННОГО ЛИЦА -->
+        {% if session.user_rights not in ['Контрольный мастер', 'Уполномоченное лицо'] %}
             <!-- ПАЛЕТНЫЕ ЭТИКЕТКИ -->
             <a href="{{ url_for('upload.upload_form') if has_labels_access else url_for('main.functionality_not_available') }}" class="menu-item {% if not has_labels_access %}disabled{% endif %}">
                 <span class="icon">📦</span>
@@ -106,22 +106,32 @@
             {% endif %}
         {% endif %}
 
-        <!-- СЕРИИ ГП НА СКЛАДЕ (доступна всем ролям, включая Контрольного мастера) -->
-        {% if session.user_rights in ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП', 'Контрольный мастер'] %}
+        <!-- СЕРИИ ГП НА СКЛАДЕ (доступна всем ролям) -->
+        {% if session.user_rights in ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП', 'Контрольный мастер', 'Уполномоченное лицо'] %}
         <a href="{{ url_for('gp_series.list_gp') }}" class="menu-item">
             <span class="icon">🏭</span>
             <div class="title">
                 {% if session.user_rights == 'Контрольный мастер' %}
                     Серии для отбора
+                {% elif session.user_rights == 'Уполномоченное лицо' %}
+                    Серии для выпуска
                 {% else %}
                     Серии ГП на складе
                 {% endif %}
             </div>
-            <div class="description">Список серий для отгрузки</div>
+            <div class="description">
+                {% if session.user_rights == 'Контрольный мастер' %}
+                    Список серий для отбора проб
+                {% elif session.user_rights == 'Уполномоченное лицо' %}
+                    Список серий для выпуска
+                {% else %}
+                    Список серий для отгрузки
+                {% endif %}
+            </div>
         </a>
         {% endif %}
 
-        <!-- ЖУРНАЛ АУДИТА (доступен всем) -->
+        <!-- ЖУРНАЛ АУДИТА -->
         <a href="{{ url_for('main.view_logs') }}" class="menu-item">
             <span class="icon">📋</span>
             <div class="title">Журнал аудита</div>

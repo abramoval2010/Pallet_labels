@@ -6,6 +6,8 @@
 <title>
 {% if session.user_rights == 'Контрольный мастер' %}
     Серии для отбора проб и списания в SAP
+{% elif session.user_rights == 'Уполномоченное лицо' %}
+    Серии для выпуска. Пробы отобраны, списание произошло
 {% elif current_filter == 'shipped' %}
     Отгруженные серии
 {% elif current_filter == 'can_ship' %}
@@ -58,7 +60,9 @@ tr.row-green { background-color: #a5d6a7 !important; }
 .qc-changed { font-weight: bold; color: #d84315; }
 .qc-disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Стили для верхней панели действий */
+.ul-select { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; font-weight: normal; background: white; }
+.ul-select.changed { font-weight: bold; color: #d84315; border-color: #d84315; }
+
 .top-actions { display: flex; gap: 10px; align-items: center; }
 </style>
 </head>
@@ -72,6 +76,8 @@ tr.row-green { background-color: #a5d6a7 !important; }
     <h1>
         {% if session.user_rights == 'Контрольный мастер' %}
             🔬 Серии для отбора проб и списания в SAP
+        {% elif session.user_rights == 'Уполномоченное лицо' %}
+            📋 Серии для выпуска. Пробы отобраны, списание произошло
         {% elif current_filter == 'shipped' %}
             📦 Отгруженные серии
         {% elif current_filter == 'can_ship' %}
@@ -80,7 +86,7 @@ tr.row-green { background-color: #a5d6a7 !important; }
             📦 Серии ГП на складе
         {% endif %}
         <div class="top-actions">
-            {% if is_manager and current_filter != 'shipped' and session.user_rights != 'Контрольный мастер' %}
+            {% if is_manager and current_filter != 'shipped' and session.user_rights not in ['Контрольный мастер', 'Уполномоченное лицо'] %}
             <form action="{{ url_for('gp_series.toggle_db') }}" method="POST" style="margin: 0;">
                 <button type="submit" class="btn btn-secondary" style="font-size: 12px; background: linear-gradient(135deg, #9c27b0, #ab47bc);">🔄 Сменить базу</button>
             </form>
@@ -92,11 +98,17 @@ tr.row-green { background-color: #a5d6a7 !important; }
             </button>
             {% endif %}
 
+            {% if session.user_rights == 'Уполномоченное лицо' %}
+            <button type="button" class="btn btn-success" style="font-size: 14px;" onclick="saveUlChanges()">
+                💾 Записать выбор
+            </button>
+            {% endif %}
+
             <a href="/" class="btn btn-primary" style="font-size: 12px;">🏠 На главную</a>
         </div>
     </h1>
 
-    <!-- СТАТИСТИКА (показывается всем, включая Контрольного мастера) -->
+    <!-- СТАТИСТИКА -->
     <div class="stats-bar">
         <div class="stats-block warm" id="stats-warm">
             <h3>☀️ Теплые (+15;+25)</h3>
@@ -124,8 +136,8 @@ tr.row-green { background-color: #a5d6a7 !important; }
         </div>
     </div>
 
-    <!-- ФИЛЬТРЫ + КНОПКА ОТГРУЗКИ (для Контрольного мастера фильтры скрыты) -->
-    {% if session.user_rights != 'Контрольный мастер' %}
+    <!-- ФИЛЬТРЫ + КНОПКА ОТГРУЗКИ -->
+    {% if session.user_rights not in ['Контрольный мастер', 'Уполномоченное лицо'] %}
     <div class="filter-bar">
         <a href="{{ url_for('gp_series.list_gp', filter='available', sort_by=current_sort_by, sort_order=current_sort_order) }}"
            class="btn btn-primary {% if current_filter == 'available' %}active-filter{% endif %}">
@@ -231,10 +243,7 @@ tr.row-green { background-color: #a5d6a7 !important; }
                     <td class="col-mid">{{ item.ul_status }}</td>
                     <td class="col-mid">
                         {% if user_rights == 'Администратор' %}
-                            <input type="checkbox" class="ship-status-checkbox"
-                                   data-id="{{ item.id }}"
-                                   {% if item.shipped %}checked{% endif %}
-                                   onchange="toggleShipStatus(this)">
+                            <input type="checkbox" class="ship-status-checkbox" data-id="{{ item.id }}" {% if item.shipped %}checked{% endif %} onchange="toggleShipStatus(this)">
                         {% else %}
                             {{ 'Отгружено' if item.shipped else 'На складе' }}
                         {% endif %}
@@ -250,12 +259,8 @@ tr.row-green { background-color: #a5d6a7 !important; }
                     </td>
                     {% else %}
                     <td class="col-check">
-                        {% if current_filter == 'can_ship' and session.user_rights != 'Контрольный мастер' %}
-                        <input type="checkbox" class="ship-checkbox"
-                               data-id="{{ item.id }}"
-                               data-temp="{{ item.storage_temp }}"
-                               data-pallets="{{ item.pallets }}"
-                               onchange="updateStats()">
+                        {% if current_filter == 'can_ship' and session.user_rights not in ['Контрольный мастер', 'Уполномоченное лицо'] %}
+                        <input type="checkbox" class="ship-checkbox" data-id="{{ item.id }}" data-temp="{{ item.storage_temp }}" data-pallets="{{ item.pallets }}" onchange="updateStats()">
                         {% endif %}
                     </td>
                     <td class="col-mid">{{ item.product_code }}</td>
@@ -276,22 +281,15 @@ tr.row-green { background-color: #a5d6a7 !important; }
                         {% endif %}
                     </td>
 
+                    <!-- ЯЧЕЙКИ ОТБОРА И СПИСАНИЯ -->
                     {% if session.user_rights == 'Контрольный мастер' %}
                         <td class="col-mid">
-                            <span class="qc-toggle {% if item.sampling_done %}qc-changed{% endif %}"
-                                  data-id="{{ item.id }}"
-                                  data-field="sampling_done"
-                                  data-value="{{ item.sampling_done }}"
-                                  onclick="toggleQcCell(this)">
+                            <span class="qc-toggle {% if item.sampling_done %}qc-changed{% endif %}" data-id="{{ item.id }}" data-field="sampling_done" data-value="{{ item.sampling_done }}" onclick="toggleQcCell(this)">
                                 {{ 'ДА' if item.sampling_done else 'НЕТ' }}
                             </span>
                         </td>
                         <td class="col-mid">
-                            <span class="qc-toggle {% if item.sap_writeoff_done %}qc-changed{% endif %}"
-                                  data-id="{{ item.id }}"
-                                  data-field="sap_writeoff_done"
-                                  data-value="{{ item.sap_writeoff_done }}"
-                                  onclick="toggleQcCell(this)">
+                            <span class="qc-toggle {% if item.sap_writeoff_done %}qc-changed{% endif %}" data-id="{{ item.id }}" data-field="sap_writeoff_done" data-value="{{ item.sap_writeoff_done }}" onclick="toggleQcCell(this)">
                                 {{ 'ДА' if item.sap_writeoff_done else 'НЕТ' }}
                             </span>
                         </td>
@@ -300,7 +298,20 @@ tr.row-green { background-color: #a5d6a7 !important; }
                         <td class="col-mid">{{ 'ДА' if item.sap_writeoff_done else 'НЕТ' }}</td>
                     {% endif %}
 
-                    <td class="col-mid">{{ item.ul_status }}</td>
+                    <!-- СТАТУС УЛ -->
+                    {% if session.user_rights == 'Уполномоченное лицо' %}
+                        <td class="col-mid">
+                            <select class="ul-select" data-id="{{ item.id }}" data-default="{{ item.ul_status }}" onchange="changeUlStatus(this)">
+                                <option value="На контроле" {% if item.ul_status == 'На контроле' %}selected{% endif %}>На контроле</option>
+                                <option value="Ограниченное использование" {% if item.ul_status == 'Ограниченное использование' %}selected{% endif %}>Ограниченное использование</option>
+                                <option value="Свободное использование" {% if item.ul_status == 'Свободное использование' %}selected{% endif %}>Свободное использование</option>
+                                <option value="Блок" {% if item.ul_status == 'Блок' %}selected{% endif %}>Блок</option>
+                            </select>
+                        </td>
+                    {% else %}
+                        <td class="col-mid">{{ item.ul_status }}</td>
+                    {% endif %}
+
                     <td class="col-wide">{{ item.comments }}</td>
                     {% if user_rights == 'Администратор' %}
                     <td class="col-mid">
@@ -367,23 +378,20 @@ tr.row-green { background-color: #a5d6a7 !important; }
 
 <script>
 // --- Логика для Контрольного мастера ---
-let pendingChanges = {}; // { id: { sampling_done: bool, sap_writeoff_done: bool } }
+let pendingChanges = {};
 
 function toggleQcCell(el) {
     const id = el.dataset.id;
     const field = el.dataset.field;
 
-    // Текущее значение (1/0)
     let currentVal = parseInt(el.dataset.value) || 0;
     let newVal = currentVal === 1 ? 0 : 1;
 
-    // Находим соседнюю ячейку для проверки логики
     const row = el.closest('tr');
     const samplingEl = row.querySelector('[data-field="sampling_done"]');
     const sapEl = row.querySelector('[data-field="sap_writeoff_done"]');
 
     if (field === 'sap_writeoff_done' && newVal === 1) {
-        // Проверяем, что Отбор тоже True
         if (samplingEl && parseInt(samplingEl.dataset.value) !== 1) {
             alert('Нельзя поставить "Списание SAP" = ДА, пока "Отбор" = НЕТ.');
             return;
@@ -391,14 +399,12 @@ function toggleQcCell(el) {
     }
 
     if (field === 'sampling_done' && newVal === 0) {
-        // Проверяем, что Списание SAP тоже False
         if (sapEl && parseInt(sapEl.dataset.value) === 1) {
             alert('Нельзя снять "Отбор", пока "Списание SAP" = ДА. Сначала снимите "Списание SAP".');
             return;
         }
     }
 
-    // Обновляем текст и стиль
     el.innerText = newVal === 1 ? 'ДА' : 'НЕТ';
     el.dataset.value = newVal;
 
@@ -408,7 +414,6 @@ function toggleQcCell(el) {
         el.classList.remove('qc-changed');
     }
 
-    // Запоминаем изменение
     if (!pendingChanges[id]) {
         pendingChanges[id] = {};
     }
@@ -431,6 +436,49 @@ function saveQcChanges() {
     }
 
     fetch('/gp/save_qc_changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes: changesArray })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    })
+    .catch(e => {
+        alert('Ошибка сети при сохранении');
+    });
+}
+
+// --- Логика для Уполномоченного лица ---
+let pendingUlChanges = {};
+
+function changeUlStatus(selectEl) {
+    const id = selectEl.dataset.id;
+    const newValue = selectEl.value;
+
+    selectEl.classList.add('changed');
+    pendingUlChanges[id] = newValue;
+}
+
+function saveUlChanges() {
+    const changesArray = [];
+    for (const [id, ul_status] of Object.entries(pendingUlChanges)) {
+        changesArray.push({
+            id: parseInt(id),
+            ul_status: ul_status
+        });
+    }
+
+    if (changesArray.length === 0) {
+        alert('Нет изменений для сохранения.');
+        return;
+    }
+
+    fetch('/gp/save_ul_changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ changes: changesArray })
@@ -542,7 +590,6 @@ document.querySelectorAll('.pallet-input').forEach(input => {
     });
 });
 
-// Обработка комментариев (только для Администратора)
 document.querySelectorAll('.comment-input').forEach(input => {
     input.addEventListener('change', async function() {
         const id = this.dataset.id;
@@ -566,7 +613,6 @@ document.querySelectorAll('.comment-input').forEach(input => {
     });
 });
 
-// Переключение статуса отгрузки (Администратор)
 async function toggleShipStatus(checkbox) {
     const id = checkbox.dataset.id;
     const isShipped = checkbox.checked;

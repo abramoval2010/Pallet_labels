@@ -7,7 +7,7 @@ from app.utils.decorators import login_required
 
 gp_series_bp = Blueprint('gp_series', __name__)
 
-GP_ACCESS_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП', 'Контрольный мастер']
+GP_ACCESS_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП', 'Контрольный мастер', 'Уполномоченное лицо']
 MANAGER_ROLES = ['Администратор', 'Менеджер ОСЛ']
 PALLETS_EDIT_ROLES = ['Администратор', 'Менеджер ОСЛ', 'Мастер/оператор ГП']
 
@@ -58,7 +58,8 @@ def clear_db():
 @gp_series_bp.route('/gp/import', methods=['GET', 'POST'])
 @login_required
 def import_gp():
-    if session.get('user_rights') not in GP_ACCESS_ROLES or session.get('user_rights') == 'Контрольный мастер':
+    if session.get('user_rights') not in GP_ACCESS_ROLES or session.get('user_rights') in ['Контрольный мастер',
+                                                                                           'Уполномоченное лицо']:
         flash('Доступ запрещён.', 'danger')
         return redirect(url_for('main.index'))
 
@@ -129,9 +130,11 @@ def list_gp():
 
     if session.get('user_rights') == 'Контрольный мастер':
         filter_type = 'qc_pending'
+    elif session.get('user_rights') == 'Уполномоченное лицо':
+        filter_type = 'ul_pending'
     else:
         filter_type = request.args.get('filter', 'available')
-        if filter_type not in ['available', 'can_ship', 'shipped', 'qc_pending']:
+        if filter_type not in ['available', 'can_ship', 'shipped', 'qc_pending', 'ul_pending']:
             filter_type = 'available'
 
     sort_by = request.args.get('sort_by', 'id')
@@ -156,10 +159,8 @@ def list_gp():
 @gp_series_bp.route('/gp/save_qc_changes', methods=['POST'])
 @login_required
 def save_qc_changes():
-    """Сохранение изменений Отбора и Списания SAP (для Контрольного мастера)"""
     if session.get('user_rights') != 'Контрольный мастер':
         return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
-
     try:
         changes = request.json.get('changes', [])
         if not changes:
@@ -188,6 +189,42 @@ def save_qc_changes():
 
         db.log_action(session['user'], 'UPDATE_QC_CHANGES',
                       f"Контрольный мастер {user_name} обновил {len(changes)} записей (Отбор/Списание).",
+                      category=category)
+
+        return jsonify({'success': True, 'message': 'Изменения сохранены'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@gp_series_bp.route('/gp/save_ul_changes', methods=['POST'])
+@login_required
+def save_ul_changes():
+    """Сохранение статусов УЛ (для Уполномоченного лица)"""
+    if session.get('user_rights') != 'Уполномоченное лицо':
+        return jsonify({'success': False, 'error': 'Доступ запрещён'}), 403
+    try:
+        changes = request.json.get('changes', [])
+        if not changes:
+            return jsonify({'success': False, 'error': 'Нет данных для сохранения'}), 400
+
+        settings_manager = current_app.config.get('settings_manager')
+        is_training = settings_manager.get('gp_table_mode') == 'training'
+        table_name = 'gp_series_training' if is_training else 'gp_series'
+
+        gp_db = current_app.config.get('gp_series_db')
+
+        for change in changes:
+            series_id = change.get('id')
+            ul_status = change.get('ul_status')
+            gp_db.update_series(table_name, series_id, {'ul_status': ul_status})
+
+        db = current_app.config.get('db')
+        user = db.find_user(session['user'])
+        user_name = f"{user['lname']} {user['fname']}" if user else session['user']
+        category = 'gp_training' if is_training else 'gp_working'
+
+        db.log_action(session['user'], 'UPDATE_UL_STATUS',
+                      f"Уполномоченное лицо {user_name} обновило {len(changes)} записей (Статус УЛ).",
                       category=category)
 
         return jsonify({'success': True, 'message': 'Изменения сохранены'})
